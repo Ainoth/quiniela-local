@@ -1,0 +1,4 @@
+__pycache__/
+*.pyc
+pronosticos.json
+.venv/
