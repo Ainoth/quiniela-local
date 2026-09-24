@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import heapq
 import json
 import math
 import os
@@ -226,6 +227,7 @@ class QuinielaApp(tk.Tk):
         for sign in ("1", "X", "2"):
             ttk.Button(controls, text=sign, width=5, command=lambda s=sign: self.set_pick(s)).pack(side="left", padx=3)
         ttk.Button(controls, text="Usar sugerencias", command=self.use_suggestions).pack(side="left", padx=(18, 3))
+        ttk.Button(controls, text="Columnas más probables…", command=self.open_system).pack(side="left", padx=3)
         ttk.Button(controls, text="Limpiar", command=self.clear_picks).pack(side="left", padx=3)
         ttk.Button(controls, text="Abrir TULOTERO", command=self.open_tulotero).pack(side="right", padx=(3, 0))
         ttk.Button(controls, text="Copiar apuesta", command=self.copy_bet).pack(side="right", padx=3)
@@ -387,6 +389,114 @@ class QuinielaApp(tk.Tk):
             "Comprueba la jornada, los 14 signos, el Pleno al 15 y el importe antes de confirmar.",
         ):
             webbrowser.open("https://tulotero.es/quiniela/")
+
+    def probable_columns(self, count: int) -> list[tuple[str, float]]:
+        """Devuelve las N combinaciones 1X2 más probables sin enumerar 3^14."""
+        ranked = []
+        for match in self.matches[:14]:
+            options = sorted(zip(("1", "X", "2"), match.probabilities), key=lambda item: item[1], reverse=True)
+            ranked.append(options)
+
+        start = tuple(0 for _ in ranked)
+
+        def score(indices):
+            # Logaritmos evitan pérdida de precisión al multiplicar 14 valores.
+            return sum(math.log(max(ranked[i][index][1] / 100, 1e-12)) for i, index in enumerate(indices))
+
+        heap = [(-score(start), start)]
+        visited = {start}
+        result = []
+        while heap and len(result) < count:
+            negative_score, indices = heapq.heappop(heap)
+            signs = "".join(ranked[i][index][0] for i, index in enumerate(indices))
+            result.append((signs, math.exp(-negative_score) * 100))
+            for position in range(len(indices)):
+                if indices[position] >= 2:
+                    continue
+                candidate = list(indices)
+                candidate[position] += 1
+                candidate_tuple = tuple(candidate)
+                if candidate_tuple not in visited:
+                    visited.add(candidate_tuple)
+                    heapq.heappush(heap, (-score(candidate_tuple), candidate_tuple))
+        return result
+
+    def open_system(self):
+        dialog = tk.Toplevel(self)
+        dialog.title("Columnas más probables")
+        dialog.geometry("670x570")
+        dialog.minsize(560, 430)
+        dialog.transient(self)
+
+        top = ttk.Frame(dialog, padding=12)
+        top.pack(fill="x")
+        ttk.Label(top, text="Número de columnas:").pack(side="left")
+        amount = tk.IntVar(value=10)
+        spin = ttk.Spinbox(top, from_=2, to=100, textvariable=amount, width=6)
+        spin.pack(side="left", padx=6)
+        ttk.Label(
+            top,
+            text="Ordenadas por probabilidad conjunta; cada fila es una apuesta de 14 signos.",
+            foreground="#444",
+        ).pack(side="left", padx=8)
+
+        tree = ttk.Treeview(dialog, columns=("rank", "column", "prob"), show="headings")
+        tree.heading("rank", text="#")
+        tree.heading("column", text="Signos 1–14")
+        tree.heading("prob", text="Probabilidad estimada")
+        tree.column("rank", width=55, anchor="center")
+        tree.column("column", width=260, anchor="center")
+        tree.column("prob", width=160, anchor="e")
+        tree.pack(fill="both", expand=True, padx=12, pady=(0, 8))
+        generated: list[tuple[str, float]] = []
+
+        def generate():
+            nonlocal generated
+            try:
+                requested = max(2, min(100, int(amount.get())))
+            except (ValueError, tk.TclError):
+                requested = 10
+                amount.set(requested)
+            generated = self.probable_columns(requested)
+            for item in tree.get_children():
+                tree.delete(item)
+            for rank, (signs, probability) in enumerate(generated, 1):
+                spaced = " ".join(signs)
+                tree.insert("", "end", values=(rank, spaced, f"{probability:.6f} %"))
+
+        def system_text():
+            pleno = self.predictions.get(self._key(self.matches[14]), "sin definir")
+            lines = [f"QUINIELA {self.season} · JORNADA {self.round_no} · PLENO {pleno}"]
+            lines.extend(f"{index:>3}. {signs}" for index, (signs, _probability) in enumerate(generated, 1))
+            return "\n".join(lines) + "\n"
+
+        def copy_system():
+            if not generated:
+                generate()
+            self.clipboard_clear()
+            self.clipboard_append(system_text())
+            self.update()
+            self.status.configure(text=f"Sistema de {len(generated)} columnas copiado al portapapeles.")
+
+        def export_system():
+            if not generated:
+                generate()
+            target = filedialog.asksaveasfilename(
+                parent=dialog, title="Exportar sistema", defaultextension=".txt",
+                initialfile=f"sistema_{self.season}_J{self.round_no:02d}_{len(generated)}columnas.txt",
+                filetypes=(("Texto", "*.txt"), ("Todos", "*.*")),
+            )
+            if target:
+                Path(target).write_text(system_text(), encoding="utf-8")
+                self.status.configure(text=f"Sistema exportado en {target}")
+
+        buttons = ttk.Frame(dialog, padding=(12, 0, 12, 12))
+        buttons.pack(fill="x")
+        ttk.Button(buttons, text="Generar", command=generate).pack(side="left")
+        ttk.Button(buttons, text="Copiar", command=copy_system).pack(side="left", padx=5)
+        ttk.Button(buttons, text="Exportar…", command=export_system).pack(side="left")
+        ttk.Button(buttons, text="Cerrar", command=dialog.destroy).pack(side="right")
+        generate()
 
 
 def check() -> int:

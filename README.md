@@ -17,6 +17,9 @@ WIN1X2. No modifica sus bases de datos ni necesita conexión a Internet.
 - Valida y copia los 14 signos más el marcador del Pleno al 15.
 - Abre la web oficial de TULOTERO para introducir, revisar y confirmar la
   apuesta manualmente.
+- Genera entre 2 y 100 **columnas más probables**, ordenando combinaciones
+  completas por la probabilidad conjunta de sus 14 signos sin recorrer de
+  forma exhaustiva las 4.782.969 combinaciones posibles.
 
 La probabilidad mostrada es un modelo sencillo, no una garantía ni una
 recomendación de apuesta. Cuando no existe historial suficiente, se usa una
