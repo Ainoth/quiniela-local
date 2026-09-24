@@ -42,3 +42,6 @@ Para comprobar únicamente la lectura de datos:
 ```bash
 python3 quiniela_local/app.py --check
 ```
+
+`update_and_run.sh` actualiza el repositorio con un avance rápido desde GitHub
+y abre la aplicación. Si no hay conexión, utiliza la última versión local.
