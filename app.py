@@ -21,6 +21,15 @@ from tkinter import filedialog, messagebox, ttk
 ROOT = Path(__file__).resolve().parent.parent
 DATA = Path(os.environ.get("WIN1X2_DATA_DIR", ROOT / "Datosg")).expanduser().resolve()
 STATE_FILE = Path(__file__).resolve().parent / "pronosticos.json"
+BET_PRICE = 0.75
+OFFICIAL_REDUCTIONS = (
+    ("Reducción 1", 0, 4, 9),
+    ("Reducción 2", 7, 0, 16),
+    ("Reducción 3", 3, 3, 24),
+    ("Reducción 4", 6, 2, 64),
+    ("Reducción 5", 0, 8, 81),
+    ("Reducción 6", 11, 0, 132),
+)
 
 
 @dataclass
@@ -37,6 +46,49 @@ class Match:
     @property
     def suggestion(self) -> str:
         return ("1", "X", "2")[self.probabilities.index(max(self.probabilities))]
+
+
+@dataclass
+class Plan:
+    name: str
+    bets: int
+    cost: float
+    coverage: float
+    selections: list[str]
+    note: str
+    columns: list[str] | None = None
+
+
+def best_multiple_structure(matches: list[Match], max_bets: int, exact_counts: tuple[int, int] | None = None):
+    """Optimiza signos simples/dobles/triples por masa de probabilidad cubierta."""
+    # Estado: (apuestas, dobles, triples) -> (log(cobertura), selecciones)
+    states = {(1, 0, 0): (0.0, [])}
+    for match in matches[:14]:
+        ordered = sorted(zip(("1", "X", "2"), match.probabilities), key=lambda item: item[1], reverse=True)
+        options = []
+        for size in (1, 2, 3):
+            signs = "".join(item[0] for item in ordered[:size])
+            mass = sum(item[1] for item in ordered[:size]) / 100
+            options.append((size, signs, mass))
+        next_states = {}
+        for (bets, doubles, triples), (score, picks) in states.items():
+            for size, signs, mass in options:
+                new_bets = bets * size
+                if new_bets > max_bets:
+                    continue
+                key = (new_bets, doubles + (size == 2), triples + (size == 3))
+                value = (score + math.log(max(mass, 1e-12)), picks + [signs])
+                if key not in next_states or value[0] > next_states[key][0]:
+                    next_states[key] = value
+        states = next_states
+    candidates = []
+    for (bets, doubles, triples), (score, picks) in states.items():
+        if exact_counts and (doubles, triples) != exact_counts:
+            continue
+        if not exact_counts and bets < 2:
+            continue
+        candidates.append((score, bets, doubles, triples, picks))
+    return max(candidates, default=None, key=lambda item: item[0])
 
 
 def read_text(path: Path) -> str:
@@ -227,6 +279,7 @@ class QuinielaApp(tk.Tk):
         for sign in ("1", "X", "2"):
             ttk.Button(controls, text=sign, width=5, command=lambda s=sign: self.set_pick(s)).pack(side="left", padx=3)
         ttk.Button(controls, text="Usar sugerencias", command=self.use_suggestions).pack(side="left", padx=(18, 3))
+        ttk.Button(controls, text="Optimizar presupuesto…", command=self.open_budget_optimizer).pack(side="left", padx=3)
         ttk.Button(controls, text="Columnas más probables…", command=self.open_system).pack(side="left", padx=3)
         ttk.Button(controls, text="Limpiar", command=self.clear_picks).pack(side="left", padx=3)
         ttk.Button(controls, text="Abrir TULOTERO", command=self.open_tulotero).pack(side="right", padx=(3, 0))
@@ -420,6 +473,166 @@ class QuinielaApp(tk.Tk):
                     visited.add(candidate_tuple)
                     heapq.heappush(heap, (-score(candidate_tuple), candidate_tuple))
         return result
+
+    def budget_plans(self, budget: float) -> list[Plan]:
+        max_bets = max(0, int((budget + 1e-9) // BET_PRICE))
+        if max_bets < 2:
+            return []
+        plans = []
+
+        # La suma de las N columnas de mayor probabilidad es la cobertura exacta
+        # máxima del modelo para N apuestas sencillas distintas.
+        column_count = min(max_bets, 1000)
+        columns_with_probability = self.probable_columns(column_count)
+        plans.append(Plan(
+            "Columnas optimizadas", column_count, column_count * BET_PRICE,
+            sum(probability for _signs, probability in columns_with_probability),
+            [], "Apuestas sencillas distintas, ordenadas por probabilidad conjunta.",
+            [signs for signs, _probability in columns_with_probability],
+        ))
+
+        direct = best_multiple_structure(self.matches, max_bets)
+        if direct:
+            score, bets, doubles, triples, picks = direct
+            plans.append(Plan(
+                "Múltiple directo", bets, bets * BET_PRICE, math.exp(score) * 100,
+                picks, f"Desarrollo completo: {doubles} dobles y {triples} triples.",
+            ))
+
+        for name, doubles, triples, reduced_bets in OFFICIAL_REDUCTIONS:
+            if reduced_bets > max_bets:
+                continue
+            full_bets = (2 ** doubles) * (3 ** triples)
+            structure = best_multiple_structure(self.matches, full_bets, (doubles, triples))
+            if not structure:
+                continue
+            score, _bets, _doubles, _triples, picks = structure
+            # Aproximación conservadora para comparar cobertura de 14: proporción
+            # de columnas jugadas dentro del desarrollo completo.
+            estimated = math.exp(score) * (reduced_bets / full_bets) * 100
+            plans.append(Plan(
+                name, reduced_bets, reduced_bets * BET_PRICE, estimated, picks,
+                f"Oficial: {doubles} dobles + {triples} triples; {full_bets} combinaciones reducidas a {reduced_bets}. "
+                "La cobertura de 14 es estimada; la garantía oficial se refiere también a categorías inferiores.",
+            ))
+        return sorted(plans, key=lambda plan: (plan.coverage, -plan.cost), reverse=True)
+
+    def plan_text(self, plan: Plan) -> str:
+        pleno = self.predictions.get(self._key(self.matches[14]), "sin definir")
+        lines = [
+            f"QUINIELA {self.season} · JORNADA {self.round_no}",
+            f"PLAN: {plan.name}",
+            f"APUESTAS: {plan.bets} · COSTE: {plan.cost:.2f} € · COBERTURA ESTIMADA: {plan.coverage:.6f} %",
+            f"PLENO AL 15: {pleno}",
+            plan.note,
+            "",
+        ]
+        if plan.columns:
+            lines.extend(f"{index:>3}. {column}" for index, column in enumerate(plan.columns, 1))
+        else:
+            for match, signs in zip(self.matches[:14], plan.selections):
+                kind = {1: "Fijo", 2: "Doble", 3: "Triple"}[len(signs)]
+                lines.append(f"{match.number:>2}. {match.home} - {match.away}: {signs} ({kind})")
+        return "\n".join(lines) + "\n"
+
+    def open_budget_optimizer(self):
+        dialog = tk.Toplevel(self)
+        dialog.title("Optimizar por presupuesto")
+        dialog.geometry("880x650")
+        dialog.minsize(720, 520)
+        dialog.transient(self)
+
+        top = ttk.Frame(dialog, padding=12)
+        top.pack(fill="x")
+        ttk.Label(top, text="Presupuesto máximo (€):", font=("Sans", 11, "bold")).pack(side="left")
+        budget_var = tk.StringVar(value="15,00")
+        ttk.Entry(top, textvariable=budget_var, width=10).pack(side="left", padx=7)
+        ttk.Label(top, text="Precio oficial usado: 0,75 € por apuesta", foreground="#444").pack(side="left", padx=8)
+
+        columns = ("recommended", "plan", "bets", "cost", "coverage")
+        tree = ttk.Treeview(dialog, columns=columns, show="headings", height=8, selectmode="browse")
+        for key, title, width in (
+            ("recommended", "", 45), ("plan", "Estrategia", 220), ("bets", "Apuestas", 90),
+            ("cost", "Coste", 100), ("coverage", "Cobertura estimada de 14", 190),
+        ):
+            tree.heading(key, text=title)
+            tree.column(key, width=width, anchor="center" if key != "plan" else "w")
+        tree.pack(fill="x", padx=12)
+
+        detail = tk.Text(dialog, wrap="word", height=18, font=("Monospace", 9), padx=8, pady=8)
+        detail.pack(fill="both", expand=True, padx=12, pady=8)
+        plans: list[Plan] = []
+
+        def selected_plan():
+            selection = tree.selection()
+            return plans[int(selection[0])] if selection else None
+
+        def show_detail(_event=None):
+            plan = selected_plan()
+            if not plan:
+                return
+            detail.configure(state="normal")
+            detail.delete("1.0", "end")
+            detail.insert("1.0", self.plan_text(plan))
+            detail.configure(state="disabled")
+
+        def calculate():
+            nonlocal plans
+            try:
+                budget = float(budget_var.get().replace(",", "."))
+            except ValueError:
+                messagebox.showwarning("Importe no válido", "Introduce un importe como 15,00.", parent=dialog)
+                return
+            plans = self.budget_plans(budget)
+            for item in tree.get_children():
+                tree.delete(item)
+            detail.configure(state="normal")
+            detail.delete("1.0", "end")
+            detail.configure(state="disabled")
+            if not plans:
+                messagebox.showwarning("Presupuesto insuficiente", "El mínimo son 2 apuestas: 1,50 €.", parent=dialog)
+                return
+            for index, plan in enumerate(plans):
+                tree.insert("", "end", iid=str(index), values=(
+                    "★" if index == 0 else "", plan.name, plan.bets,
+                    f"{plan.cost:.2f} €", f"{plan.coverage:.6f} %",
+                ))
+            tree.selection_set("0")
+            show_detail()
+
+        def copy_plan():
+            plan = selected_plan()
+            if plan:
+                self.clipboard_clear()
+                self.clipboard_append(self.plan_text(plan))
+                self.update()
+                self.status.configure(text=f"Plan «{plan.name}» copiado; revisa la apuesta antes de comprar.")
+
+        def export_plan():
+            plan = selected_plan()
+            if not plan:
+                return
+            target = filedialog.asksaveasfilename(
+                parent=dialog, title="Exportar plan", defaultextension=".txt",
+                initialfile=f"plan_{self.season}_J{self.round_no:02d}_{plan.bets}apuestas.txt",
+                filetypes=(("Texto", "*.txt"), ("Todos", "*.*")),
+            )
+            if target:
+                Path(target).write_text(self.plan_text(plan), encoding="utf-8")
+
+        tree.bind("<<TreeviewSelect>>", show_detail)
+        buttons = ttk.Frame(dialog, padding=(12, 0, 12, 12))
+        buttons.pack(fill="x")
+        ttk.Button(buttons, text="Calcular", command=calculate).pack(side="left")
+        ttk.Button(buttons, text="Copiar plan", command=copy_plan).pack(side="left", padx=5)
+        ttk.Button(buttons, text="Exportar…", command=export_plan).pack(side="left")
+        ttk.Button(buttons, text="Cerrar", command=dialog.destroy).pack(side="right")
+        ttk.Label(
+            buttons,
+            text="★ = mayor cobertura estimada según el modelo; no garantiza premio.",
+            foreground="#8a4b00",
+        ).pack(side="right", padx=16)
+        calculate()
 
     def open_system(self):
         dialog = tk.Toplevel(self)

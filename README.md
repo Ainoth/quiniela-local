@@ -20,6 +20,14 @@ WIN1X2. No modifica sus bases de datos ni necesita conexión a Internet.
 - Genera entre 2 y 100 **columnas más probables**, ordenando combinaciones
   completas por la probabilidad conjunta de sus 14 signos sin recorrer de
   forma exhaustiva las 4.782.969 combinaciones posibles.
+- Optimiza un presupuesto en euros y compara columnas sencillas, un desarrollo
+  múltiple directo y las seis reducciones oficiales. Indica partidos fijos,
+  dobles y triples, número de apuestas, coste y cobertura estimada.
+
+El optimizador aplica el precio vigente de 0,75 € por apuesta y un mínimo de
+dos apuestas. Las reducciones oficiales abaratan un desarrollo múltiple, pero
+solo juegan una parte de sus combinaciones; la cobertura mostrada es una
+estimación del modelo y no garantiza premio.
 
 La probabilidad mostrada es un modelo sencillo, no una garantía ni una
 recomendación de apuesta. Cuando no existe historial suficiente, se usa una
