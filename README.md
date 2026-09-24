@@ -1,5 +1,7 @@
 # Quiniela Local
 
+![Icono de Quiniela Local](assets/quiniela-local.png)
+
 Aplicación local y sin registro que lee directamente los datos instalados por
 WIN1X2. No modifica sus bases de datos ni necesita conexión a Internet.
 
