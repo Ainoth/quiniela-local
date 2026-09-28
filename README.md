@@ -9,6 +9,8 @@ WIN1X2. No modifica sus bases de datos ni necesita conexión a Internet.
 
 - Detecta la temporada y la jornada vigente.
 - Lee los 15 partidos y horarios desde `Datosg/PRE*.txt` y `Datosg/Hor*.txt`.
+- El botón **Actualizar datos** vuelve a leer directamente la carpeta
+  `WIN1X2/Datosg`; no usa ni mantiene una copia interna de esos ficheros.
 - Traduce códigos mediante `Datosg/WEQUIPOS.TXT`.
 - Calcula una orientación 1/X/2 con hasta ocho resultados recientes de cada
   equipo y una pequeña corrección por ventaja local.
