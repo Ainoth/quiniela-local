@@ -7,6 +7,7 @@ import argparse
 import heapq
 import json
 import math
+import queue
 import os
 import re
 import threading
@@ -17,6 +18,8 @@ from datetime import date, datetime
 from pathlib import Path
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
+
+from live_results import fetch_live_results, evaluate_live_bets
 
 from quiniela_engine import (
     FilterConfig, analyze, development_size, filter_columns, generate_columns,
@@ -801,27 +804,26 @@ class QuinielaApp(tk.Tk):
         dialog = tk.Toplevel(self)
         dialog.title("Comprobar aciertos y premios")
         dialog.configure(background="#06162c")
-        self._fit_dialog(dialog, 980, 700, 760, 540)
+        self._fit_dialog(dialog, 1120, 780, 900, 640)
         dialog.transient(self)
 
-        hero = ttk.Frame(dialog, padding=(18, 12), style="Hero.TFrame")
+        hero = ttk.Frame(dialog, padding=(12, 5), style="Hero.TFrame")
         hero.pack(fill="x")
-        ttk.Label(hero, text="COMPRUEBA TUS APUESTAS", font=("DejaVu Sans Condensed", 20, "bold"), foreground="#75df91", style="Hero.TLabel").pack(anchor="w")
-        ttk.Label(hero, text="Usa el escrutinio descargado de WIN1X2; los importes aparecen cuando están disponibles.", style="Hero.TLabel").pack(anchor="w")
+        ttk.Label(hero, text="COMPRUEBA TUS APUESTAS", font=("DejaVu Sans Condensed", 17, "bold"), foreground="#75df91", style="Hero.TLabel").pack(anchor="w")
 
-        bottom = ttk.Frame(dialog, padding=(12, 6, 12, 12))
+        bottom = ttk.Frame(dialog, padding=(10, 4, 10, 6))
         bottom.pack(side="bottom", fill="x")
-        content = ttk.Frame(dialog, padding=12)
+        content = ttk.Frame(dialog, padding=(10, 4))
         content.pack(fill="both", expand=True)
 
         source = tk.StringVar(value="current")
         file_path = tk.StringVar()
         loaded_bets: list[str] = []
-        controls = ttk.LabelFrame(content, text="  APUESTAS Y JORNADA  ", padding=10, style="Workflow.TLabelframe")
+        controls = ttk.Frame(content, padding=4)
         controls.pack(fill="x")
-        ttk.Radiobutton(controls, text="Desarrollo generado actualmente", variable=source, value="current").grid(row=0, column=0, sticky="w")
-        ttk.Radiobutton(controls, text="Cargar fichero TXT exportado", variable=source, value="file").grid(row=1, column=0, sticky="w", pady=(6, 0))
-        ttk.Entry(controls, textvariable=file_path, state="readonly", width=48).grid(row=1, column=1, sticky="ew", padx=8, pady=(6, 0))
+        ttk.Radiobutton(controls, text="Desarrollo actual", variable=source, value="current").grid(row=0, column=0, sticky="w")
+        ttk.Radiobutton(controls, text="Archivo TXT", variable=source, value="file").grid(row=1, column=0, sticky="w", pady=(2, 0))
+        ttk.Entry(controls, textvariable=file_path, state="readonly", width=48).grid(row=1, column=1, sticky="ew", padx=8, pady=(2, 0))
         controls.columnconfigure(1, weight=1)
 
         def choose_file():
@@ -838,36 +840,164 @@ class QuinielaApp(tk.Tk):
             source.set("file")
             source_label.configure(text=f"Archivo cargado: {len(bets):,} apuestas")
 
-        ttk.Button(controls, text="Elegir TXT…", command=choose_file, style="Purple.TButton").grid(row=1, column=2, pady=(6, 0))
+        ttk.Button(controls, text="Elegir TXT…", command=choose_file, style="Purple.TButton").grid(row=1, column=2, pady=(2, 0))
         ttk.Label(controls, text="Jornada:").grid(row=0, column=1, sticky="e", padx=(8, 2))
         round_var = tk.IntVar(value=self.round_no)
         ttk.Spinbox(controls, from_=1, to=99, textvariable=round_var, width=5).grid(row=0, column=2, sticky="w")
 
-        source_label = ttk.Label(content, text="", style="Big.TLabel", padding=(0, 10))
+        source_label = ttk.Label(content, text="", font=("DejaVu Sans", 12, "bold"), foreground="#20cbef", padding=(0, 4))
         source_label.pack(fill="x")
-        result_label = ttk.Label(content, text="Selecciona la fuente y pulsa Comprobar.", style="Card.TLabel", padding=10)
-        result_label.pack(fill="x", pady=(0, 8))
+        result_label = ttk.Label(content, text="Selecciona la fuente y pulsa Comprobar.", style="Card.TLabel", padding=(6, 3))
+        result_label.pack(fill="x", pady=(0, 4))
+        def wrap_labels(event):
+            source_label.configure(wraplength=max(250, event.width - 12))
+            result_label.configure(wraplength=max(250, event.width - 32))
+        content.bind("<Configure>", wrap_labels)
 
-        panes = ttk.Frame(content)
-        panes.pack(fill="both", expand=True)
-        distribution = ttk.Treeview(panes, columns=("category", "mine", "official", "prize", "total"), show="headings", height=7)
-        for key, title, width in (
-            ("category", "Categoría", 105), ("mine", "Tus apuestas", 100), ("official", "Acertantes oficiales", 135),
+        tabs = ttk.Notebook(content)
+        tabs.pack(fill="both", expand=True)
+        live_page = ttk.Frame(tabs)
+        bets_page = ttk.Frame(tabs)
+        panes = ttk.Frame(tabs)
+        tabs.add(live_page, text="● Marcadores en directo")
+        tabs.add(bets_page, text="Tus aciertos provisionales")
+        tabs.add(panes, text="Escrutinio y premios")
+
+        table_style = f"Checker{id(dialog)}.Treeview"
+        style = ttk.Style(dialog)
+        style.configure(table_style, rowheight=24, font=("DejaVu Sans Condensed", 9, "bold"),
+                        background="#ffffff", fieldbackground="#ffffff", foreground="#082b70",
+                        bordercolor="#b8c8d8", lightcolor="#b8c8d8", darkcolor="#b8c8d8")
+        style.configure(table_style + ".Heading", font=("DejaVu Sans Condensed", 8, "bold"),
+                        background="#e8edf4", foreground="#30445c", bordercolor="#b8c8d8", padding=(1, 2))
+        style.map(table_style, background=[("selected", "#ccecff")], foreground=[("selected", "#071a33")])
+        pagers = {}
+
+        def make_table(parent, columns, page_size=None, rows=15):
+            holder = ttk.Frame(parent)
+            holder.pack(fill="both", expand=True)
+            table = ttk.Treeview(holder, columns=tuple(c[0] for c in columns),
+                                 show="headings", height=rows, style=table_style)
+            if page_size:
+                bar = ttk.Frame(holder)
+                bar.pack(side="bottom", fill="x")
+                data = {"rows": [], "page": 0, "size": page_size}
+                def render():
+                    count = max(1, (len(data["rows"]) + page_size - 1) // page_size)
+                    data["page"] = max(0, min(data["page"], count - 1))
+                    table.delete(*table.get_children())
+                    offset = data["page"] * page_size
+                    for i, values in enumerate(data["rows"][offset:offset + page_size]):
+                        table.insert("", "end", values=values, tags=("even" if i % 2 == 0 else "odd",))
+                    label.configure(text=f"Página {data['page'] + 1} / {count} · {len(data['rows'])} columnas")
+                    previous.configure(state="normal" if data["page"] else "disabled")
+                    following.configure(state="normal" if data["page"] + 1 < count else "disabled")
+                def move(delta):
+                    data["page"] += delta
+                    render()
+                previous = ttk.Button(bar, text="‹ Anterior", command=lambda: move(-1))
+                previous.pack(side="left")
+                label = ttk.Label(bar, anchor="center")
+                label.pack(side="left", fill="x", expand=True)
+                following = ttk.Button(bar, text="Siguiente ›", command=lambda: move(1))
+                following.pack(side="right")
+                pagers[table] = (data, render)
+                render()
+            table.pack(fill="both", expand=True)
+            for key, title, width in columns:
+                table.heading(key, text=title)
+                table.column(key, width=width, minwidth=25, anchor="center", stretch=False)
+            def fit_columns(event):
+                total = sum(c[2] for c in columns)
+                available = max(1, event.width - 4)
+                widths = [int(available * c[2] / total) for c in columns]
+                widths[-1] += available - sum(widths)
+                for (key, _, _), width in zip(columns, widths):
+                    table.column(key, width=width)
+            table.bind("<Configure>", fit_columns)
+            table.tag_configure("even", background="#ffffff", foreground="#082b70")
+            table.tag_configure("odd", background="#eef3f8", foreground="#082b70")
+            table.tag_configure("pleno", background="#fff0f0", foreground="#082b70")
+            return table
+
+        def set_rows(table, rows):
+            if table in pagers:
+                data, render = pagers[table]
+                data["rows"] = list(rows)
+                render()
+            else:
+                table.delete(*table.get_children())
+                for i, values in enumerate(rows):
+                    tag = "pleno" if table is live_table and i == 14 else "even" if i % 2 == 0 else "odd"
+                    table.insert("", "end", values=values, tags=(tag,))
+                if table is live_table:
+                    dialog.after_idle(draw_result_cells)
+
+        live_table = make_table(live_page, (
+            ("n", "Nº", 35), ("match", "Partido", 335),
+            ("score", "Marcador", 90), ("sign", "1     X     2 / P15", 115), ("status", "Estado", 215),
+        ))
+        live_table.column("match", anchor="w")
+        result_cells = []
+
+        def draw_result_cells(event=None):
+            if not live_table.winfo_exists():
+                return
+            for cell in result_cells:
+                cell.destroy()
+            result_cells.clear()
+            for item in live_table.get_children():
+                values = live_table.item(item, "values")
+                pleno = str(values[0]) == "15"
+                for column in ("score", "sign"):
+                    box = live_table.bbox(item, column)
+                    if not box:
+                        continue
+                    x, y, width, height = box
+                    frame = tk.Frame(live_table, background="#ffaaaa")
+                    frame.place(x=x, y=y, width=width, height=height)
+                    result_cells.append(frame)
+                    value = str(values[2 if column == "score" else 3])
+                    if column == "sign" and not pleno:
+                        labels = [(sign, value == sign) for sign in ("1", "X", "2")]
+                    elif column == "sign" and pleno and len(value) == 2:
+                        labels = [(sign, True) for sign in value]
+                    else:
+                        labels = [(value, value != "—")]
+                    for index, (text, active) in enumerate(labels):
+                        cell = tk.Label(frame, text=text, font=("DejaVu Sans", 9, "bold"),
+                            background="#e94d5c" if active else "#fffafa",
+                            foreground="white" if active else "#ef7777", bd=0)
+                        cell.place(relx=index / len(labels), rely=0, relwidth=1 / len(labels),
+                                   relheight=1, x=1, y=1, width=-2, height=-2)
+        live_table.bind("<Configure>", lambda event: dialog.after_idle(draw_result_cells), add="+")
+        ttk.Label(bets_page, text="Ahora: partidos con marcador · Confirmados: finalizados · Máximo: descontando fallos definitivos",
+                  style="Card.TLabel", font=("Sans", 9)).pack(side="bottom", fill="x")
+        live_bets = make_table(bets_page, (
+            ("bet", "Mejores 100 columnas", 210), ("hits", "Aciertos ahora", 130),
+            ("fixed", "Confirmados", 105), ("max", "Máximo posible", 125), ("pleno", "Pleno al 15", 150),
+        ), page_size=12, rows=12)
+        distribution = make_table(panes, (
+            ("category", "Categoría", 100), ("mine", "Tus apuestas", 100), ("official", "Acertantes oficiales", 150),
             ("prize", "Premio/apuesta", 120), ("total", "Premio calculado", 130),
-        ):
-            distribution.heading(key, text=title)
-            distribution.column(key, width=width, anchor="center")
-        distribution.pack(side="left", fill="both", expand=True)
-        best = ttk.Treeview(panes, columns=("bet", "hits", "pleno"), show="headings", height=7)
-        for key, title, width in (("bet", "Mejores columnas", 205), ("hits", "Aciertos", 70), ("pleno", "P15", 55)):
-            best.heading(key, text=title)
-            best.column(key, width=width, anchor="center")
-        best.pack(side="left", fill="both", expand=True, padx=(8, 0))
+        ), rows=6)
+        best = make_table(panes, (
+            ("bet", "Mejores 100 columnas", 300), ("hits", "Aciertos", 100), ("pleno", "P15", 100),
+        ), page_size=5, rows=5)
+
+        def fit_rows(event=None):
+            # Reserva cabecera y bordes: siempre caben los 15 partidos completos.
+            height = max(18, min(32, ((event.height if event else live_page.winfo_height()) - 30) // 15))
+            style.configure(table_style, rowheight=height,
+                            font=("DejaVu Sans Condensed", 9, "bold"))
+            dialog.after_idle(draw_result_cells)
+        for page in (live_page, bets_page, panes):
+            page.bind("<Configure>", fit_rows)
 
         def current_bets():
             if not self.current_development_columns:
                 raise ValueError("No hay un desarrollo generado. Usa «Crear desarrollo» o carga un TXT.")
-            pleno = self.predictions.get(self._key(self.matches[14]), "")
+            pleno = self.predictions.get(self._key(self.matches[14]), "") if len(self.matches) >= 15 else ""
             suffix = pleno.replace("-", "") if re.fullmatch(r"[012M]-[012M]", pleno) else ""
             return ["".join(column) + suffix for column in self.current_development_columns]
 
@@ -886,7 +1016,7 @@ class QuinielaApp(tk.Tk):
                 result_label.configure(text=f"Jornada {selected_round}: todavía no hay resultados completos en los datos descargados.", foreground="#ffe066")
                 source_label.configure(text=f"{len(bets):,} apuestas listas para comprobar cuando termine la jornada")
                 for tree in (distribution, best):
-                    tree.delete(*tree.get_children())
+                    set_rows(tree, [])
                 return
             evaluations = evaluate_bets(bets, scrutiny["result"], scrutiny["pleno"])
             counts = defaultdict(int)
@@ -901,23 +1031,116 @@ class QuinielaApp(tk.Tk):
                 estimated_total += subtotal
                 label = "14 + Pleno" if category == 15 else str(category)
                 distribution.insert("", "end", values=(label, mine, official_winners, f"{prize:,.2f} €", f"{subtotal:,.2f} €"))
-            best.delete(*best.get_children())
             ordered = sorted(evaluations, key=lambda item: (item["category"], item["hits"], item["pleno_hit"]), reverse=True)
-            for item in ordered[:100]:
-                best.insert("", "end", values=(item["bet"], item["hits"], "Sí" if item["pleno_hit"] else "No"))
+            set_rows(best, [(item["bet"], item["hits"], "Sí" if item["pleno_hit"] else "No") for item in ordered[:100]])
             source_label.configure(text=f"{len(bets):,} apuestas · mejor resultado: {ordered[0]['category']} · premio calculado: {estimated_total:,.2f} €")
             result_label.configure(
                 text=f"Jornada {selected_round} · Resultado: {scrutiny['result']} · Pleno: {scrutiny['pleno'][0]}-{scrutiny['pleno'][1]} · Datos locales descargados",
                 foreground="#75df91",
             )
 
-        ttk.Button(bottom, text="★ Comprobar", command=check_bets, style="Green.TButton").pack(side="left")
-        ttk.Button(bottom, text="↻ Descargar datos", command=self.update_from_internet, style="Soft.TButton").pack(side="left", padx=6)
-        ttk.Button(bottom, text="Cerrar", command=dialog.destroy, style="Red.TButton").pack(side="right")
-        if self.current_development_columns:
-            source_label.configure(text=f"Desarrollo actual: {len(self.current_development_columns):,} apuestas")
-        else:
-            source_label.configure(text="No hay desarrollo actual; puedes cargar un TXT exportado")
+        responses = queue.Queue()
+        auto = tk.BooleanVar(value=True)
+        state = {"busy": False, "closed": False, "timer": None, "poll": None, "generation": 0}
+
+        def clear_views(*_):
+            state["generation"] += 1
+            for tree in (live_table, live_bets, distribution, best):
+                set_rows(tree, [])
+            source_label.configure(text="Selección modificada; pulsa Actualizar ahora.")
+            result_label.configure(text="Sin consultar para esta selección.", foreground="#ffe066")
+
+        for variable in (round_var, source, file_path):
+            variable.trace_add("write", clear_views)
+
+        def refresh(manual=True):
+            if state["closed"] or state["busy"]:
+                return
+            if state["timer"]:
+                dialog.after_cancel(state["timer"])
+                state["timer"] = None
+            try:
+                selected_round = int(round_var.get())
+                if not 1 <= selected_round <= 99:
+                    raise ValueError("La jornada debe estar entre 1 y 99.")
+                bets = current_bets() if source.get() == "current" and self.current_development_columns else list(loaded_bets) if source.get() == "file" else []
+            except (ValueError, tk.TclError) as exc:
+                result_label.configure(text=str(exc), foreground="#ffe066")
+                schedule()
+                return
+            if tabs.select() == str(panes):
+                tabs.select(live_page)
+            generation = state["generation"]
+            state["busy"] = True
+            refresh_button.configure(state="disabled")
+            result_label.configure(text=f"Consultando jornada {selected_round}…", foreground="#ffe066")
+
+            def worker():
+                try:
+                    matches = fetch_live_results(self.season, selected_round)
+                    evaluations = evaluate_live_bets(bets, matches)
+                    responses.put((generation, selected_round, matches, evaluations, None))
+                except Exception as exc:
+                    responses.put((generation, selected_round, None, None, str(exc)))
+            threading.Thread(target=worker, daemon=True).start()
+
+        def schedule():
+            if state["timer"]:
+                dialog.after_cancel(state["timer"])
+                state["timer"] = None
+            if auto.get() and not state["closed"]:
+                state["timer"] = dialog.after(60_000, lambda: refresh(False))
+
+        def poll():
+            if state["closed"]:
+                return
+            try:
+                generation, selected_round, matches, evaluations, error = responses.get_nowait()
+            except queue.Empty:
+                pass
+            else:
+                state["busy"] = False
+                refresh_button.configure(state="normal")
+                if generation == state["generation"]:
+                    if error:
+                        result_label.configure(text=f"Sin actualización: {error}\nLos datos anteriores, si aparecen, no están actualizados.", foreground="#ffe066")
+                    else:
+                        set_rows(live_table, [(match.number, f"{match.home.title()}  -  {match.away.title()}", match.score,
+                            (match.pleno if match.number == 15 else match.sign) or "—",
+                            re.sub(r"minuto\s*(\d+)", r"\1′", match.status)) for match in matches])
+                        set_rows(live_bets, [(item["bet"], f'{item["hits"]} / {item["known"]}',
+                            item["fixed"], item["maximum"], item["pleno"]) for item in evaluations[:100]])
+                        final_count = sum(m.final for m in matches)
+                        source_label.configure(text=(f'{len(evaluations):,} apuestas · mejor: {evaluations[0]["hits"]} aciertos sobre {evaluations[0]["known"]} con marcador'
+                            if evaluations else "Carga un TXT o genera un desarrollo para ver tus aciertos."))
+                        stamps = [m.updated for m in matches if m.updated]
+                        stamp = datetime.fromtimestamp(min(stamps)).strftime("%d/%m %H:%M:%S") if len(stamps) == 15 else "sin hora de origen"
+                        result_label.configure(text=f"Jornada {selected_round} · {final_count}/15 finalizados · Fuente: Quinielista / Dataradar\nDatos: {stamp} · Consulta: {datetime.now():%H:%M:%S} · Aciertos provisionales; premios en Escrutinio.", foreground="#75df91")
+                schedule()
+            state["poll"] = dialog.after(100, poll)
+
+        def close():
+            state["closed"] = True
+            for key in ("timer", "poll"):
+                if state[key]:
+                    dialog.after_cancel(state[key])
+            dialog.destroy()
+
+        refresh_button = ttk.Button(bottom, text="↻ Actualizar ahora", command=refresh, style="Green.TButton")
+        refresh_button.pack(side="left")
+        ttk.Checkbutton(bottom, text="Automático · 60 s", variable=auto, command=schedule).pack(side="left", padx=8)
+        def official():
+            auto.set(False)
+            schedule()
+            state["generation"] += 1
+            tabs.select(panes)
+            check_bets()
+        ttk.Button(bottom, text="Escrutinio oficial", command=official, style="Soft.TButton").pack(side="left", padx=6)
+        ttk.Button(bottom, text="Descargar datos", command=self.update_from_internet, style="Soft.TButton").pack(side="left")
+        ttk.Button(bottom, text="Cerrar", command=close, style="Red.TButton").pack(side="right")
+        dialog.protocol("WM_DELETE_WINDOW", close)
+        poll()
+        refresh()
 
 
     def _selected_suggestion(self) -> str:

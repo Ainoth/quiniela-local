@@ -60,3 +60,19 @@ python3 quiniela_local/app.py --check
 
 `update_and_run.sh` actualiza el repositorio con un avance rápido desde GitHub
 y abre la aplicación. Si no hay conexión, utiliza la última versión local.
+
+## Seguimiento en directo
+
+En **Comprobar aciertos y premios**, la pestaña **Marcadores en directo** consulta
+el marcador público de Quinielista/Dataradar al abrir y cada 60 segundos. Puedes
+desactivar el refresco automático o pulsar **Actualizar ahora**. Muestra la hora
+de origen y de consulta; la frecuencia y el retraso de los resultados dependen
+del proveedor. Si falla la conexión, avisa y conserva la última consulta visible.
+
+**Tus aciertos provisionales** compara tu desarrollo o TXT con los partidos que
+ya tienen marcador, sin tratar los pendientes como empates. Los confirmados
+cuentan únicamente partidos finalizados; el máximo posible solo descuenta fallos
+definitivos. El Pleno usa M para tres o más goles. No calcula premios a partir de
+marcadores provisionales: **Escrutinio oficial** conserva la consulta de WIN1X2.
+El directo valida temporada, jornada y numeración; si la fuente ya no ofrece una
+jornada antigua, se puede consultar su escrutinio local.
