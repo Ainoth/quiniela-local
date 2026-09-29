@@ -2,8 +2,12 @@ import math
 import tempfile
 import unittest
 from pathlib import Path
+from types import MethodType, SimpleNamespace
 
-from app import parse_results
+from app import (
+    Match, QuinielaApp, decode_pleno, evaluate_bets, parse_results,
+    parse_scrutiny, quinielista_text, read_bet_file,
+)
 from data_updater import read_percentages
 
 from quiniela_engine import (
@@ -14,6 +18,61 @@ from quiniela_engine import (
 
 
 class EngineTests(unittest.TestCase):
+    def test_scrutiny_and_bet_evaluation(self):
+        prefix = "9 0 0 2 53 648 4639 108988,09 232507,92 54494,05 2056,38 168,19 28,19"
+        line = prefix.ljust(104) + "12XX121112122XB" + "ABC" * 30 + " " * 24
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "PRE26-27.txt"
+            path.write_text(line + "\n", encoding="latin-1")
+            scrutiny = parse_scrutiny(path, 9)
+        self.assertEqual(scrutiny["result"], "12XX121112122X")
+        self.assertEqual(scrutiny["pleno"], "2M")
+        self.assertEqual(scrutiny["prizes"][14], (0, 232507.92))
+        bets = ["12XX121112122X2M", "12XX121112122X11", "22XX121112122X2M"]
+        result = evaluate_bets(bets, scrutiny["result"], scrutiny["pleno"].replace("-", ""))
+        self.assertEqual([item["category"] for item in result], [15, 14, 13])
+
+    def test_read_exported_bets(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "bets.txt"
+            path.write_text("1X211111111111M0\n2X1XXXXXXXXXXX11\n", encoding="utf-8")
+            self.assertEqual(len(read_bet_file(path)), 2)
+        self.assertEqual(decode_pleno("0"), "00")
+        self.assertEqual(decode_pleno("F"), "MM")
+
+    def test_quinielista_text_format(self):
+        columns = ["1X2" + "1" * 11, tuple("2X1" + "X" * 11)]
+        self.assertEqual(quinielista_text(columns, "M-0"), "1X211111111111M0\n2X1XXXXXXXXXXXM0\n")
+        with self.assertRaises(ValueError):
+            quinielista_text(["1X2"], "M-0")
+        with self.assertRaises(ValueError):
+            quinielista_text(columns, "")
+
+    @staticmethod
+    def sample_matches():
+        return [
+            Match(index, f"H{index}", f"A{index}", f"Local {index}", f"Visitante {index}", "", (60.0, 25.0, 15.0), "")
+            for index in range(1, 16)
+        ]
+
+    def test_probable_columns_respect_selected_base(self):
+        dummy = SimpleNamespace(matches=self.sample_matches())
+        base = ["1X", "2"] + ["1"] * 12
+        result = QuinielaApp.probable_columns(dummy, 20, base)
+        self.assertEqual({column for column, _probability in result}, {"1" + "2" + "1" * 12, "X" + "2" + "1" * 12})
+
+    def test_budget_optimizer_only_uses_existing_development(self):
+        matches = self.sample_matches()
+        source = ["1" * 14, "X" + "1" * 13, "2" + "1" * 13]
+        dummy = SimpleNamespace(matches=matches)
+        dummy._key = lambda match: str(match.number)
+        dummy.predictions = {str(match.number): ("1X2" if match.number == 1 else "1") for match in matches[:14]}
+        dummy.probable_columns = MethodType(QuinielaApp.probable_columns, dummy)
+        plans = QuinielaApp.budget_plans(dummy, 1.50, source)
+        self.assertTrue(plans)
+        self.assertTrue(set(plans[0].columns) <= set(source))
+        self.assertEqual(plans[0].bets, 2)
+
     def test_cached_percentages(self):
         xml = b'''<?xml version="1.0"?><quinielista><porcentajes>''' + b"".join(
             f'<partido num="{number}" p_jugados_1="50" p_jugados_X="30" p_jugados_2="20"/>'.encode()
