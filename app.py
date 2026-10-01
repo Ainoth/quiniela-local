@@ -875,6 +875,24 @@ class QuinielaApp(tk.Tk):
         style.map(table_style, background=[("selected", "#ccecff")], foreground=[("selected", "#071a33")])
         pagers = {}
 
+        def update_tree_rows(table, rows, tag_for_index):
+            """Actualiza solo las filas modificadas para evitar el parpadeo del Treeview."""
+            rows = list(rows)
+            children = list(table.get_children())
+            common = min(len(children), len(rows))
+            for index in range(common):
+                item = children[index]
+                values = rows[index]
+                wanted = tuple(str(value) for value in values)
+                current = tuple(str(value) for value in table.item(item, "values"))
+                tag = tag_for_index(index)
+                if current != wanted or tuple(table.item(item, "tags")) != (tag,):
+                    table.item(item, values=values, tags=(tag,))
+            for item in children[len(rows):]:
+                table.delete(item)
+            for index in range(common, len(rows)):
+                table.insert("", "end", values=rows[index], tags=(tag_for_index(index),))
+
         def make_table(parent, columns, page_size=None, rows=15):
             holder = ttk.Frame(parent)
             holder.pack(fill="both", expand=True)
@@ -887,10 +905,9 @@ class QuinielaApp(tk.Tk):
                 def render():
                     count = max(1, (len(data["rows"]) + page_size - 1) // page_size)
                     data["page"] = max(0, min(data["page"], count - 1))
-                    table.delete(*table.get_children())
                     offset = data["page"] * page_size
-                    for i, values in enumerate(data["rows"][offset:offset + page_size]):
-                        table.insert("", "end", values=values, tags=("even" if i % 2 == 0 else "odd",))
+                    visible = data["rows"][offset:offset + page_size]
+                    update_tree_rows(table, visible, lambda i: "even" if i % 2 == 0 else "odd")
                     label.configure(text=f"Página {data['page'] + 1} / {count} · {len(data['rows'])} columnas")
                     previous.configure(state="normal" if data["page"] else "disabled")
                     following.configure(state="normal" if data["page"] + 1 < count else "disabled")
@@ -928,38 +945,53 @@ class QuinielaApp(tk.Tk):
                 data["rows"] = list(rows)
                 render()
             else:
-                table.delete(*table.get_children())
-                for i, values in enumerate(rows):
-                    tag = "pleno" if table is live_table and i == 14 else "even" if i % 2 == 0 else "odd"
-                    table.insert("", "end", values=values, tags=(tag,))
+                update_tree_rows(
+                    table, rows,
+                    lambda i: "pleno" if table is live_table and i == 14 else "even" if i % 2 == 0 else "odd",
+                )
                 if table is live_table:
-                    dialog.after_idle(draw_result_cells)
+                    schedule_result_cells()
 
         live_table = make_table(live_page, (
             ("n", "Nº", 35), ("match", "Partido", 335),
             ("score", "Marcador", 90), ("sign", "1     X     2 / P15", 115), ("status", "Estado", 215),
         ))
         live_table.column("match", anchor="w")
-        result_cells = []
+        result_cells = {}
+        result_redraw_job = None
+
+        def schedule_result_cells():
+            nonlocal result_redraw_job
+            if result_redraw_job is not None:
+                dialog.after_cancel(result_redraw_job)
+            result_redraw_job = dialog.after_idle(draw_result_cells)
 
         def draw_result_cells(event=None):
+            nonlocal result_redraw_job
+            result_redraw_job = None
             if not live_table.winfo_exists():
                 return
-            for cell in result_cells:
-                cell.destroy()
-            result_cells.clear()
+            visible_keys = set()
             for item in live_table.get_children():
                 values = live_table.item(item, "values")
                 pleno = str(values[0]) == "15"
                 for column in ("score", "sign"):
+                    key = (item, column)
                     box = live_table.bbox(item, column)
                     if not box:
                         continue
+                    visible_keys.add(key)
                     x, y, width, height = box
+                    value = str(values[2 if column == "score" else 3])
+                    existing = result_cells.get(key)
+                    if existing and existing[1:] == (value, pleno):
+                        existing[0].place(x=x, y=y, width=width, height=height)
+                        continue
+                    if existing:
+                        existing[0].destroy()
                     frame = tk.Frame(live_table, background="#ffaaaa")
                     frame.place(x=x, y=y, width=width, height=height)
-                    result_cells.append(frame)
-                    value = str(values[2 if column == "score" else 3])
+                    result_cells[key] = (frame, value, pleno)
                     if column == "sign" and not pleno:
                         labels = [(sign, value == sign) for sign in ("1", "X", "2")]
                     elif column == "sign" and pleno and len(value) == 2:
@@ -972,7 +1004,9 @@ class QuinielaApp(tk.Tk):
                             foreground="white" if active else "#ef7777", bd=0)
                         cell.place(relx=index / len(labels), rely=0, relwidth=1 / len(labels),
                                    relheight=1, x=1, y=1, width=-2, height=-2)
-        live_table.bind("<Configure>", lambda event: dialog.after_idle(draw_result_cells), add="+")
+            for key in set(result_cells) - visible_keys:
+                result_cells.pop(key)[0].destroy()
+        live_table.bind("<Configure>", lambda event: schedule_result_cells(), add="+")
         ttk.Label(bets_page, text="Ahora: partidos con marcador · Confirmados: finalizados · Máximo: descontando fallos definitivos",
                   style="Card.TLabel", font=("Sans", 9)).pack(side="bottom", fill="x")
         live_bets = make_table(bets_page, (
@@ -992,7 +1026,7 @@ class QuinielaApp(tk.Tk):
             height = max(18, min(32, ((event.height if event else live_page.winfo_height()) - 30) // 15))
             style.configure(table_style, rowheight=height,
                             font=("DejaVu Sans Condensed", 9, "bold"))
-            dialog.after_idle(draw_result_cells)
+            schedule_result_cells()
         for page in (live_page, bets_page, panes):
             page.bind("<Configure>", fit_rows)
 
