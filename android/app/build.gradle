@@ -1,5 +1,8 @@
 plugins { id 'com.android.application' }
 
+def releaseStore = System.getenv('QUINIELA_KEYSTORE')
+def releasePassword = System.getenv('QUINIELA_KEY_PASSWORD')
+
 android {
     namespace 'es.quinielalocal.app'
     compileSdk 33
@@ -12,9 +15,21 @@ android {
         versionName '1.0.0'
     }
 
+    signingConfigs {
+        if (releaseStore && releasePassword) {
+            release {
+                storeFile file(releaseStore)
+                storePassword releasePassword
+                keyAlias 'quiniela-local'
+                keyPassword releasePassword
+            }
+        }
+    }
+
     buildTypes {
         release {
             minifyEnabled false
+            if (releaseStore && releasePassword) signingConfig signingConfigs.release
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }

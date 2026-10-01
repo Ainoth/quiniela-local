@@ -15,6 +15,11 @@ export ANDROID_HOME=/ruta/al/Android/Sdk
 
 El APK se genera en `app/build/outputs/apk/debug/app-debug.apk`.
 
+Para una versión de distribución firmada se indican `QUINIELA_KEYSTORE` y
+`QUINIELA_KEY_PASSWORD` y se ejecuta `./gradlew assembleRelease`. La clave de
+firma debe mantenerse fuera del repositorio y conservarse para futuras
+actualizaciones.
+
 ## Instalar
 
 1. Copiar el APK al teléfono.
