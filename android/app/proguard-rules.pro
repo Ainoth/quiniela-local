@@ -1,0 +1,1 @@
+-keepclassmembers class es.quinielalocal.app.MainActivity$AndroidBridge { public *; }

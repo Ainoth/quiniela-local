@@ -2,8 +2,30 @@
 
 ![Icono de Quiniela Local](assets/quiniela-local.png)
 
-Aplicación local y sin registro que lee directamente los datos instalados por
-WIN1X2. No modifica sus bases de datos ni necesita conexión a Internet.
+Aplicación de Quiniela para escritorio y Android. La versión de escritorio
+puede leer los datos instalados por WIN1X2; ambas versiones descargan datos,
+porcentajes y marcadores directamente de sus proveedores públicos.
+
+## Aplicación Android autónoma
+
+El APK para Android 10 o posterior está en
+[`dist/QuinielaLocal-Android-1.0.0.apk`](dist/QuinielaLocal-Android-1.0.0.apk).
+Es compatible con el Samsung Galaxy S20+ y funciona sin PC ni servidor.
+
+En el teléfono:
+
+1. Descarga o copia el APK.
+2. Ábrelo desde **Mis archivos**.
+3. Si Android lo solicita, permite instalar aplicaciones desde esa fuente.
+4. Instala **Quiniela Local** y pulsa **Actualizar datos**.
+
+La aplicación Android descarga por sí sola la jornada, porcentajes y
+resultados; conserva los pronósticos en el móvil y guarda las apuestas en
+`Descargas/QuinielaLocal`. Incluye selecciones múltiples, generación y filtros,
+optimización por presupuesto, importación/exportación TXT, marcadores,
+comprobación de aciertos y escrutinio. La validación y el pago se realizan en la
+web externa que se abre desde **Subir TXT y jugar**; la app nunca guarda
+credenciales ni confirma compras.
 
 ## Funciones de esta primera versión
 
@@ -17,8 +39,8 @@ WIN1X2. No modifica sus bases de datos ni necesita conexión a Internet.
 - Guarda automáticamente el pronóstico del usuario.
 - Exporta una quiniela legible en formato de texto.
 - Valida y copia los 14 signos más el marcador del Pleno al 15.
-- Abre la web oficial de TULOTERO para introducir, revisar y confirmar la
-  apuesta manualmente.
+- Abre la carga de archivos de Quinielista para validar y pagar el TXT después
+  de que el usuario revise jornada, columnas, Pleno e importe.
 - Genera entre 2 y 100 **columnas más probables**, ordenando combinaciones
   completas por la probabilidad conjunta de sus 14 signos sin recorrer de
   forma exhaustiva las 4.782.969 combinaciones posibles.
@@ -35,9 +57,8 @@ La probabilidad mostrada es un modelo sencillo, no una garantía ni una
 recomendación de apuesta. Cuando no existe historial suficiente, se usa una
 estimación neutral.
 
-TULOTERO no publica una API para que aplicaciones de terceros carguen apuestas.
-Por seguridad, Quiniela Local no guarda credenciales ni realiza compras: copia
-el pronóstico y abre la web oficial, donde el usuario debe verificar y confirmar.
+Por seguridad, Quiniela Local no guarda credenciales ni realiza compras. La
+confirmación final se hace siempre en la web de validación elegida por el usuario.
 
 ## Ejecución
 
