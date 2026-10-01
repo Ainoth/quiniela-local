@@ -1,11 +1,12 @@
 import math
 import tempfile
 import unittest
+from datetime import date
 from pathlib import Path
 from types import MethodType, SimpleNamespace
 
 from app import (
-    Match, QuinielaApp, decode_pleno, evaluate_bets, parse_results,
+    Match, QuinielaApp, current_round, decode_pleno, evaluate_bets, parse_results,
     parse_scrutiny, quinielista_text, read_bet_file,
 )
 from data_updater import read_percentages
@@ -18,6 +19,11 @@ from quiniela_engine import (
 
 
 class EngineTests(unittest.TestCase):
+    def test_current_round_keeps_nearest_nominal_date(self):
+        entries = [(10, date(2026, 9, 30)), (11, date(2026, 10, 4))]
+        self.assertEqual(current_round(entries, date(2026, 10, 1)), 10)
+        self.assertEqual(current_round(entries, date(2026, 10, 3)), 11)
+
     def test_scrutiny_and_bet_evaluation(self):
         prefix = "9 0 0 2 53 648 4639 108988,09 232507,92 54494,05 2056,38 168,19 28,19"
         line = prefix.ljust(104) + "12XX121112122XB" + "ABC" * 30 + " " * 24

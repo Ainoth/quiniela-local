@@ -222,10 +222,12 @@ def parse_dates(path: Path) -> list[tuple[int, date]]:
 
 def current_round(entries: list[tuple[int, date]], today: date | None = None) -> int:
     today = today or date.today()
-    future = [(abs((day - today).days), round_no) for round_no, day in entries if day >= today]
-    if future:
-        return min(future)[1]
-    return entries[-1][0]
+    if not entries:
+        raise ValueError("El calendario no contiene jornadas.")
+    # La fecha de FEC es nominal: algunos partidos pueden terminar al día siguiente.
+    # Elegir la fecha más cercana evita saltar de jornada mientras aún se juega la anterior;
+    # en empate se prefiere la próxima jornada.
+    return min(entries, key=lambda item: (abs((item[1] - today).days), item[1] < today))[0]
 
 
 def parse_round_teams(season: str, round_no: int) -> list[tuple[str, str]]:
@@ -1041,9 +1043,12 @@ class QuinielaApp(tk.Tk):
 
         responses = queue.Queue()
         auto = tk.BooleanVar(value=True)
-        state = {"busy": False, "closed": False, "timer": None, "poll": None, "generation": 0}
+        state = {"busy": False, "closed": False, "timer": None, "poll": None,
+                 "generation": 0, "suppress_trace": False}
 
         def clear_views(*_):
+            if state["suppress_trace"]:
+                return
             state["generation"] += 1
             for tree in (live_table, live_bets, distribution, best):
                 set_rows(tree, [])
@@ -1077,9 +1082,18 @@ class QuinielaApp(tk.Tk):
 
             def worker():
                 try:
-                    matches = fetch_live_results(self.season, selected_round)
+                    actual_round = selected_round
+                    try:
+                        matches = fetch_live_results(self.season, actual_round)
+                    except ValueError as exc:
+                        # El calendario local puede avanzar un día antes de que el proveedor
+                        # retire la jornada que todavía está disputándose.
+                        if selected_round != self.round_no or selected_round <= 1 or "no ofrece el directo" not in str(exc):
+                            raise
+                        actual_round = selected_round - 1
+                        matches = fetch_live_results(self.season, actual_round)
                     evaluations = evaluate_live_bets(bets, matches)
-                    responses.put((generation, selected_round, matches, evaluations, None))
+                    responses.put((generation, actual_round, matches, evaluations, None))
                 except Exception as exc:
                     responses.put((generation, selected_round, None, None, str(exc)))
             threading.Thread(target=worker, daemon=True).start()
@@ -1105,6 +1119,10 @@ class QuinielaApp(tk.Tk):
                     if error:
                         result_label.configure(text=f"Sin actualización: {error}\nLos datos anteriores, si aparecen, no están actualizados.", foreground="#ffe066")
                     else:
+                        if round_var.get() != selected_round:
+                            state["suppress_trace"] = True
+                            round_var.set(selected_round)
+                            state["suppress_trace"] = False
                         set_rows(live_table, [(match.number, f"{match.home.title()}  -  {match.away.title()}", match.score,
                             (match.pleno if match.number == 15 else match.sign) or "—",
                             re.sub(r"minuto\s*(\d+)", r"\1′", match.status)) for match in matches])
