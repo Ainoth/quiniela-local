@@ -1,95 +1,369 @@
 <!doctype html>
 <html lang="es">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#071a33">
-  <title>Quiniela Local</title>
-  <link rel="stylesheet" href="style.css">
-</head>
-<body>
-  <header>
-    <div><span class="ball">⚽</span><b>QUINIELA</b> <em>LOCAL</em></div>
-    <small id="seasonLabel">Aplicación autónoma</small>
-  </header>
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width,initial-scale=1,viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#071a33" />
+    <title>Quiniela Local</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header>
+      <div><span class="ball">⚽</span><b>QUINIELA</b> <em>LOCAL</em></div>
+      <small id="seasonLabel">Aplicación autónoma</small>
+    </header>
 
-  <nav>
-    <button class="active" data-page="quiniela">1. Quiniela</button>
-    <button data-page="develop">2. Desarrollo</button>
-    <button data-page="results">3. Resultados</button>
-  </nav>
+    <nav>
+      <button class="active" data-page="quiniela">1. Quiniela</button>
+      <button data-page="develop">2. Desarrollo</button>
+      <button data-page="results">3. Resultados</button>
+    </nav>
 
-  <main>
-    <section id="quiniela" class="page active">
-      <div class="toolbar">
-        <button class="green" onclick="updateData()">↻ Actualizar datos</button>
-        <button class="gold" onclick="useSuggestions()">★ Sugerencias</button>
-        <button onclick="clearPicks()">Limpiar</button>
-      </div>
-      <div id="updateStatus" class="notice">Pulsa “Actualizar datos” para descargar la jornada directamente.</div>
-      <div class="card">
-        <h2>PARTIDOS DE LA JORNADA</h2>
-        <div class="match-head"><span>Nº</span><span>Partido</span><span>Hora</span><span>% 1/X/2</span><span>Pronóstico</span></div>
-        <div id="matches"></div>
-      </div>
-      <div class="price" id="price">Selecciona al menos un signo por partido</div>
-      <div class="actions">
-        <button class="orange" onclick="showPage('develop')">Crear desarrollo</button>
-        <button class="purple" onclick="optimizeBudget()">Optimizar</button>
-        <button class="red" onclick="exportTxt()">Guardar TXT</button>
-        <button class="gold" onclick="openPlaySite()">Subir TXT y jugar</button>
-      </div>
-    </section>
-
-    <section id="develop" class="page">
-      <div class="card">
-        <h2>CREA TU DESARROLLO</h2>
-        <p class="help">Parte de los signos elegidos, aplica condiciones y conserva las columnas más probables.</p>
-        <div class="form-grid">
-          <label>Variantes (X o 2)<span><input id="varMin" type="number" min="0" max="14" value="0"> a <input id="varMax" type="number" min="0" max="14" value="14"></span></label>
-          <label>Empates (X)<span><input id="xMin" type="number" min="0" max="14" value="0"> a <input id="xMax" type="number" min="0" max="14" value="14"></span></label>
-          <label>Victorias visitantes (2)<span><input id="twoMin" type="number" min="0" max="14" value="0"> a <input id="twoMax" type="number" min="0" max="14" value="14"></span></label>
-          <label>Máximo de 1 seguidos<input id="run1" type="number" min="1" max="14" value="14"></label>
-          <label>Máximo de X seguidas<input id="runX" type="number" min="1" max="14" value="14"></label>
-          <label>Máximo de 2 seguidos<input id="run2" type="number" min="1" max="14" value="14"></label>
-          <label>Cambios entre signos<span><input id="intMin" type="number" min="0" max="13" value="0"> a <input id="intMax" type="number" min="0" max="13" value="13"></span></label>
-          <label>Columnas finales<input id="limit" type="number" min="2" max="100000" value="125"></label>
-          <label>Presupuesto máximo (€)<input id="budget" type="number" min="1.5" step="0.75" value="15"></label>
+    <main>
+      <div class="round-nav">
+        <button
+          id="previousRound"
+          onclick="moveRound(-1)"
+          aria-label="Jornada anterior"
+        >
+          ‹
+        </button>
+        <div>
+          <strong id="roundTitle">Selecciona una jornada</strong
+          ><small id="roundMode">Descarga el calendario</small
+          ><select
+            id="seasonSelect"
+            onchange="selectSeason(this.value)"
+            aria-label="Consultar temporada"
+          ></select>
         </div>
+        <button
+          id="nextRound"
+          onclick="moveRound(1)"
+          aria-label="Jornada siguiente"
+        >
+          ›
+        </button>
+        <button onclick="goCurrentRound()">En curso</button>
       </div>
-      <div class="actions sticky">
-        <button class="green" onclick="generateDevelopment()">▶ Generar</button>
-        <button class="purple" onclick="optimizeBudget()">◆ Ajustar al presupuesto</button>
-        <button class="red" onclick="exportTxt()">Guardar TXT</button>
-      </div>
-      <div id="devSummary" class="notice">Todavía no hay un desarrollo calculado.</div>
-      <div id="columns" class="columns"></div>
-    </section>
+      <section id="quiniela" class="page active">
+        <div class="toolbar">
+          <button class="green" onclick="updateData()">
+            ↻ Actualizar datos
+          </button>
+          <button class="gold" data-edit onclick="useSuggestions()">
+            ★ Sugerencias
+          </button>
+          <button data-edit onclick="clearPicks()">Limpiar</button>
+        </div>
+        <div id="updateStatus" class="notice">
+          Pulsa “Actualizar datos” para descargar la jornada directamente.
+        </div>
+        <div class="card">
+          <h2>PARTIDOS DE LA JORNADA</h2>
+          <div class="match-head">
+            <span>Nº</span><span>Partido</span><span>Hora</span
+            ><span>% 1/X/2</span><span>Pronóstico</span>
+          </div>
+          <div id="matches"></div>
+        </div>
+        <div class="price" id="price">
+          Selecciona al menos un signo por partido
+        </div>
+        <div class="card">
+          <h2>COBERTURA PROGRESIVA</h2>
+          <input
+            id="coverage"
+            data-edit
+            type="range"
+            min="0"
+            max="10"
+            step="1"
+            value="0"
+            oninput="applyCoverage(this.value)"
+          />
+          <div class="ticks"></div>
+          <p id="coverageDescription">
+            Mueve la barra para añadir dobles y triples.
+          </p>
+        </div>
+        <div class="actions">
+          <button class="orange" onclick="showPage('develop')">
+            Crear desarrollo
+          </button>
+          <button class="purple" data-edit onclick="optimizeBudget()">
+            Optimizar
+          </button>
+          <button class="red" onclick="exportTxt()">Guardar TXT</button>
+          <button class="gold" onclick="openPlaySite()">
+            Subir TXT y jugar
+          </button>
+        </div>
+        <div class="card">
+          <h2>COLUMNAS MÁS PROBABLES</h2>
+          <label
+            >Cantidad
+            <input
+              id="probableCount"
+              type="number"
+              min="2"
+              max="100"
+              value="10"
+              data-edit /></label
+          ><button data-edit onclick="generateProbable()">
+            Generar columnas probables</button
+          ><label class="help"
+            ><input id="respectBase" type="checkbox" data-edit checked />
+            Respetar mis signos seleccionados</label
+          >
+        </div>
+        <button onclick="copyBets()">Copiar apuestas</button>
+      </section>
 
-    <section id="results" class="page">
-      <div class="toolbar">
-        <button class="green" onclick="refreshLive()">↻ Actualizar resultados</button>
-        <button class="purple" onclick="Android.pickTextFile()">Elegir TXT</button>
-        <button onclick="useCurrentDevelopment()">Usar desarrollo actual</button>
-      </div>
-      <div id="resultStatus" class="notice">Actualiza para consultar los marcadores.</div>
-      <div class="card live-card">
-        <h2>MARCADORES Y SIGNOS</h2>
-        <div id="liveMatches"></div>
-      </div>
-      <div class="card">
-        <h2>TUS ACIERTOS</h2>
-        <div id="hitsSummary" class="big-result">Carga un TXT o genera un desarrollo.</div>
-        <div id="hits"></div>
-      </div>
-      <div class="card">
-        <h2>ESCRUTINIO Y PREMIOS</h2>
-        <div id="prizes">Disponible cuando WIN1X2 publique el escrutinio definitivo.</div>
-      </div>
-    </section>
-  </main>
+      <section id="develop" class="page">
+        <div class="card">
+          <h2>CREA TU DESARROLLO</h2>
+          <p class="help">
+            Parte de los signos elegidos, aplica condiciones y conserva las
+            columnas más probables.
+          </p>
+          <button onclick="showPage('quiniela')">
+            ① Elegir signos y cobertura
+          </button>
+          <div class="slider-card">
+            <h3>AJUSTES RÁPIDOS</h3>
+            <input
+              id="quickLevel"
+              data-edit
+              type="range"
+              min="0"
+              max="10"
+              step="1"
+              value="0"
+              oninput="applyQuick(this.value)"
+            />
+            <div class="ticks"></div>
+            <p id="quickDescription">Nivel 0/10 · sin restricciones</p>
+          </div>
+          <div class="form-grid">
+            <label
+              >Variantes (X o 2)<span
+                ><input id="varMin" type="number" min="0" max="14" value="0" />
+                a
+                <input
+                  id="varMax"
+                  type="number"
+                  min="0"
+                  max="14"
+                  value="14" /></span
+            ></label>
+            <label
+              >Empates (X)<span
+                ><input id="xMin" type="number" min="0" max="14" value="0" /> a
+                <input
+                  id="xMax"
+                  type="number"
+                  min="0"
+                  max="14"
+                  value="14" /></span
+            ></label>
+            <label
+              >Victorias visitantes (2)<span
+                ><input id="twoMin" type="number" min="0" max="14" value="0" />
+                a
+                <input
+                  id="twoMax"
+                  type="number"
+                  min="0"
+                  max="14"
+                  value="14" /></span
+            ></label>
+            <label
+              >Máximo de 1 seguidos<input
+                id="run1"
+                type="number"
+                min="1"
+                max="14"
+                value="14"
+            /></label>
+            <label
+              >Máximo de X seguidas<input
+                id="runX"
+                type="number"
+                min="1"
+                max="14"
+                value="14"
+            /></label>
+            <label
+              >Máximo de 2 seguidos<input
+                id="run2"
+                type="number"
+                min="1"
+                max="14"
+                value="14"
+            /></label>
+            <label
+              >Cambios entre signos<span
+                ><input id="intMin" type="number" min="0" max="13" value="0" />
+                a
+                <input
+                  id="intMax"
+                  type="number"
+                  min="0"
+                  max="13"
+                  value="13" /></span
+            ></label>
+            <label
+              >Separación entre empates (X)<span
+                ><input
+                  id="distanceMin"
+                  type="number"
+                  min="1"
+                  max="14"
+                  value="1" />
+                a
+                <input
+                  id="distanceMax"
+                  type="number"
+                  min="1"
+                  max="14"
+                  value="14" /></span
+            ></label>
+            <label
+              >Comparar con columna<input
+                id="reference"
+                type="text"
+                maxlength="14"
+                placeholder="14 signos 1/X/2"
+                class="reference"
+            /></label>
+            <label
+              >Coincidencias permitidas<span
+                ><input id="repMin" type="number" min="0" max="14" value="0" />
+                a
+                <input
+                  id="repMax"
+                  type="number"
+                  min="0"
+                  max="14"
+                  value="14" /></span
+            ></label>
+            <label
+              >Columnas finales<input
+                id="limit"
+                type="number"
+                min="2"
+                max="100000"
+                value="125"
+            /></label>
+            <label
+              >Presupuesto máximo (€)<input
+                id="budget"
+                type="number"
+                min="1.5"
+                step="0.75"
+                value="15"
+            /></label>
+          </div>
+          <details class="help">
+            <summary>¿Qué significa cada condición?</summary>
+            <p>
+              Variantes: suma de X y 2. Cambios: cuántas veces la columna pasa
+              de un signo a otro. Seguidos: limita las rachas de signos iguales.
+            </p>
+            <p>
+              Separación: distancia entre dos X consecutivas; si hay menos de
+              dos X, no elimina la columna. Comparación: cuenta las
+              coincidencias con los 14 signos de otra columna.
+            </p>
+            <p>
+              Columnas finales: reducción por probabilidad y diversidad, sin
+              garantía de premio. El presupuesto selecciona únicamente columnas
+              del desarrollo ya generado.
+            </p>
+          </details>
+        </div>
+        <div class="actions sticky">
+          <button class="green" data-edit onclick="generateDevelopment()">
+            ▶ Generar
+          </button>
+          <button class="purple" data-edit onclick="optimizeBudget()">
+            ◆ Ajustar al presupuesto
+          </button>
+          <button class="red" onclick="exportTxt()">Guardar TXT</button>
+          <button onclick="copyBets()">Copiar columnas</button>
+        </div>
+        <div id="devSummary" class="notice">
+          Todavía no hay un desarrollo calculado.
+        </div>
+        <div id="columns" class="columns"></div>
+        <div id="developmentPager" class="toolbar"></div>
+      </section>
 
-  <div id="loading" class="loading hidden"><div class="spinner"></div><b id="loadingText">Actualizando…</b></div>
-  <script src="app.js"></script>
-</body>
+      <section id="results" class="page">
+        <div class="toolbar">
+          <button class="green" onclick="refreshLive()">
+            ↻ Actualizar resultados
+          </button>
+          <button class="purple" onclick="Android.pickTextFile()">
+            Elegir TXT
+          </button>
+          <button onclick="useCurrentDevelopment()">
+            Usar desarrollo actual
+          </button>
+          <button onclick="checkOfficial()">Escrutinio oficial</button>
+          <button onclick="updateData()">Descargar datos</button>
+          <label
+            ><input id="autoLive" type="checkbox" onchange="scheduleLive()" />
+            Automático · 60 s</label
+          >
+        </div>
+        <div id="resultStatus" class="notice">
+          Actualiza para consultar los marcadores.
+        </div>
+        <div id="betSource" class="notice">Apuestas de esta jornada</div>
+        <p class="help">
+          El TXT se comprueba contra la jornada seleccionada arriba. Antes de
+          importarlo, comprueba su temporada y jornada.
+        </p>
+        <div class="toolbar">
+          <button onclick="switchSource('development')">Desarrollo</button
+          ><button onclick="switchSource('imported')">TXT importado</button>
+        </div>
+        <div class="card live-card">
+          <h2>MARCADORES Y SIGNOS</h2>
+          <div id="liveMatches"></div>
+        </div>
+        <div class="card">
+          <h2>TUS ACIERTOS</h2>
+          <div id="hitsSummary" class="big-result">
+            Carga un TXT o genera un desarrollo.
+          </div>
+          <div id="hits"></div>
+          <div id="hitsPager" class="toolbar"></div>
+        </div>
+        <div class="card">
+          <h2>ESCRUTINIO Y PREMIOS</h2>
+          <div id="prizes">
+            Disponible cuando WIN1X2 publique el escrutinio definitivo.
+          </div>
+        </div>
+      </section>
+    </main>
+    <dialog id="historyDialog">
+      <h2 id="historyTitle">Histórico</h2>
+      <div id="historyContent"></div>
+      <button onclick="el('historyDialog').close()">Cerrar</button>
+    </dialog>
+
+    <div id="loading" class="loading hidden">
+      <div class="spinner"></div>
+      <b id="loadingText">Actualizando…</b>
+    </div>
+    <script src="engine.js"></script>
+    <script src="app.js"></script>
+  </body>
 </html>

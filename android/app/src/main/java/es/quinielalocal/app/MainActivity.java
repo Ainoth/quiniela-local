@@ -4,14 +4,19 @@ import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.ContentValues;
 import android.content.Intent;
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.database.Cursor;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
 import android.provider.MediaStore;
+import android.provider.OpenableColumns;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebChromeClient;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.webkit.WebResourceRequest;
 import android.widget.Toast;
 
 import org.json.JSONObject;
@@ -31,11 +36,14 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class MainActivity extends Activity {
     private static final int PICK_TXT = 41;
     private static final int MAX_DOWNLOAD = 25 * 1024 * 1024;
     private WebView webView;
+    private final ExecutorService downloads = Executors.newSingleThreadExecutor();
 
     @SuppressLint({"SetJavaScriptEnabled", "AddJavascriptInterface"})
     @Override public void onCreate(Bundle state) {
@@ -47,7 +55,11 @@ public class MainActivity extends Activity {
         // Los únicos ficheros locales son los recursos empaquetados dentro del APK.
         webView.getSettings().setAllowFileAccess(true);
         webView.getSettings().setAllowContentAccess(false);
-        webView.setWebViewClient(new WebViewClient());
+        webView.setWebViewClient(new WebViewClient() {
+            @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+                return !request.getUrl().toString().startsWith("file:///android_asset/");
+            }
+        });
         webView.setWebChromeClient(new WebChromeClient());
         webView.addJavascriptInterface(new AndroidBridge(), "Android");
         setContentView(webView);
@@ -55,10 +67,17 @@ public class MainActivity extends Activity {
     }
 
     private byte[] download(String address) throws Exception {
-        HttpURLConnection connection = (HttpURLConnection) new URL(address).openConnection();
+        URL url = new URL(address);
+        String host = url.getHost();
+        if (!url.getProtocol().equals("https") || !(host.equals("www.win1x2.com") ||
+                host.equals("www.quinielista.es") || host.equals("static.dataradar.es"))) {
+            throw new IllegalArgumentException("Proveedor no permitido");
+        }
+        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+        connection.setInstanceFollowRedirects(false);
         connection.setConnectTimeout(20000);
         connection.setReadTimeout(30000);
-        connection.setRequestProperty("User-Agent", "QuinielaLocal-Android/1.0");
+        connection.setRequestProperty("User-Agent", "QuinielaLocal-Android/1.1");
         connection.setRequestProperty("Cache-Control", "no-cache");
         connection.setRequestProperty("Referer", "https://www.eduardolosilla.es/");
         try (InputStream input = new BufferedInputStream(connection.getInputStream());
@@ -81,17 +100,32 @@ public class MainActivity extends Activity {
     }
 
     public class AndroidBridge {
-        @JavascriptInterface public String fetchText(String url) {
+        @JavascriptInterface public void request(String id, String method, String argument) {
+            downloads.execute(() -> {
+                String result;
+                if (method.equals("winData")) result = fetchWinData();
+                else if (method.equals("text")) result = fetchText(argument);
+                else result = "__ERROR__Operación desconocida";
+                final String response = result;
+                runOnUiThread(() -> {
+                    if (!isDestroyed() && !isFinishing()) webView.evaluateJavascript(
+                            "window.onNativeResponse(" + JSONObject.quote(id) + "," + JSONObject.quote(response) + ")", null);
+                });
+            });
+        }
+
+        private String fetchText(String url) {
             try { return decode(download(url)); }
             catch (Exception error) { return "__ERROR__" + error.getMessage(); }
         }
 
-        @JavascriptInterface public String fetchWinData() {
+        private String fetchWinData() {
             try {
                 byte[] archive = download("https://www.win1x2.com/datos/actudato.zip");
                 Map<String, byte[]> files = new HashMap<>();
                 String newestSeason = "";
                 int newestStartYear = 0;
+                int total = 0;
                 try (ZipInputStream zip = new ZipInputStream(new ByteArrayInputStream(archive))) {
                     ZipEntry entry;
                     while ((entry = zip.getNextEntry()) != null) {
@@ -101,7 +135,12 @@ public class MainActivity extends Activity {
                         ByteArrayOutputStream output = new ByteArrayOutputStream();
                         byte[] buffer = new byte[8192];
                         int count;
-                        while ((count = zip.read(buffer)) != -1) output.write(buffer, 0, count);
+                        while ((count = zip.read(buffer)) != -1) {
+                            output.write(buffer, 0, count);
+                            total += count;
+                            if (output.size() > MAX_DOWNLOAD || total > 60 * 1024 * 1024)
+                                throw new IllegalStateException("Paquete de datos demasiado grande");
+                        }
                         files.put(name, output.toByteArray());
                         String upper = name.toUpperCase(Locale.ROOT);
                         if (upper.matches("FEC\\d{2}-\\d{2}\\.TXT")) {
@@ -119,9 +158,8 @@ public class MainActivity extends Activity {
                 result.put("season", newestSeason);
                 for (Map.Entry<String, byte[]> item : files.entrySet()) {
                     String upper = item.getKey().toUpperCase(Locale.ROOT);
-                    if (upper.equals("FEC" + newestSeason + ".TXT") ||
-                        upper.equals("PRE" + newestSeason + ".TXT") ||
-                        upper.equals("HOR" + newestSeason + ".TXT") ||
+                    if (upper.matches("(?:FEC|PRE|HOR|RS1|RS2)\\d{2}-\\d{2}\\.TXT") ||
+                        upper.equals("ESTARESU.TXT") ||
                         upper.equals("WEQUIPOS.TXT")) {
                         result.put(upper, decode(item.getValue()));
                     }
@@ -151,6 +189,14 @@ public class MainActivity extends Activity {
             });
         }
 
+        @JavascriptInterface public void copyText(String text) {
+            runOnUiThread(() -> {
+                ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+                clipboard.setPrimaryClip(ClipData.newPlainText("Apuestas Quiniela Local", text));
+                Toast.makeText(MainActivity.this, "Apuestas copiadas", Toast.LENGTH_SHORT).show();
+            });
+        }
+
         @JavascriptInterface public void pickTextFile() {
             runOnUiThread(() -> {
                 Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
@@ -161,7 +207,13 @@ public class MainActivity extends Activity {
         }
 
         @JavascriptInterface public void openUrl(String url) {
-            runOnUiThread(() -> startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url))));
+            runOnUiThread(() -> {
+                if (!url.startsWith("https://")) return;
+                try { startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url))); }
+                catch (android.content.ActivityNotFoundException error) {
+                    Toast.makeText(MainActivity.this, "No hay un navegador disponible", Toast.LENGTH_LONG).show();
+                }
+            });
         }
 
         @JavascriptInterface public void notify(String message) {
@@ -172,16 +224,32 @@ public class MainActivity extends Activity {
     @Override protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode != PICK_TXT || resultCode != RESULT_OK || data == null || data.getData() == null) return;
-        try (InputStream input = getContentResolver().openInputStream(data.getData());
+        Uri uri = data.getData();
+        downloads.execute(() -> {
+        try (InputStream input = getContentResolver().openInputStream(uri);
              ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            String name = "TXT";
+            try (Cursor cursor = getContentResolver().query(uri, new String[]{OpenableColumns.DISPLAY_NAME}, null, null, null)) {
+                if (cursor != null && cursor.moveToFirst()) name = cursor.getString(0);
+            }
             byte[] buffer = new byte[8192];
             int count;
-            while ((count = input.read(buffer)) != -1) output.write(buffer, 0, count);
-            String script = "window.onImportedText(" + JSONObject.quote(decode(output.toByteArray())) + ")";
-            webView.evaluateJavascript(script, null);
+            while ((count = input.read(buffer)) != -1) {
+                output.write(buffer, 0, count);
+                if (output.size() > MAX_DOWNLOAD) throw new IllegalStateException("TXT demasiado grande");
+            }
+            String script = "window.onImportedText(" + JSONObject.quote(decode(output.toByteArray())) + "," + JSONObject.quote(name) + ")";
+            runOnUiThread(() -> { if (!isDestroyed()) webView.evaluateJavascript(script, null); });
         } catch (Exception error) {
-            Toast.makeText(this, "No se pudo leer el TXT", Toast.LENGTH_LONG).show();
+            runOnUiThread(() -> Toast.makeText(this, "No se pudo leer el TXT", Toast.LENGTH_LONG).show());
         }
+        });
+    }
+
+    @Override protected void onDestroy() {
+        downloads.shutdownNow();
+        webView.destroy();
+        super.onDestroy();
     }
 
     @Override public void onBackPressed() {

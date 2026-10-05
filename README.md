@@ -9,7 +9,7 @@ porcentajes y marcadores directamente de sus proveedores públicos.
 ## Aplicación Android autónoma
 
 El APK para Android 10 o posterior está en
-[`dist/QuinielaLocal-Android-1.0.0.apk`](dist/QuinielaLocal-Android-1.0.0.apk).
+[`dist/QuinielaLocal-Android-1.1.0.apk`](dist/QuinielaLocal-Android-1.1.0.apk).
 Es compatible con el Samsung Galaxy S20+ y funciona sin PC ni servidor.
 
 En el teléfono:
@@ -26,6 +26,15 @@ optimización por presupuesto, importación/exportación TXT, marcadores,
 comprobación de aciertos y escrutinio. La validación y el pago se realizan en la
 web externa que se abre desde **Subir TXT y jugar**; la app nunca guarda
 credenciales ni confirma compras.
+
+La versión 1.1 incorpora las barras **Cobertura progresiva** y **Ajustes
+rápidos** (0–10), distancia entre X, comparación/coincidencias, análisis,
+histórico y consulta de temporadas y jornadas publicadas. Los desarrollos,
+TXT importados y condiciones se guardan por temporada/jornada: al navegar no
+se mezclan apuestas. Solo la jornada en curso admite edición; las anteriores
+y futuras son de consulta. **En curso** vuelve a la quiniela editable.
+Las descargas se ejecutan en segundo plano y los datos quedan disponibles
+sin conexión tras la primera actualización. Véase [Android](android/README.md).
 
 ## Funciones de esta primera versión
 
