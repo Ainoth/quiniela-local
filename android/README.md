@@ -38,6 +38,17 @@ La migración mantiene las apuestas bajo la temporada/jornada que figuraba en
 la versión anterior. Pulsar **Actualizar datos** para descargar también
 calendarios, escrutinios e histórico; después usar **En curso**.
 
+### Corrección 1.1.1
+
+Antes de descargar el calendario, la cabecera pide **Actualizar datos**, sin
+clasificar erróneamente las apuestas migradas como de una temporada anterior.
+Si falla la renovación de porcentajes y existen porcentajes guardados para
+esa misma jornada, el aviso identifica que se siguen utilizando los guardados.
+No se asignan porcentajes de otra jornada.
+Las descargas cierran la conexión al terminar para no reutilizar conexiones
+inactivas entre actualizaciones. Tras el cambio se verificaron consultas
+consecutivas de porcentajes desde el teléfono.
+
 La cabecera persistente identifica temporada, jornada y modo (edición o
 consulta). Las flechas recorren las jornadas con partidos publicados; el
 selector permite consultar otras temporadas incluidas por WIN1X2. Las jornadas
@@ -118,4 +129,18 @@ generación e histórico con esos datos. El lector PRE respeta el campo fijo de
 dos caracteres de jornada, incluso cuando está pegado al primer número de
 acertantes; hay una regresión específica para los premios de esas filas.
 La compilación Android se valida con `./gradlew lintRelease assembleRelease`
-y la firma con `apksigner verify`. No sustituyen la comprobación en un S20+ físico.
+y la firma con `apksigner verify`.
+
+### Comprobación en Samsung físico
+
+El 6 de octubre de 2026 se comprobó la aplicación instalada en un Galaxy S20+
+SM-G986N con Android 13. La descarga se realizó desde el teléfono, a los
+proveedores reales, sin servidor de la aplicación en el ordenador. Se probaron
+los 11 niveles de ambas barras, la generación y sincronización con la base,
+la optimización de las columnas generadas y la navegación en modo consulta.
+La reducción coincidió columna por columna y en el mismo orden con Python.
+También se probó guardar un TXT en MediaStore y leerlo mediante el lector nativo.
+Las apuestas del usuario se respaldaron localmente y se restauraron después
+de las pruebas; el archivo creado únicamente para la prueba se retiró.
+La inspección del WebView se habilitó solo mediante instrumentación temporal,
+no en el APK distribuido. No se enviaron apuestas ni se hicieron pagos.

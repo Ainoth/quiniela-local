@@ -354,7 +354,10 @@ async function updateData() {
       state.rounds[key] ||= emptyRound();
       state.rounds[key].probabilities = pct;
     } catch (e) {
-      note = " · Porcentajes no disponibles: " + e.message;
+      const cached = state.rounds[season + ":" + state.currentRound]?.probabilities;
+      note = cached
+        ? " · No se pudieron renovar los porcentajes; se conservan los guardados de esta jornada: " + e.message
+        : " · Porcentajes no disponibles: " + e.message;
     }
     state.updated = new Date().toLocaleString("es-ES");
     loadRound();
@@ -1317,11 +1320,14 @@ function renderAll() {
   const r = current(),
     rounds = availableRounds(),
     i = rounds.findIndex((x) => x.round === state.round);
-  el("seasonSelect").innerHTML = Object.keys(state.winData || {})
+  const seasons = Object.keys(state.winData || {})
     .filter((k) => /^FEC\d{2}-\d{2}\.TXT$/.test(k))
     .map((k) => k.slice(3, 8))
     .sort()
-    .reverse()
+    .reverse();
+  if (!seasons.length && state.season) seasons.push(state.season);
+  el("seasonSelect").disabled = !state.winData;
+  el("seasonSelect").innerHTML = seasons
     .map(
       (s) =>
         "<option " +
@@ -1336,7 +1342,9 @@ function renderAll() {
     : "Aplicación autónoma";
   el("roundTitle").textContent =
     "Temporada " + (state.season || "—") + " · Jornada " + (state.round || "—");
-  el("roundMode").textContent = editable()
+  el("roundMode").textContent = !state.winData
+    ? "ACTUALIZA DATOS · calendario pendiente de descargar"
+    : editable()
     ? "EN CURSO · edición habilitada"
     : state.season !== state.winData?.season
       ? "TEMPORADA ANTERIOR · consulta"

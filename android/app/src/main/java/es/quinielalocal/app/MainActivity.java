@@ -77,6 +77,8 @@ public class MainActivity extends Activity {
         connection.setInstanceFollowRedirects(false);
         connection.setConnectTimeout(20000);
         connection.setReadTimeout(30000);
+        // No reutilizar conexiones inactivas del proveedor entre actualizaciones.
+        connection.setRequestProperty("Connection", "close");
         connection.setRequestProperty("User-Agent", "QuinielaLocal-Android/1.1");
         connection.setRequestProperty("Cache-Control", "no-cache");
         connection.setRequestProperty("Referer", "https://www.eduardolosilla.es/");

@@ -126,7 +126,20 @@ const live = Array.from({ length: 15 }, (_, i) => ({
       { fixture, pct, live },
     );
     await page.goto("http://127.0.0.1:" + server.address().port);
+    assert.match(await page.locator("#roundMode").textContent(), /ACTUALIZA DATOS/);
+    assert.ok(await page.locator("#seasonSelect").isDisabled());
     await page.evaluate(() => updateData());
+    assert.ok(await page.locator("#seasonSelect").isEnabled());
+    await page.evaluate(() => {
+      window.normalRequest = Android.request;
+      Android.request = (id, method, arg) => method === "text"
+        ? setTimeout(() => onNativeResponse(id, "__ERROR__timeout"), 0)
+        : normalRequest(id, method, arg);
+    });
+    await page.evaluate(() => updateData());
+    assert.match(await page.locator("#updateStatus").textContent(), /se conservan los guardados de esta jornada/);
+    assert.equal(await page.evaluate(() => probabilities().length), 14);
+    await page.evaluate(() => { Android.request = normalRequest; });
     assert.equal(await page.evaluate(() => state.currentRound), 11);
     assert.equal(await page.evaluate(() => editable()), true);
     await page.evaluate(() => applyCoverage(10));
@@ -328,6 +341,8 @@ const live = Array.from({ length: 15 }, (_, i) => ({
       );
     });
     await page.reload();
+    assert.match(await page.locator("#roundMode").textContent(), /ACTUALIZA DATOS/);
+    assert.equal(await page.locator("#seasonSelect").inputValue(), "26-27");
     await page.evaluate(() => updateData());
     await page.evaluate(() => goCurrentRound());
     assert.equal(await page.evaluate(() => state.round), 11);

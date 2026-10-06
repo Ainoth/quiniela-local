@@ -9,7 +9,7 @@ porcentajes y marcadores directamente de sus proveedores públicos.
 ## Aplicación Android autónoma
 
 El APK para Android 10 o posterior está en
-[`dist/QuinielaLocal-Android-1.1.0.apk`](dist/QuinielaLocal-Android-1.1.0.apk).
+[`dist/QuinielaLocal-Android-1.1.1.apk`](dist/QuinielaLocal-Android-1.1.1.apk).
 Es compatible con el Samsung Galaxy S20+ y funciona sin PC ni servidor.
 
 En el teléfono:
