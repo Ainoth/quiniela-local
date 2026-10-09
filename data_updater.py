@@ -35,27 +35,37 @@ def _atomic_write(path: Path, data: bytes) -> None:
     os.replace(temporary, path)
 
 
-def update_win1x2_files(data_dir: Path) -> list[str]:
+def unpack_win1x2(payload: bytes, data_dir: Path) -> list[str]:
     """Valida el paquete completo antes de reemplazar cada fichero de Datosg."""
-    payload = _download(WIN1X2_ZIP)
+    if len(payload) > MAX_DOWNLOAD:
+        raise ValueError("El ZIP supera el tamaño máximo permitido")
     updated: list[tuple[Path, bytes]] = []
     with zipfile.ZipFile(io.BytesIO(payload)) as archive:
         members = [item for item in archive.infolist() if not item.is_dir()]
-        if not members or sum(item.file_size for item in members) > MAX_UNPACKED:
+        if not members or len(members) > 5000 or sum(item.file_size for item in members) > MAX_UNPACKED:
             raise ValueError("El paquete de WIN1X2 está vacío o tiene un tamaño inesperado")
+        seen = set()
         for item in members:
             normalized = item.filename.replace("\\", "/")
             parts = Path(normalized).parts
             if len(parts) != 2 or parts[0].upper() != "DATOSG":
                 raise ValueError(f"Ruta no permitida dentro del ZIP: {item.filename}")
             name = parts[1]
-            if not re.fullmatch(r"[A-Za-z0-9_.-]+", name):
+            if name in ('.', '..') or not re.fullmatch(r"[A-Za-z0-9_.-]+", name):
                 raise ValueError(f"Nombre de archivo no permitido: {name}")
+            if name.casefold() in seen:
+                raise ValueError(f"Archivo duplicado dentro del ZIP: {name}")
+            seen.add(name.casefold())
             updated.append((data_dir / name, archive.read(item)))
     # Solo se escribe después de validar todos los miembros.
     for target, data in updated:
         _atomic_write(target, data)
     return [target.name for target, _ in updated]
+
+
+def update_win1x2_files(data_dir: Path) -> list[str]:
+    """Descarga mediante el mismo lector usado por la importación local."""
+    return unpack_win1x2(_download(WIN1X2_ZIP), data_dir)
 
 
 def fetch_percentages(season: str, round_no: int, cache_dir: Path) -> Path:
@@ -67,6 +77,9 @@ def fetch_percentages(season: str, round_no: int, cache_dir: Path) -> Path:
 
 
 def _validated_percentages(payload: bytes, season: str, round_no: int):
+    declarations = payload.replace(b'\x00', b'').upper()  # También detecta UTF-16/32.
+    if len(payload) > MAX_DOWNLOAD or b'<!DOCTYPE' in declarations or b'<!ENTITY' in declarations:
+        raise ValueError("XML demasiado grande o con declaraciones no permitidas")
     root = ElementTree.fromstring(payload)
     header = root if root.tag == "porcentajes" else root.find(".//porcentajes")
     if header is None or header.attrib.get("temporada") != str(2000 + int(season[3:])) or header.attrib.get("jornada") != str(round_no):

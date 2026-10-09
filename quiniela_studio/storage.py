@@ -13,7 +13,8 @@ class Repository:
         self.db = sqlite3.connect(self.path)
         self.db.execute('PRAGMA foreign_keys=ON')
         version = self.db.execute('PRAGMA user_version').fetchone()[0]
-        if version > 1:
+        if version > 2:
+            self.db.close()
             raise ValueError('Esta base necesita una versión posterior de Studio.')
         if version == 0:
             with self.db:
@@ -28,11 +29,54 @@ class Repository:
                 PRAGMA user_version=1;
                 COMMIT;
                 ''')
+        if version < 2:
+            if version == 1:
+                backup_path = self.path.with_name(self.path.stem + '-pre-v2-' + uuid.uuid4().hex + '.sqlite3')
+                with sqlite3.connect(backup_path) as backup_db:
+                    self.db.backup(backup_db)
+            with self.db:
+                self.db.execute('CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)')
+                self.db.execute('PRAGMA user_version=2')
+
+    def setting(self, key, default=None):
+        row = self.db.execute('SELECT value FROM settings WHERE key=?', (key,)).fetchone()
+        return json.loads(row[0]) if row else default
+
+    def set_setting(self, key, value):
+        with self.db:
+            self.db.execute('INSERT OR REPLACE INTO settings VALUES (?,?)', (key, json.dumps(value)))
+
+    def import_rounds(self, rounds, directory):
+        """Actualiza datos y referencia de caché juntos; nunca cambia versiones."""
+        keys = [r.key for r in rounds]
+        if not keys or len(keys) != len(set(keys)):
+            raise ValueError('Paquete de jornadas vacío o duplicado.')
+        with self.db:
+            self.db.executemany('INSERT INTO rounds VALUES (?,?) ON CONFLICT(key) DO UPDATE SET payload=excluded.payload',
+                                [(r.key, json.dumps(round_dict(r), ensure_ascii=False)) for r in rounds])
+            self.db.execute('INSERT OR REPLACE INTO settings VALUES (?,?)', ('data_directory', json.dumps(str(directory))))
+            self.db.execute('INSERT INTO audit(created_at,action,details) VALUES (?,?,?)',
+                            (utcnow(), 'import_rounds', json.dumps(dict(rounds=keys, directory=str(directory)))))
 
     def save_round(self, round_):
         with self.db:
             self.db.execute('INSERT INTO rounds VALUES (?,?) ON CONFLICT(key) DO UPDATE SET payload=excluded.payload',
                             (round_.key, json.dumps(round_dict(round_), ensure_ascii=False)))
+
+    def import_system_copies(self, systems):
+        """Copias idempotentes y atómicas de sistemas del escritorio anterior."""
+        count = 0
+        with self.db:
+            for system in systems:
+                if self.db.execute('SELECT 1 FROM systems WHERE id=?', (system.system_id,)).fetchone():
+                    continue
+                self.db.execute('INSERT INTO systems VALUES (?,?)', (system.system_id, system.round_key))
+                self.db.execute('INSERT INTO versions VALUES (?,?,?,?)',
+                                (system.system_id, 1, json.dumps(system_dict(system)), system.hash))
+                self.db.execute('INSERT INTO audit(created_at,action,system_id,revision,details) VALUES (?,?,?,?,?)',
+                                (utcnow(), 'import_pc_system', system.system_id, 1, system.origin))
+                count += 1
+        return count
 
     def round(self, key):
         row = self.db.execute('SELECT payload FROM rounds WHERE key=?', (key,)).fetchone()

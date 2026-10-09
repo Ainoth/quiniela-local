@@ -1,12 +1,12 @@
 requisito,entrega_prevista,estado,descripcion
-RF-JOR-001,v0.1/v0.5,PENDIENTE,"Crear, abrir, modificar y archivar temporadas, jornadas y sus 15 partidos."
-RF-JOR-002,v0.1/v0.5,PENDIENTE,Validar orden 1..14 y partido 15; detectar duplicados y entradas incompletas.
+RF-JOR-001,v0.1/v0.5,PARCIAL,"Crear, abrir, modificar y archivar temporadas, jornadas y sus 15 partidos."
+RF-JOR-002,v0.1/v0.5,PARCIAL,Validar orden 1..14 y partido 15; detectar duplicados y entradas incompletas.
 RF-JOR-003,v0.1/v0.5,PENDIENTE,"Registrar equipos, fecha/hora con zona horaria, competición y estado del evento."
 RF-JOR-004,v0.1/v0.5,PENDIENTE,"Capturar resultados manualmente y cargarlos desde proveedor autorizado, distinguiendo provisionales/finales."
-RF-JOR-005,v0.1/v0.5,PENDIENTE,"Guardar instantáneas de datos con proveedor, hora de captura, versión y calidad."
+RF-JOR-005,v0.1/v0.5,PARCIAL,"Guardar instantáneas de datos con proveedor, hora de captura, versión y calidad."
 RF-JOR-006,v0.1/v0.5,PENDIENTE,"Historial de temporadas, jornadas, recaudación, premios y acertantes cuando estén publicados."
-RF-JOR-007,v0.1/v0.5,PENDIENTE,"Política de caché, reintentos, actualización explícita y modo offline."
-RF-JOR-008,v0.1/v0.5,PENDIENTE,Comparación y conciliación entre proveedores; nunca sobrescribir un dato manual sin informar.
+RF-JOR-007,v0.1/v0.5,PARCIAL,"Política de caché, reintentos, actualización explícita y modo offline."
+RF-JOR-008,v0.1/v0.5,PARCIAL,Comparación y conciliación entre proveedores; nunca sobrescribir un dato manual sin informar.
 RF-QUI-001,v0.1/v0.8,PENDIENTE,"Editor de 14 casillas con subconjuntos no vacíos de `{1,X,2}`: fijo, doble, triple."
 RF-QUI-002,v0.1/v0.8,PENDIENTE,"Selector de Pleno al 15 con marcadores `{0,1,2,M}` por equipo; permitir múltiples resultados o uno fijo."
 RF-QUI-003,v0.1/v0.8,PENDIENTE,"Contador de fijos, dobles, triples y columnas, multiplicando por selecciones del Pleno al 15."
@@ -27,18 +27,18 @@ RF-GEN-008,v0.4/v0.6,PENDIENTE,"Asistente con dos modos: automático y experto, 
 RF-GEN-009,v0.4/v0.6,PENDIENTE,"Predicción de signo y Pleno al 15 desde modelos registrados y evaluados, con fallback honesto (sin predicción) si faltan datos."
 RF-GEN-010,v0.4/v0.6,PENDIENTE,"Estabilización de porcentajes: aproximar una distribución objetivo de signos en las columnas generadas, ciclos reproducibles y error final informado."
 RF-PRO-001,v0.4,PENDIENTE,"Cargar P(1), P(X), P(2) por partido, con validación suma=1 dentro de tolerancia."
-RF-PRO-002,v0.4,PENDIENTE,"Capturar separadamente porcentajes de selección pública de SELAE y otras fuentes, con fecha y procedencia."
+RF-PRO-002,v0.4,PARCIAL,"Capturar separadamente porcentajes de selección pública de SELAE y otras fuentes, con fecha y procedencia."
 RF-PRO-003,v0.4,PENDIENTE,Mostrar diferencias porcentuales entre probabilidad estimada y proporción jugada.
 RF-PRO-004,v0.4,PENDIENTE,Guardar distribución `4×4` para Pleno al 15 y verificar que suma 1.
 RF-PRO-005,v0.4,PENDIENTE,Ordenar columnas por probabilidad estimada; etiquetar supuesto de independencia cuando se use.
 RF-PRO-006,v0.4,PENDIENTE,Redondear SOLO para representación; no alterar cálculo interno.
 RF-PRO-007,v0.4,PENDIENTE,Columnas Base y sugerencias «más 1 / más X / más 2» ordenando probabilidades de signos.
-RF-PRO-008,v0.4,PENDIENTE,"Mostrar valores de fuente, instante y advertencia de datos incompletos u obsoletos."
-RF-FIL-001,v0.2/v0.7,PENDIENTE,"Motor de filtros composable, registro, validación, ejecutar por lotes y reportar descartes."
-RF-FIL-002,v0.2/v0.7,PENDIENTE,"Filtros de recuentos y secuencias (1, X, 2, variantes, signos seguidos, interrupciones)."
+RF-PRO-008,v0.4,PARCIAL,"Mostrar valores de fuente, instante y advertencia de datos incompletos u obsoletos."
+RF-FIL-001,v0.2/v0.7,PARCIAL,"Motor de filtros composable, registro, validación, ejecutar por lotes y reportar descartes."
+RF-FIL-002,v0.2/v0.7,PARCIAL,"Filtros de recuentos y secuencias (1, X, 2, variantes, signos seguidos, interrupciones)."
 RF-FIL-003,v0.2/v0.7,PENDIENTE,"Filtros de patrones: parejas, tríos, cuartetos, quintetos, sextetos, septetos y por partido."
 RF-FIL-004,v0.2/v0.7,PENDIENTE,"Filtros de columnas base (CB), sumas de CB, CB relacionadas y grupos de CB."
-RF-FIL-005,v0.2/v0.7,PENDIENTE,"Filtros de diferencias, coincidencias, rangos, figuras X-2, dibujos de variantes."
+RF-FIL-005,v0.2/v0.7,PARCIAL,"Filtros de diferencias, coincidencias, rangos, figuras X-2, dibujos de variantes."
 RF-FIL-006,v0.2/v0.7,PENDIENTE,"Filtro de valoraciones (suma, productos/logaritmos con gestión numérica segura)."
 RF-FIL-007,v0.2/v0.7,PENDIENTE,"Filtro `IF THEN`, condiciones vinculadas y grupos generales."
 RF-FIL-008,v0.2/v0.7,PENDIENTE,Reservas: tolerancia controlada al incumplimiento de condiciones con reglas explícitas.
@@ -70,10 +70,10 @@ RF-REN-005,v0.6,PENDIENTE,Ranking por rentabilidad / probabilidad; visualizació
 RF-REN-006,v0.6,PENDIENTE,"Estimar posibles premios con 3 o menos encuentros pendientes, sin mezclarlos con premios oficiales."
 RF-REN-007,v0.6,PENDIENTE,Calculadora de premios históricos y definitivos con datos oficiales validados.
 RF-REN-008,v0.6,PENDIENTE,"Comparativa real vs simulada: coste, premios, beneficio neto y retorno acumulado."
-RF-ESC-001,v0.1/v0.5,PENDIENTE,Escrutinio parcial y final de sistemas locales y ficheros externos.
+RF-ESC-001,v0.1/v0.5,PARCIAL,Escrutinio parcial y final de sistemas locales y ficheros externos.
 RF-ESC-002,v0.1/v0.5,PENDIENTE,"Categorías de aciertos 14,13,12,11,10 y Pleno al 15 según reglas vigentes."
 RF-ESC-003,v0.1/v0.5,PENDIENTE,No conceder Pleno al 15 por acertar solo el marcador si faltan los 14.
-RF-ESC-004,v0.1/v0.5,PENDIENTE,Filtrar solo partidos finalizados; mostrar intervalo de aciertos potenciales en parciales.
+RF-ESC-004,v0.1/v0.5,PARCIAL,Filtrar solo partidos finalizados; mostrar intervalo de aciertos potenciales en parciales.
 RF-ESC-005,v0.1/v0.5,PENDIENTE,"Procesar múltiples ficheros con progreso, cancelar y ranking."
 RF-ESC-006,v0.1/v0.5,PENDIENTE,"Columnas ganadoras aleatorias solo en simulación, claramente identificada."
 RF-ESC-007,v0.1/v0.5,PENDIENTE,Informe detallado / resumido y desglose de apuestas sin premio.
@@ -90,7 +90,7 @@ RF-EST-003,v0.4/v0.7,PENDIENTE,"Figuras, dibujos, transiciones, interrupciones y
 RF-EST-004,v0.4/v0.7,PENDIENTE,Distancias de Hamming y distribución entre columnas.
 RF-EST-005,v0.4/v0.7,PENDIENTE,"Gráficas por jornadas/temporadas, con periodo aplicable a todos los cálculos."
 RF-EST-006,v0.4/v0.7,PENDIENTE,Medir efectos de cada filtro y estudiar la conservación de resultados históricos.
-RF-ARC-001,v0.1/v0.8,PENDIENTE,"Import/export nativo versionado a JSON y texto simple, sin pérdida del Pleno al 15."
+RF-ARC-001,v0.1/v0.8,PARCIAL,"Import/export nativo versionado a JSON y texto simple, sin pérdida del Pleno al 15."
 RF-ARC-002,v0.1/v0.8,PENDIENTE,Soporte XML interno y compatibilidad externa mediante adaptadores de formato.
 RF-ARC-003,v0.1/v0.8,PENDIENTE,"Unir, intersecar, restar, deduplicar y ordenar grandes conjuntos."
 RF-ARC-004,v0.1/v0.8,PENDIENTE,"Dividir por número, tamaño y Pleno al 15; conservar manifiestos para recomponer."
@@ -109,11 +109,11 @@ RF-PEN-002,v0.8,PENDIENTE,Asociar apuestas/sistemas a peña y jornada.
 RF-PEN-003,v0.8,PENDIENTE,Calcular participaciones y repartos con aritmética decimal exacta y reglas explícitas.
 RF-PEN-004,v0.8,PENDIENTE,"Informes de participantes, aportaciones y resultados; PDF imprimible."
 RF-PEN-005,v0.8,PENDIENTE,No gestionar cobros reales ni facturación regulada sin fase separada.
-RF-AUD-001,v0.1/v0.9,PENDIENTE,"Bitácora de cada acción: origen de datos, filtros, reducción, semilla, costes y resultados."
-RF-AUD-002,v0.1/v0.9,PENDIENTE,Historial comparativo y posibilidad de reproducir un sistema desde parámetros versionados.
+RF-AUD-001,v0.1/v0.9,PARCIAL,"Bitácora de cada acción: origen de datos, filtros, reducción, semilla, costes y resultados."
+RF-AUD-002,v0.1/v0.9,PARCIAL,Historial comparativo y posibilidad de reproducir un sistema desde parámetros versionados.
 RF-AUD-003,v0.1/v0.9,PENDIENTE,"Informes de quiniela, filtros, apuestas eliminadas, garantías, escrutinio y desempeño."
 RF-AUD-004,v0.1/v0.9,PENDIENTE,"Panel inicial: jornada vigente, actividad reciente y accesos útiles, sin saturación."
 RF-AUD-005,v0.1/v0.9,PENDIENTE,"Preferencias de idioma, accesibilidad, tema, fuentes y límites de presupuesto."
 RF-AUD-006,v0.1/v0.9,PENDIENTE,"Copia de seguridad, exportación de datos y restauración con confirmación."
-RF-AUD-007,v0.1/v0.9,PENDIENTE,"Diagnóstico entendible de importaciones fallidas, dependencia ausente y errores de datos."
-RF-AUD-008,v0.1/v0.9,PENDIENTE,Instalación portable sin rutas de usuario incrustadas; registro de versión de datos y migraciones.
+RF-AUD-007,v0.1/v0.9,PARCIAL,"Diagnóstico entendible de importaciones fallidas, dependencia ausente y errores de datos."
+RF-AUD-008,v0.1/v0.9,PARCIAL,Instalación portable sin rutas de usuario incrustadas; registro de versión de datos y migraciones.

@@ -1,17 +1,15 @@
 from dataclasses import replace
 from datetime import date
 import json
-import math
-from pathlib import Path
 import sqlite3
 import time
 
 import pytest
 from quiniela_studio.demo import demo_round
-from quiniela_studio.domain import Bet, ProbabilitySnapshot, round_dict
+from quiniela_studio.domain import Bet, ProbabilitySnapshot
 from quiniela_studio.engine import (generate, size, coverage_template, probability_mass,
     optimize, evaluate, Cancelled, column_id, decode_column)
-from quiniela_studio.files import read_txt, write_txt, write_system, read_system, read_round
+from quiniela_studio.files import read_txt, write_txt, write_system, read_system
 from quiniela_studio.providers import scrutiny_record, load_win1x2, migrate_legacy
 from quiniela_studio.services import SystemService
 from quiniela_studio.storage import Repository
@@ -191,6 +189,7 @@ def test_local_win1x2_uses_fixed_round_and_provider_ids(tmp_path):
     (tmp_path/'PRE26-27.txt').write_text(pre_record(10),encoding='cp1252')
     (tmp_path/'FEC26-27.txt').write_text('10:09/10/2026')
     rounds=load_win1x2(tmp_path,today=date(2026,10,9))
-    assert rounds[0].number==10 and rounds[0].mode=='current'
+    # Un PRE con escrutinio definitivo ya es histórico, incluso en su fecha nominal.
+    assert rounds[0].number==10 and rounds[0].mode=='past'
     assert rounds[0].matches[0].home_id.startswith('win1x2:26-27:')
     assert rounds[0].snapshot('sport') is None

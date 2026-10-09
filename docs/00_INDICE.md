@@ -38,3 +38,6 @@ No cargues todos los documentos en cada interacción si no es necesario. Para un
 
 - [PC Studio Tkinter](PC_STUDIO_FASE1.md): entrega integrada desde GitHub;
   convive con la interfaz Qt durante la comprobación de paridad.
+
+- [Fusión de escritorio v0.1.1](STUDIO_FUSION.md): datos, marcador, recuperación
+  de sistemas, filtros básicos y límites de paridad.

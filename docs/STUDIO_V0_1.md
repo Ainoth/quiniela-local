@@ -11,6 +11,9 @@ vive en `quiniela_studio/` y declara Python >=3.10, en lugar de
 `src/quiniela_ai_studio/` y Python >=3.11. Esta entrega no afirma paridad completa
 con Quiniela Local ni cumplimiento íntegro de la especificación original.
 
+La ampliación actual se describe en [Fusión v0.1.1](STUDIO_FUSION.md).
+Las limitaciones de red/calendario de este documento describen la versión inicial.
+
 ## Qué funciona
 
 - Interfaz Qt en español, siete secciones y pie con cantidad/coste real.

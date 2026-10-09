@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 import re
 import uuid
-from .domain import Round, Match, ProbabilitySnapshot, utcnow
+from .domain import Round, Match, utcnow
 from .files import read_bytes, atomic_text
 
 
@@ -38,6 +38,7 @@ def scrutiny_record(line):
 def load_win1x2(directory, today=None):
     directory = Path(directory)
     today = today or date.today()
+    paths = {p.name.casefold(): p for p in directory.iterdir() if p.is_file()}
     names = {}
     for path in directory.iterdir():
         if path.name.upper() == 'WEQUIPOS.TXT' or path.name.upper().startswith('EQ'):
@@ -53,8 +54,8 @@ def load_win1x2(directory, today=None):
         if not re.fullmatch(r'PRE\d{2}-\d{2}\.txt', path.name, re.I):
             continue
         season = path.stem[3:]
-        dates_path = directory / f'FEC{season}.txt'
-        if not dates_path.exists():
+        dates_path = paths.get(f'FEC{season}.txt'.casefold())
+        if dates_path is None:
             continue
         dates = {int(m[1]): datetime.strptime(m[2], '%d/%m/%Y').date()
                  for line in text(dates_path).splitlines()
@@ -73,16 +74,26 @@ def load_win1x2(directory, today=None):
             if nominal is None:
                 continue
             codes = [line[119+i*3:122+i*3].upper() for i in range(30)]
-            if any(not re.fullmatch('[A-Z0-9]{3}', code) for code in codes):
+            if any(not re.fullmatch('[A-Z0-9]{3}', code) or code == '000' for code in codes):
                 continue
             matches = tuple(Match(i+1, names.get(codes[2*i], codes[2*i]), names.get(codes[2*i+1], codes[2*i+1]),
                                   schedules.get(number, ['']*15)[i], f'win1x2:{season}:{codes[2*i]}',
                                   f'win1x2:{season}:{codes[2*i+1]}') for i in range(15))
-            mode = 'current' if nominal == today else 'past' if nominal < today else 'future'
+            kickoff_dates = [datetime.strptime(m.kickoff[:10], '%d/%m/%Y').date() for m in matches
+                             if re.fullmatch(r'\d{2}/\d{2}/\d{4}\d{2}:\d{2}', m.kickoff)]
+            last_day = max(kickoff_dates + [nominal])
+            mode = 'past' if scrutiny_record(line) or last_day < today else 'future'
             rounds.append(Round(season, number, matches, mode, f'WIN1X2 local · {path.name}', captured,
-                                rules_version='referencia-local-75c; confirmar canal antes de jugar', nominal_date=nominal.isoformat()))
+                                rules_version='referencia-local-75c; confirmar canal antes de jugar', nominal_date=nominal.isoformat(),
+                                editable_until=last_day.isoformat()))
     if not rounds:
         raise ValueError('No se encontraron jornadas PRE/FEC válidas.')
+    candidates = [r for r in rounds if r.mode == 'future']
+    if candidates:
+        current = min(candidates, key=lambda r: (r.editable_until, r.nominal_date, r.key))
+        rounds = [replace(r, mode='current') if r.key == current.key else r for r in rounds]
+    if len({r.key for r in rounds}) != len(rounds):
+        raise ValueError('Hay jornadas duplicadas en los archivos PRE.')
     return tuple(rounds)
 
 

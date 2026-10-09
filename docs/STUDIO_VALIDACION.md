@@ -83,3 +83,25 @@ Comprobaciones tras la integración:
 
 El ZIP documental se conserva localmente, fuera de los commits de esta entrega.
 Windows sigue sin ejecución nativa acreditada.
+
+## Escritorio integrado v0.1.1 — 10/10/2026
+
+- 69 pruebas Studio: importación carpeta/ZIP/red simulada, nombres y fuentes,
+  XML cruzado/inválido/entidades, rollback, cancelación y cierre de Qt,
+  migración con copia previa, recuperación SQLite idempotente, filtros contra
+  oráculo exhaustivo, restauración de origen y conservación de cantidades.
+- 32 pruebas de regresión Tkinter, incluidas las GUI con `RUN_PC_GUI_TESTS=1`.
+- Ruff: chequeo completo de módulos/tests nuevos y chequeo F del conjunto Studio.
+  El formato compacto histórico no se ha reescrito en esta integración.
+- Arranque Qt real Linux/X11 y revisión visual de Inicio, Crear, Optimizar,
+  Escrutinio y Configuración a 1024×768 con datos públicos, en perfil temporal.
+- Descarga real: 80 jornadas WIN1X2 y fuente pública de `26-27/J12`, con
+  identidad de los 15 equipos validada. `Andorra` / `ANDORRA FC` se registra
+  como alias nominal explícito; no hay coincidencias difusas.
+- Directo real: el proveedor no ofrece esa jornada en la consulta realizada.
+  No se afirma éxito en vivo para ella. El flujo parcial/caché/errores se
+  verifica con fixtures sintéticos; no se consulta otra jornada como fallback.
+- Wheel y sdist v0.1.1 incluyen los adaptadores compartidos. Se comprueba la
+  importación del wheel en un directorio separado y la inicialización de Qt.
+- Acceso de escritorio existente apunta a `run_studio.sh`; no se sustituyen
+  accesos de la versión anterior. Windows sigue sin prueba nativa.

@@ -52,12 +52,15 @@ class SystemService:
         return self.version(system, bets=tuple(bets), origin='desarrollo cartesiano exacto',
                             parameters=json.dumps(dict(base=system.base, pleno=system.pleno)))
 
-    def optimized(self, system, budget_cents):
+    def optimized(self, system, budget_cents, kind='sport'):
         round_ = self._editable(system)
         if not system.bets:
             raise ValueError('Genera o importa un desarrollo antes de optimizarlo.')
         frozen = round_from_dict(json.loads(system.round_snapshot)) if system.round_snapshot else round_
-        bets = optimize(system.bets, budget_cents, frozen.price_cents, frozen.snapshot('sport'))
+        if kind not in ('sport', 'public'): raise ValueError('Tipo de fuente desconocido.')
+        snapshot = frozen.snapshot(kind)
+        if kind == 'public' and snapshot is None: raise ValueError('No hay porcentajes jugados congelados en este sistema.')
+        bets = optimize(system.bets, budget_cents, frozen.price_cents, snapshot)
         if not bets:
             raise ValueError('El presupuesto no permite conservar una apuesta.')
         # Unión descriptiva: se conservan exactamente las apuestas seleccionadas.
@@ -65,7 +68,48 @@ class SystemService:
         base = tuple(system.base[i] if system.locks[i] else union[i] for i in range(14))
         return self.version(system, bets=bets, base=base, origin='selección del desarrollo de origen',
                             parameters=json.dumps(dict(input_hash=system.hash, input_revision=system.revision,
-                                                       budget_cents=budget_cents, ranking='sport' if frozen.snapshot('sport') else 'lexicográfico')))
+                                                       budget_cents=budget_cents, ranking=kind if snapshot else 'lexicográfico')))
+
+    def refresh_sources(self, system):
+        """Adopta fuentes actualizadas mediante versión explícita sin cambiar apuestas/precio."""
+        current = self._editable(system)
+        frozen = round_from_dict(json.loads(system.round_snapshot)) if system.round_snapshot else current
+        if tuple((m.home_id, m.away_id) for m in frozen.matches) != tuple((m.home_id, m.away_id) for m in current.matches):
+            raise ValueError('Los equipos han cambiado. Crea un sistema nuevo para revisarlos.')
+        updated = replace(current, price_cents=frozen.price_cents, rules_version=frozen.rules_version)
+        return self.version(system, round_snapshot=json.dumps(round_dict(updated)),
+                            origin='actualización explícita de fuentes; apuestas y precio conservados', action='refresh_sources')
+
+    def filtered(self, system, spec):
+        self._editable(system)
+        if not system.bets: raise ValueError('Genera o importa apuestas antes de aplicar filtros.')
+        bets = spec.apply(system.bets)
+        if not bets: raise ValueError('Los filtros eliminarían todas las apuestas. El sistema anterior se conserva.')
+        union = union_base(bets, system.base)
+        base = tuple(system.base[i] if system.locks[i] else union[i] for i in range(14))
+        return self.version(system, bets=bets, base=base, origin='filtros básicos de Quiniela Local', action='filter',
+                            parameters=json.dumps(dict(input_revision=system.revision, input_hash=system.hash,
+                                                       filter_spec=spec.parameters(), input_quantity=system.quantity,
+                                                       output_quantity=sum(b.quantity for b in bets))))
+
+    def restore_origin(self, system):
+        self._editable(system)
+        source = system
+        while True:
+            parameters = json.loads(source.parameters)
+            previous = parameters.get('input_revision')
+            if previous is None or previous >= source.revision: break
+            source = self.repository.load(system.system_id, previous)
+        legacy = json.loads(source.parameters).get('legacy_parameters', {})
+        if legacy.get('original'):
+            from .domain import Bet
+            bets = tuple(Bet(column, legacy.get('pleno', '').replace('-', '')) for column in legacy['original'])
+        else:
+            bets = source.bets
+        if not bets: raise ValueError('No hay un desarrollo de origen disponible en esta versión.')
+        union = union_base(bets, system.base)
+        base = tuple(system.base[i] if system.locks[i] else union[i] for i in range(14))
+        return self.version(system, bets=bets, base=base, origin=f'desarrollo original de v{source.revision}', action='restore_origin')
 
     def undo(self, system):
         if system.revision <= 1:

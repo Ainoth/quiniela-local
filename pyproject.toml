@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "quiniela-ai-studio"
-version = "0.1.0"
+version = "0.1.1"
 description = "Estudio local de sistemas de Quiniela para Linux y Windows"
 requires-python = ">=3.10"
 dependencies = ["PySide6>=6.8,<7"]
@@ -17,6 +17,9 @@ quiniela-studio = "quiniela_studio.__main__:main"
 
 [tool.setuptools.packages.find]
 include = ["quiniela_studio*"]
+
+[tool.setuptools]
+py-modules = ["data_updater", "live_results", "quiniela_engine"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests/studio"]

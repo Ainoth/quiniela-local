@@ -97,11 +97,13 @@ class Round:
     snapshots: tuple[ProbabilitySnapshot, ...] = ()
     rules_version: str = "local-v1"
     nominal_date: str = ""
+    editable_until: str = ""
 
     def __post_init__(self):
         object.__setattr__(self, "matches", tuple(self.matches))
         object.__setattr__(self, "snapshots", tuple(self.snapshots))
         if self.nominal_date: date.fromisoformat(self.nominal_date)
+        if self.editable_until: date.fromisoformat(self.editable_until)
         if not re.fullmatch(r"\d{2}-\d{2}|DEMO", self.season) or type(self.number) is not int or not 1 <= self.number <= 99:
             raise ValueError("Temporada o jornada inválida.")
         if len(self.matches) != 15 or tuple(m.number for m in self.matches) != tuple(range(1, 16)):
@@ -120,7 +122,9 @@ class Round:
 
     @property
     def editable(self):
-        return self.mode == "simulation" or (self.mode == "current" and (not self.nominal_date or date.fromisoformat(self.nominal_date) == date.today()))
+        return self.mode == "simulation" or (self.mode == "current" and (
+            date.today() <= date.fromisoformat(self.editable_until) if self.editable_until
+            else not self.nominal_date or date.fromisoformat(self.nominal_date) == date.today()))
 
     def snapshot(self, kind):
         return next((s for s in self.snapshots if s.kind == kind), None)

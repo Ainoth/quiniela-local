@@ -6,17 +6,30 @@ Aplicación de Quiniela para escritorio y Android. La versión de escritorio
 puede leer los datos instalados por WIN1X2; ambas versiones descargan datos,
 porcentajes y marcadores directamente de sus proveedores públicos.
 
-## Quiniela AI Studio v0.1 — nueva aplicación de escritorio
+## Quiniela AI Studio v0.1.1 — escritorio integrado
 
 La nueva interfaz modular Qt en español está en `quiniela_studio/`.
 Incluye constructor con bloqueos y plantillas 0–10, generación cancelable,
 sistemas/versiones SQLite, selección por presupuesto, fuentes separadas,
-TXT/JSON y escrutinio local. Es una primera entrega acotada: no supone paridad
+TXT/JSON y escrutinio local. Ahora reúne descarga/importación WIN1X2, porcentajes
+públicos, marcador, copias de sistemas antiguos y filtros básicos de Quiniela Local.
+Es una entrega acotada: no supone paridad
 completa, IA entrenada ni garantías de reducción. Android no se modifica.
 
 ```bash
 ./run_studio.sh
 ```
+
+En **Inicio → Descargar / actualizar datos**, revisa la lista de jornadas y pulsa
+**Importar datos revisados**. Para datos ya instalados, usa **Importar datos
+locales**; Configuración también admite ZIP WIN1X2 y porcentajes XML.
+Los datos quedan disponibles sin conexión. El precio sigue siendo una regla
+local de referencia que debes confirmar antes de jugar.
+
+En Configuración puedes recuperar `desktop_data/systems.sqlite3` como copias
+sin modificar la base anterior. En Escrutinio están el marcador y los premios
+PRE guardados. En Optimizar están los filtros y restauración del origen.
+[Funciones integradas y límites](docs/STUDIO_FUSION.md).
 
 Windows: `run_studio.bat` (preparado; pendiente de validación nativa).
 
