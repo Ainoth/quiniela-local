@@ -1,0 +1,10 @@
+include AGENTS.md CODEX_EMPEZAR_AQUI.md requirements-studio.lock run_studio.sh run_studio.bat
+include app.py quiniela_engine.py data_updater.py live_results.py update_and_run.sh
+include test_quiniela_engine.py test_live_results.py
+include assets/quiniela-local.png
+include docs/00_INDICE.md docs/ESPECIFICACION_PC.md
+recursive-include docs *.md
+recursive-include fixtures *.json
+include requisitos.csv
+recursive-include scripts *.py *.sh
+recursive-include tests/studio *.py

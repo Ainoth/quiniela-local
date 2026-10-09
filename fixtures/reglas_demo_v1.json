@@ -1,0 +1,10 @@
+{
+  "id": "demo-v1",
+  "demo": true,
+  "description": "Reglas sintéticas para tests de v0.1; no equivalen a tarifa oficial vigente.",
+  "number_of_main_matches": 14,
+  "main_alphabet": ["1", "X", "2"],
+  "full15_goal_alphabet": ["0", "1", "2", "M"],
+  "unit_price_cents": 75,
+  "has_elige8_extension": false
+}

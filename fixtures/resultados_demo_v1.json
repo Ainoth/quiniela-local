@@ -1,0 +1,7 @@
+{
+  "draw_id": "DEMO-2026-01",
+  "demo": true,
+  "results14": ["1", "X", "2", "X", "1", "1", "1", "X", "2", "1", "X", "1", "1", "2"],
+  "full15": ["0", "1"],
+  "results_status": "synthetic_final"
+}

@@ -1,0 +1,11 @@
+{
+  "schema": "quiniela_ai_studio.selection",
+  "version": 1,
+  "draw_id": "DEMO-2026-01",
+  "demo": true,
+  "ruleset_id": "demo-v1",
+  "picks14": ["1", "1X", "2", "X", "1X2", "1", "1", "X", "2", "1", "X", "1", "1", "2"],
+  "full15": [["0", "1"], ["1", "1"]],
+  "unit_price_cents": 75,
+  "metadata": {"author": "local", "algorithm": "manual", "seed": null}
+}
