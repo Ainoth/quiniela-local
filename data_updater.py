@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import io
+import math
 import os
 import re
 import urllib.request
@@ -59,7 +60,17 @@ def update_win1x2_files(data_dir: Path) -> list[str]:
 
 def fetch_percentages(season: str, round_no: int, cache_dir: Path) -> Path:
     payload = _download(QUINIELISTA_PERCENTAGES.format(round_no=round_no))
+    _validated_percentages(payload, season, round_no)
+    target = cache_dir / f"porcentajes_{season}_J{round_no:02d}.xml"
+    _atomic_write(target, payload)
+    return target
+
+
+def _validated_percentages(payload: bytes, season: str, round_no: int):
     root = ElementTree.fromstring(payload)
+    header = root if root.tag == "porcentajes" else root.find(".//porcentajes")
+    if header is None or header.attrib.get("temporada") != str(2000 + int(season[3:])) or header.attrib.get("jornada") != str(round_no):
+        raise ValueError("Los porcentajes no identifican la temporada y jornada solicitadas.")
     matches = root.findall(".//partido")
     if len(matches) != 15:
         raise ValueError(f"Se esperaban 15 partidos y se recibieron {len(matches)}")
@@ -68,22 +79,21 @@ def fetch_percentages(season: str, round_no: int, cache_dir: Path) -> Path:
             raise ValueError("El XML contiene una numeración de partidos inesperada")
         values = [float(match.attrib[f"p_jugados_{sign}"]) for sign in ("1", "X", "2")]
         # El partido 15 es un marcador (Pleno al 15), no un signo 1-X-2.
+        if any(not math.isfinite(v) or v < 0 or v > 100 for v in values):
+            raise ValueError("Porcentajes no válidos.")
         if number <= 14 and not 99.0 <= sum(values) <= 101.0:
             raise ValueError(f"Los porcentajes del partido {number} no suman 100")
-    target = cache_dir / f"porcentajes_{season}_J{round_no:02d}.xml"
-    _atomic_write(target, payload)
-    return target
+    return [tuple(v * 100 / sum(row) for v in row) for row in (
+        [float(m.attrib[f"p_jugados_{s}"]) for s in ("1", "X", "2")]
+        for m in matches[:14]
+    )]
 
 
 def read_percentages(season: str, round_no: int, cache_dir: Path) -> list[tuple[float, float, float]] | None:
     path = cache_dir / f"porcentajes_{season}_J{round_no:02d}.xml"
     if not path.exists():
         return None
-    root = ElementTree.fromstring(path.read_bytes())
-    matches = root.findall(".//partido")
-    if len(matches) != 15:
+    try:
+        return _validated_percentages(path.read_bytes(), season, round_no)
+    except (ValueError, KeyError, ElementTree.ParseError, OSError):
         return None
-    return [
-        tuple(float(match.attrib[f"p_jugados_{sign}"]) for sign in ("1", "X", "2"))
-        for match in matches
-    ]

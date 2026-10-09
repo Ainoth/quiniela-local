@@ -64,12 +64,12 @@ y futuras son de consulta. **En curso** vuelve a la quiniela editable.
 Las descargas se ejecutan en segundo plano y los datos quedan disponibles
 sin conexión tras la primera actualización. Véase [Android](android/README.md).
 
-## Funciones de esta primera versión
+## Funciones de escritorio
 
 - Detecta la temporada y la jornada vigente.
 - Lee los 15 partidos y horarios desde `Datosg/PRE*.txt` y `Datosg/Hor*.txt`.
-- El botón **Actualizar datos** vuelve a leer directamente la carpeta
-  `WIN1X2/Datosg`; no usa ni mantiene una copia interna de esos ficheros.
+- **Descargar datos** actualiza los archivos de `WIN1X2/Datosg` y los porcentajes
+  desde sus proveedores, sin ejecutar WebW1X2.exe; se pueden consultar sin conexión.
 - Traduce códigos mediante `Datosg/WEQUIPOS.TXT`.
 - Calcula una orientación 1/X/2 con hasta ocho resultados recientes de cada
   equipo y una pequeña corrección por ventaja local.
@@ -81,14 +81,14 @@ sin conexión tras la primera actualización. Véase [Android](android/README.md
 - Genera entre 2 y 100 **columnas más probables**, ordenando combinaciones
   completas por la probabilidad conjunta de sus 14 signos sin recorrer de
   forma exhaustiva las 4.782.969 combinaciones posibles.
-- Optimiza un presupuesto en euros y compara columnas sencillas, un desarrollo
-  múltiple directo y las seis reducciones oficiales. Indica partidos fijos,
-  dobles y triples, número de apuestas, coste y cobertura estimada.
+- Optimiza el presupuesto usando únicamente las columnas del desarrollo de origen;
+  permite restaurarlo y conserva las apuestas, sistemas y versiones por jornada.
+- Compara modelo deportivo y porcentajes jugados sin tratarlos como la misma fuente.
 
-El optimizador aplica el precio vigente de 0,75 € por apuesta y un mínimo de
-dos apuestas. Las reducciones oficiales abaratan un desarrollo múltiple, pero
-solo juegan una parte de sus combinaciones; la cobertura mostrada es una
-estimación del modelo y no garantiza premio.
+El cálculo usa 0,75 € por apuesta; el optimizador requiere al menos dos apuestas
+de origen y un presupuesto de 1,50 €. No se añaden apuestas para completar mínimos.
+La reducción disponible es una heurística de probabilidad/diversidad; la cobertura
+mostrada es una estimación del modelo, no un certificado matemático ni rentabilidad.
 
 La probabilidad mostrada es un modelo sencillo, no una garantía ni una
 recomendación de apuesta. Cuando no existe historial suficiente, se usa una
@@ -105,10 +105,17 @@ filtros, arquitectura, fases y pruebas de aceptación. Es una especificación
 de desarrollo: no significa que las funciones nuevas ya estén implementadas.
 La ampliación está limitada al escritorio; Android queda sin cambios.
 
+La [primera entrega de PC Studio](docs/PC_STUDIO_FASE1.md) ya incorpora las siete
+secciones, navegación de jornadas, sistemas y versiones SQLite, comparación
+modelo/público, conservación del desarrollo de origen y correcciones del
+escrutador. Mantiene los editores actuales de Tkinter; el resto de módulos y la
+paridad con la versión Qt siguen pendientes. Ejecuta `python3 app.py` para abrir
+esta versión Tkinter o `./run_studio.sh` para abrir la nueva versión Qt.
+
 ## Ejecución
 
 ```bash
-python3 quiniela_local/app.py
+python3 app.py
 ```
 
 Si la aplicación no está dentro de la carpeta de WIN1X2, indica la carpeta de
@@ -121,7 +128,7 @@ WIN1X2_DATA_DIR=/ruta/a/WIN1X2/Datosg python3 app.py
 Para comprobar únicamente la lectura de datos:
 
 ```bash
-python3 quiniela_local/app.py --check
+python3 app.py --check
 ```
 
 `update_and_run.sh` actualiza el repositorio con un avance rápido desde GitHub

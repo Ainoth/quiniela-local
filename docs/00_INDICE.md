@@ -35,3 +35,6 @@ Documentación de la implementación local; complementar con la especificación 
 ## Regla de lectura
 
 No cargues todos los documentos en cada interacción si no es necesario. Para una tarea de filtros, lee `03`, `04`, `09` y la matriz. Para reducción, lee `03`, `05`, `09`. Para datos externos, lee `07`, `11`. `AGENTS.md` es el mapa mínimo y el contrato de trabajo.
+
+- [PC Studio Tkinter](PC_STUDIO_FASE1.md): entrega integrada desde GitHub;
+  convive con la interfaz Qt durante la comprobación de paridad.

@@ -12,3 +12,4 @@ studio-data/
 *.egg-info/
 build/
 artifacts/
+desktop_data/
