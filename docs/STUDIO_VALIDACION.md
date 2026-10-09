@@ -64,3 +64,22 @@ No se modificó ningún archivo `android/` ni los APK existentes.
 Consultar `STUDIO_V0_1.md` para matriz T01–T17. Las pruebas de esta entrega no
 certifican fases 2–4, modelos entrenados, reductor con garantía, simulación,
 proveedores online ni la paridad completa de la versión anterior.
+
+## Sincronización con GitHub — 10 de octubre de 2026
+
+Integrada la entrega Tkinter de `origin/main` (`69597c0`) con la versión Qt
+local, conservando ambos lanzadores. Incorporados los documentos originales
+y fixtures del paquete documental; la matriz RF conserva su estado original
+pendiente de auditoría, sin declarar cumplimiento nuevo.
+
+Comprobaciones tras la integración:
+
+- `QT_QPA_PLATFORM=offscreen .venv-studio/bin/python -m pytest -q`: 35 correctas.
+- `RUN_PC_GUI_TESTS=1 python3 -m unittest discover -q`: 32 correctas.
+- Arranque Qt real con perfil temporal y `--smoke-test`: salida 0.
+- `git diff --check`: correcto; sin cambios en Android ni APK.
+- Acceso de escritorio local `Quiniela AI Studio.desktop`: ejecutable, apunta
+  a `run_studio.sh` y tiene `metadata::trusted=true`.
+
+El ZIP documental se conserva localmente, fuera de los commits de esta entrega.
+Windows sigue sin ejecución nativa acreditada.
