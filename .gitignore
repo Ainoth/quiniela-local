@@ -3,3 +3,4 @@ cache/
 *.pyc
 pronosticos.json
 .venv/
+desktop_data/

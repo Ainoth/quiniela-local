@@ -80,7 +80,7 @@ class EngineTests(unittest.TestCase):
         self.assertEqual(plans[0].bets, 2)
 
     def test_cached_percentages(self):
-        xml = b'''<?xml version="1.0"?><quinielista><porcentajes>''' + b"".join(
+        xml = b'''<?xml version="1.0"?><quinielista><porcentajes temporada="2027" jornada="10">''' + b"".join(
             f'<partido num="{number}" p_jugados_1="50" p_jugados_X="30" p_jugados_2="20"/>'.encode()
             for number in range(1, 16)
         ) + b'''</porcentajes></quinielista>'''

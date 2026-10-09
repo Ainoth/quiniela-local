@@ -15,9 +15,12 @@ import webbrowser
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import date, datetime
+from decimal import Decimal
 from pathlib import Path
 import tkinter as tk
-from tkinter import filedialog, messagebox, ttk
+from tkinter import filedialog, messagebox, simpledialog, ttk
+from pc_store import SystemStore
+from pc_studio import StudioPages
 
 from live_results import fetch_live_results, evaluate_live_bets
 
@@ -31,7 +34,8 @@ from data_updater import fetch_percentages, read_percentages, update_win1x2_file
 ROOT = Path(__file__).resolve().parent.parent
 DATA = Path(os.environ.get("WIN1X2_DATA_DIR", ROOT / "Datosg")).expanduser().resolve()
 APP_DIR = Path(__file__).resolve().parent
-STATE_FILE = APP_DIR / "pronosticos.json"
+STATE_DIR = Path(os.environ.get("QUINIELA_STATE_DIR", APP_DIR)).expanduser().resolve()
+STATE_FILE = STATE_DIR / "pronosticos.json"
 CACHE_DIR = APP_DIR / "cache"
 WINDOW_ICON = APP_DIR / "assets" / "quiniela-local.png"
 QUINIELISTA_UPLOAD_URL = "https://www.eduardolosilla.es/quiniela/archivos"
@@ -56,6 +60,8 @@ class Match:
     kickoff: str
     probabilities: tuple[float, float, float]
     detail: str
+    sport_probabilities: tuple[float, float, float] | None = None
+    public_percentages: tuple[float, float, float] | None = None
 
     @property
     def suggestion(self) -> str:
@@ -94,6 +100,8 @@ def quinielista_text(columns, pleno: str) -> str:
 
 def read_bet_file(path: Path) -> list[str]:
     """Lee un TXT de apuestas: 14 signos, o 14 signos más el Pleno al 15."""
+    if path.stat().st_size > 25 * 1024 * 1024:
+        raise ValueError("El TXT supera el máximo de importación de 25 MiB.")
     bets = [line.strip().upper().replace(" ", "") for line in read_text(path).splitlines() if line.strip()]
     if not bets or any(not re.fullmatch(r"[1X2]{14}(?:[012M]{2})?", bet) for bet in bets):
         raise ValueError("El archivo debe contener una apuesta de 14 o 16 signos por línea.")
@@ -113,7 +121,7 @@ def decode_pleno(code: str) -> str:
 def parse_scrutiny(path: Path, round_no: int):
     """Extrae resultado y premios de una jornada del fichero PRE de WIN1X2."""
     line = next(
-        (item for item in read_text(path).splitlines() if re.match(r"\d+", item) and int(re.match(r"\d+", item).group()) == round_no),
+        (item for item in read_text(path).splitlines() if item[:2].strip().isdigit() and int(item[:2]) == round_no),
         "",
     )
     # Los 15 caracteres inmediatamente anteriores al bloque de equipos (posición 119)
@@ -122,9 +130,9 @@ def parse_scrutiny(path: Path, round_no: int):
     if not re.fullmatch(r"[1X2]{14}", result):
         return None
     pleno = decode_pleno(line[118].upper())
-    tokens = re.findall(r"\d[\d.]*,\d{2}|\d+", line[:104])
-    counts = [int(token) for token in tokens[1:7]] if len(tokens) >= 7 else []
-    amounts = [float(token.replace(".", "").replace(",", ".")) for token in tokens[7:13]] if len(tokens) >= 13 else []
+    tokens = re.findall(r"\d[\d.]*,\d{2}|\d+", line[2:104])
+    counts = [int(token) for token in tokens[:6]] if len(tokens) >= 6 else []
+    amounts = [float(token.replace(".", "").replace(",", ".")) for token in tokens[6:12]] if len(tokens) >= 12 else []
     prizes = {}
     for category, winners, amount in zip((15, 14, 13, 12, 11, 10), counts, amounts):
         prizes[category] = (winners, amount)
@@ -137,7 +145,10 @@ def evaluate_bets(bets: list[str], result: str, pleno: str) -> list[dict]:
         hits = sum(sign == winner for sign, winner in zip(bet[:14], result))
         pleno_hit = len(bet) == 16 and bet[14:] == pleno
         category = 15 if hits == 14 and pleno_hit else hits
-        evaluations.append({"bet": bet, "hits": hits, "pleno_hit": pleno_hit, "category": category})
+        categories = [hits] if hits >= 10 else []
+        if hits == 14 and pleno_hit:
+            categories.append(15)
+        evaluations.append({"bet": bet, "hits": hits, "pleno_hit": pleno_hit, "category": category, "categories": categories})
     return evaluations
 
 
@@ -184,7 +195,8 @@ def read_text(path: Path) -> str:
 
 
 def season_files() -> tuple[Path, Path, str]:
-    candidates = sorted(DATA.glob("FEC*.txt"), key=lambda p: p.stat().st_mtime, reverse=True)
+    candidates = sorted((p for p in DATA.iterdir() if re.fullmatch(r"FEC\d{2}-\d{2}\.TXT", p.name.upper())),
+                        key=lambda p: int(p.stem[-2:]), reverse=True)
     if not candidates:
         raise FileNotFoundError("No se encontró FEC*.txt en Datosg")
     dates = candidates[0]
@@ -193,6 +205,40 @@ def season_files() -> tuple[Path, Path, str]:
     if not schedule.exists():
         schedule = next(iter(DATA.glob(f"HOR{season}.txt")), schedule)
     return dates, schedule, season
+
+
+def data_file(prefix: str, season: str) -> Path:
+    name = f"{prefix}{season}.txt"
+    return next((p for p in DATA.iterdir() if p.name.upper() == name.upper()), DATA / name)
+
+
+def published_rounds(season: str) -> list[tuple[int, date]]:
+    result = []
+    for number, day in parse_dates(data_file("FEC", season)):
+        try:
+            teams = parse_round_teams(season, number)
+        except (ValueError, FileNotFoundError):
+            continue
+        if len(teams) == 15 and all(re.fullmatch(r"[A-Z0-9]{3}", c) and c != "000" for pair in teams for c in pair):
+            result.append((number, day))
+    return result
+
+
+def detect_current_round(season: str, today: date | None = None) -> int:
+    today = today or date.today()
+    entries = published_rounds(season)
+    if not entries:
+        raise ValueError("No hay jornadas con partidos publicados.")
+    for number, nominal in entries:
+        if parse_scrutiny(data_file("PRE", season), number):
+            continue
+        kickoffs = parse_kickoffs(data_file("HOR", season), number)
+        days = [datetime.strptime(k[:10], "%d/%m/%Y").date() for k in kickoffs
+                if re.fullmatch(r"\d{2}/\d{2}/\d{4}\d{2}:\d{2}", k)]
+        last_day = max(days) if days else nominal
+        if last_day >= today:
+            return number
+    return entries[-1][0]
 
 
 def load_team_names() -> dict[str, str]:
@@ -231,14 +277,9 @@ def current_round(entries: list[tuple[int, date]], today: date | None = None) ->
 
 
 def parse_round_teams(season: str, round_no: int) -> list[tuple[str, str]]:
-    path = DATA / f"PRE{season}.txt"
-    if not path.exists():
-        matches = list(DATA.glob(f"Pre{season}.txt"))
-        if not matches:
-            raise FileNotFoundError(f"No se encontró PRE{season}.txt")
-        path = matches[0]
+    path = data_file("PRE", season)
     lines = read_text(path).splitlines()
-    line = next((s for s in lines if int((re.match(r"\d+", s) or ["-1"])[0]) == round_no), None)
+    line = next((s for s in lines if s[:2].strip().isdigit() and int(s[:2]) == round_no), None)
     if line is None or len(line) < 209:
         raise ValueError(f"La jornada {round_no} no está disponible en {path.name}")
     block = line[119:209]
@@ -324,9 +365,15 @@ def probabilities(home: str, away: str, history) -> tuple[tuple[float, float, fl
     return probs, f"Local: {hd}; visitante: {ad}. Modelo simple de forma reciente + ventaja local."
 
 
-def load_matches(today: date | None = None) -> tuple[str, int, list[Match]]:
-    dates_file, schedule_file, season = season_files()
-    round_no = current_round(parse_dates(dates_file), today)
+def load_matches(today: date | None = None, season: str | None = None, round_no: int | None = None,
+                 probability_source: str = "Modelo deportivo") -> tuple[str, int, list[Match]]:
+    if season is None:
+        dates_file, schedule_file, season = season_files()
+    else:
+        dates_file = data_file("FEC", season)
+        schedule_file = data_file("HOR", season)
+    if round_no is None:
+        round_no = detect_current_round(season, today)
     pairs = parse_round_teams(season, round_no)
     kickoffs = parse_kickoffs(schedule_file, round_no)
     names = load_team_names()
@@ -335,15 +382,20 @@ def load_matches(today: date | None = None) -> tuple[str, int, list[Match]]:
     matches = []
     for index, (home, away) in enumerate(pairs, 1):
         internet_probs = downloaded_percentages[index - 1] if downloaded_percentages and index <= 14 else None
-        if internet_probs and 99.0 <= sum(internet_probs) <= 101.0:
-            probs = tuple(round(value, 2) for value in internet_probs)
-            detail = "Porcentajes jugados de Quinielista descargados directamente de Internet."
-        else:
-            probs, detail = probabilities(home, away, history)
+        sport, detail = probabilities(home, away, history)
+        total = sum(sport)
+        sport = tuple(v * 100 / total for v in sport)
+        probs = sport
+        if probability_source == "Porcentajes jugados" and index <= 14:
+            if not internet_probs:
+                raise ValueError("No hay porcentajes jugados válidos para esta jornada. Elige el modelo deportivo o actualiza los datos.")
+            probs = tuple(internet_probs)
+            detail = "Porcentajes jugados de Quinielista (popularidad, no probabilidad deportiva)."
         kickoff = kickoffs[index - 1] if index <= len(kickoffs) else ""
         if len(kickoff) == 15:
             kickoff = f"{kickoff[:10]} {kickoff[10:]}"
-        matches.append(Match(index, home, away, names.get(home, home), names.get(away, away), kickoff, probs, detail))
+        matches.append(Match(index, home, away, names.get(home, home), names.get(away, away), kickoff,
+                             probs, detail, sport, internet_probs))
     return season, round_no, matches
 
 
@@ -369,10 +421,10 @@ def compact_kickoff(value: str) -> str:
     return f"{days[moment.weekday()]} {moment:%H:%M}"
 
 
-class QuinielaApp(tk.Tk):
+class QuinielaApp(StudioPages, tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("Quiniela Local")
+        self.title("Quiniela Local · PC Studio")
         self._window_icon = None
         if WINDOW_ICON.exists():
             try:
@@ -384,12 +436,23 @@ class QuinielaApp(tk.Tk):
         screen_width = self.winfo_screenwidth()
         screen_height = self.winfo_screenheight()
         self.geometry(f"{min(1320, screen_width - 40)}x{min(790, screen_height - 90)}")
-        self.minsize(min(1050, screen_width - 40), min(650, screen_height - 90))
+        self.minsize(min(980, screen_width - 40), min(650, screen_height - 90))
         self.configure(background="#06162c")
         self.predictions: dict[str, str] = {}
         self.matches: list[Match] = []
         self.current_development_columns: list[str] | None = None
         self.current_development_source = ""
+        self.original_development_columns = None
+        self.generation_snapshot = None
+        self.active_system_id = None
+        self._closing = False
+        self.season = ""
+        self.round_no = 0
+        self.store = SystemStore(STATE_DIR / "desktop_data" / "systems.sqlite3")
+        self.probability_source = tk.StringVar(value=self.store.get_meta("probability_source", "Modelo deportivo"))
+        self.browse_season = tk.StringVar()
+        self.round_mode = tk.StringVar()
+        self.protocol("WM_DELETE_WINDOW", self.close_app)
         self._build_ui()
         self._load_state()
         self.refresh()
@@ -485,32 +548,64 @@ class QuinielaApp(tk.Tk):
         ttk.Label(header, text="⚽  QUINIELA", font=("DejaVu Sans Condensed", 23, "bold", "italic"), style="Hero.TLabel").pack(side="left")
         ttk.Label(header, text=" LOCAL", font=("DejaVu Sans Condensed", 23, "bold"), foreground="#49dbff", style="Hero.TLabel").pack(side="left")
         self.subtitle = ttk.Label(header, text="", font=("DejaVu Sans", 10, "bold"), foreground="#ffe066", style="Hero.TLabel")
+        self.subtitle.configure(wraplength=190)
         self.subtitle.pack(side="left", padx=18)
         self.update_data_button = ttk.Button(
             header, text="↻  Descargar datos", command=self.update_from_internet, style="Soft.TButton"
         )
         self.update_data_button.pack(side="right")
-        ttk.Button(
-            header, text="🌐 Subir TXT y jugar", command=self.open_quinielista, style="Gold.TButton"
-        ).pack(side="right", padx=(10, 0))
-        ttk.Button(header, text="✨ Crear desarrollo guiado", command=self.open_advanced, style="Accent.TButton").pack(side="right", padx=10)
+        ttk.Button(header, text="Guardar sistema", command=self.save_named_system, style="Purple.TButton").pack(side="right", padx=8)
 
         guide = ttk.Frame(self, padding=(18, 10))
         guide.pack(fill="x")
-        ttk.Label(guide, text="① PARTIDOS", font=("DejaVu Sans", 10, "bold"), foreground="#49dbff").pack(side="left")
-        ttk.Label(guide, text="→ ② SIGNOS", font=("DejaVu Sans", 10, "bold"), foreground="#75df91").pack(side="left", padx=16)
-        ttk.Label(guide, text="→ ③ CONDICIONES", font=("DejaVu Sans", 10, "bold"), foreground="#ffe066").pack(side="left", padx=16)
-        ttk.Label(guide, text="→ ④ REDUCCIÓN", font=("DejaVu Sans", 10, "bold"), foreground="#c69cff").pack(side="left", padx=16)
-        ttk.Label(guide, text="→ ⑤ EXPORTAR", font=("DejaVu Sans", 10, "bold"), foreground="#ff8391").pack(side="left", padx=16)
+        self.navigation = guide
+        rounds = ttk.Frame(self, padding=(14, 2))
+        rounds.pack(fill="x")
+        self.previous_round_button = ttk.Button(rounds, text="‹ Anterior", command=lambda: self.move_round(-1))
+        self.previous_round_button.pack(side="left")
+        self.season_selector = ttk.Combobox(rounds, textvariable=self.browse_season, state="readonly", width=7)
+        self.season_selector.pack(side="left", padx=5)
+        self.season_selector.bind("<<ComboboxSelected>>", lambda e: self.select_season())
+        self.next_round_button = ttk.Button(rounds, text="Siguiente ›", command=lambda: self.move_round(1))
+        self.next_round_button.pack(side="left")
+        ttk.Button(rounds, text="En curso", command=self.go_current_round).pack(side="left", padx=5)
+        ttk.Label(rounds, textvariable=self.round_mode, foreground="#ffe066").pack(side="left", padx=8)
+
+        # Reservar el pie antes del panel expansible mantiene siempre las acciones visibles.
+        self.status = ttk.Label(self, text="", style="Status.TLabel", wraplength=1100)
+        self.status.pack(fill="x", side="bottom")
+        self.detail = ttk.Label(self, text="", padding=(14, 4), style="Muted.TLabel", wraplength=1000)
+        self.detail.pack(fill="x", side="bottom")
+        controls = ttk.Frame(self, padding=(14, 5))
+        controls.pack(fill="x", side="bottom")
+        for text, command, button_style in (
+            ("Crear desarrollo", self.open_advanced, "Green.TButton"),
+            ("Historial del partido", self.open_match_history, "Gold.TButton"),
+            ("Exportar TXT", self.export, "Red.TButton"),
+            ("Copiar apuestas", self.copy_bet, "Soft.TButton"),
+            ("Subir TXT y jugar", self.open_quinielista, "Gold.TButton"),
+            ("Limpiar", self.clear_picks, "Soft.TButton"),
+        ):
+            ttk.Button(controls, text=text, command=command, style=button_style).pack(side="left", padx=3)
 
         columns = ("n", "match")
         body = ttk.Frame(self, padding=(14, 4, 14, 4))
         body.pack(fill="both", expand=True)
-        left_panel = ttk.Frame(body, width=465)
-        left_panel.pack(side="left", fill="y")
-        left_panel.pack_propagate(False)
+        left_outer = ttk.Frame(body, width=484)
+        left_outer.pack(side="left", fill="y")
+        left_outer.pack_propagate(False)
+        left_canvas = tk.Canvas(left_outer, background="#071a33", highlightthickness=0)
+        self.match_canvas = left_canvas
+        left_scroll = ttk.Scrollbar(left_outer, command=left_canvas.yview)
+        left_canvas.configure(yscrollcommand=left_scroll.set)
+        left_scroll.pack(side="right", fill="y")
+        left_canvas.pack(fill="both", expand=True)
+        left_panel = ttk.Frame(left_canvas, width=465)
+        left_canvas.create_window(0, 0, window=left_panel, anchor="nw", width=465)
+        left_panel.bind("<Configure>", lambda e: left_canvas.configure(scrollregion=left_canvas.bbox("all")))
         ttk.Label(left_panel, text="PARTIDOS DE LA JORNADA", style="Section.TLabel").pack(fill="x", pady=(0, 4))
         table_area = ttk.Frame(left_panel, height=346)
+        self.match_table_area = table_area
         table_area.pack(fill="x")
         table_area.pack_propagate(False)
         self.tree = ttk.Treeview(table_area, columns=columns, show="headings", selectmode="browse", style="Compact.Treeview")
@@ -534,6 +629,7 @@ class QuinielaApp(tk.Tk):
         pick_header = tk.Frame(picks, background="#fff0f0", height=22)
         pick_header.pack(fill="x")
         pick_header.pack_propagate(False)
+        pick_header.grid_propagate(False)
         for column, sign in enumerate(("1", "X", "2")):
             tk.Label(
                 pick_header, text=sign, width=3, background="#fff0f0", foreground="#e06666",
@@ -541,13 +637,16 @@ class QuinielaApp(tk.Tk):
             ).grid(row=0, column=column, sticky="nsew")
             pick_header.columnconfigure(column, weight=1)
         self.pick_buttons: dict[tuple[int, str], tk.Button] = {}
+        self.match_rows = []
         for number in range(1, 15):
             row = tk.Frame(picks, background="#fffafa" if number % 2 else "#fff0f0", height=23)
             row.pack(fill="x")
             row.pack_propagate(False)
+            row.grid_propagate(False)
+            self.match_rows.append(row)
             for column, sign in enumerate(("1", "X", "2")):
                 button = tk.Button(
-                    row, text=sign, padx=0, pady=0, relief="solid", bd=1,
+                    row, text=sign, padx=0, pady=0, relief="solid", bd=1, highlightthickness=0,
                     background="#fffafa" if number % 2 else "#fff0f0", foreground="#ef7777",
                     activebackground="#ffcaca", font=("DejaVu Sans", 9, "bold"),
                     command=lambda n=number, s=sign: self._toggle_pick_by_number(n, s),
@@ -587,83 +686,159 @@ class QuinielaApp(tk.Tk):
         self.main_price_label = ttk.Label(
             left_panel, text="", style="Card.TLabel", font=("DejaVu Sans", 10, "bold"),
             padding=(10, 9), anchor="center",
+            wraplength=440,
         )
         self.main_price_label.pack(fill="x", pady=(7, 0))
+        left_canvas.bind("<Configure>", self._fit_match_list)
 
-        workflow = ttk.LabelFrame(body, text="  PASOS DE TU QUINIELA  ", padding=14, style="Workflow.TLabelframe")
+        workflow = ttk.Frame(body)
         workflow.pack(side="right", fill="both", expand=True, padx=(14, 0))
-        ttk.Label(workflow, text="Sigue estos pasos en orden", font=("Sans", 11, "bold"), style="Card.TLabel").pack(anchor="w", pady=(0, 10))
-        workflow_items = (
-            ("↻", "Actualizar partidos", "Descarga jornada y porcentajes", self.update_from_internet, "Green.TButton", "#35d27f"),
-            ("✓", "Marcar una quiniela", "Elige 1, X o 2 en la tabla", self.use_suggestions, "Gold.TButton", "#ffc83d"),
-            ("⚙", "Crear desarrollo", "Dobles, triples y condiciones", self.open_advanced, "Orange.TButton", "#ff8a3d"),
-            ("◆", "Optimizar presupuesto", "Busca la mejor cobertura", self.open_budget_optimizer, "Purple.TButton", "#a77cff"),
-            ("★", "Comprobar premios", "Revisa aciertos del desarrollo o un TXT", self.open_prize_checker, "Green.TButton", "#75df91"),
-            ("➜", "Exportar o copiar", "Guarda el resultado final", self.export, "Red.TButton", "#ff6678"),
-        )
-        for icon, title, description, command, button_style, color in workflow_items:
-            card = ttk.Frame(workflow, padding=(8, 7), style="Card.TFrame")
-            card.pack(fill="x", pady=4)
-            ttk.Label(card, text=icon, font=("DejaVu Sans", 20, "bold"), foreground=color, style="Card.TLabel").pack(side="left", padx=(0, 8))
-            text_frame = ttk.Frame(card, style="Card.TFrame")
-            text_frame.pack(side="left", fill="x", expand=True)
-            ttk.Button(text_frame, text=title, command=command, style=button_style).pack(fill="x")
-            ttk.Label(text_frame, text=description, style="Card.TLabel", font=("DejaVu Sans", 8)).pack(anchor="w", pady=(2, 0))
+        self._build_studio_pages(workflow)
+        self.bind("<Configure>", self._fit_main_labels, add="+")
 
-        controls = ttk.Frame(self, padding=(16, 8))
-        controls.pack(fill="x")
-        ttk.Label(controls, text="Signo del partido seleccionado:").pack(side="left")
-        for sign, sign_style in (("1", "Green.TButton"), ("X", "Gold.TButton"), ("2", "Red.TButton")):
-            ttk.Button(controls, text=sign, width=5, style=sign_style, command=lambda s=sign: self.toggle_selected_pick(s)).pack(side="left", padx=3)
-        ttk.Button(controls, text="Usar sugerencias", command=self.use_suggestions).pack(side="left", padx=(18, 3))
-        ttk.Button(controls, text="Historial del partido", command=self.open_match_history, style="Gold.TButton").pack(side="left", padx=3)
-        ttk.Button(controls, text="Optimizar presupuesto…", command=self.open_budget_optimizer).pack(side="left", padx=3)
-        ttk.Button(controls, text="Columnas más probables…", command=self.open_system).pack(side="left", padx=3)
-        ttk.Button(controls, text="Comprobar premios…", command=self.open_prize_checker, style="Green.TButton").pack(side="left", padx=3)
-        ttk.Button(controls, text="Limpiar", command=self.clear_picks).pack(side="left", padx=3)
-        ttk.Button(controls, text="Abrir TULOTERO", command=self.open_tulotero).pack(side="right", padx=(3, 0))
-        ttk.Button(controls, text="Subir TXT y jugar", command=self.open_quinielista, style="Gold.TButton").pack(side="right", padx=3)
-        ttk.Button(controls, text="Copiar apuesta", command=self.copy_bet).pack(side="right", padx=3)
-        ttk.Button(controls, text="Exportar…", command=self.export).pack(side="right")
+    def _fit_main_labels(self, event):
+        if event.widget == self:
+            self.detail.configure(wraplength=max(300, event.width - 32))
+            self.status.configure(wraplength=max(300, event.width - 16))
 
-        self.detail = ttk.Label(self, text="", padding=(16, 4, 16, 14), foreground="#444")
-        self.detail.pack(fill="x")
-        self.status = ttk.Label(self, text="", style="Status.TLabel")
-        self.status.pack(fill="x", side="bottom")
+    def _fit_match_list(self, _event=None):
+        extra = self.pleno_home_name.master.winfo_reqheight() + self.main_price_label.winfo_reqheight() + 42
+        height = max(18, min(23, (self.match_canvas.winfo_height() - extra - 22) // 14))
+        self.match_table_area.configure(height=22 + 14 * height)
+        style = ttk.Style(self)
+        style.configure("Compact.Treeview", rowheight=height)
+        style.configure("CompactData.Treeview", rowheight=height)
+        for row in self.match_rows:
+            row.configure(height=height)
 
     def _key(self, match: Match) -> str:
         return f"{self.season}-{self.round_no}-{match.number}"
 
     def _load_state(self):
-        if STATE_FILE.exists():
-            try:
-                saved = json.loads(STATE_FILE.read_text(encoding="utf-8"))
-                if isinstance(saved, dict) and isinstance(saved.get("predictions"), dict):
-                    self.predictions = saved["predictions"]
-                    columns = saved.get("development_columns")
-                    self.current_development_columns = columns if isinstance(columns, list) else None
-                    self.current_development_source = str(saved.get("development_source", ""))
-                else:
-                    # Compatibilidad con el formato anterior, que era un diccionario plano.
-                    self.predictions = saved if isinstance(saved, dict) else {}
-            except (OSError, json.JSONDecodeError):
-                self.predictions = {}
+        try:
+            self.store.migrate_legacy(STATE_FILE)
+        except (OSError, ValueError) as e:
+            messagebox.showwarning("Datos antiguos conservados", "No se ha modificado el archivo original. No se pudo migrar: " + str(e), parent=self)
+
+    def system_payload(self):
+        return {
+            "picks": [self.predictions.get(self._key(m), "") for m in self.matches[:14]],
+            "pleno": self.predictions.get(self._key(self.matches[14]), "") if len(self.matches) == 15 else "",
+            "pleno_selection": [self.pleno_home.get(), self.pleno_away.get()],
+            "columns": self.current_development_columns,
+            "original": self.original_development_columns,
+            "source": self.current_development_source,
+            "probability_source": self.probability_source.get(),
+            "probabilities": [[v / 100 for v in m.probabilities] for m in self.matches[:14]],
+            "probability_units": "fraction",
+            "generation": self.generation_snapshot,
+        }
 
     def _save_state(self):
-        payload = {
-            "predictions": self.predictions,
-            "development_columns": self.current_development_columns,
-            "development_source": self.current_development_source,
-        }
-        STATE_FILE.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        if len(self.matches) != 15 or not self._editable():
+            return
+        payload = self.system_payload()
+        if self.active_system_id is None:
+            self.active_system_id = self.store.create(self.season, self.round_no, "Mi quiniela", payload)
+            self.store.activate(self.active_system_id)
+        else:
+            self.store.append(self.active_system_id, payload)
+        self.update_studio_summary()
 
-    def refresh(self):
+    def close_app(self):
+        self._closing = True
+        self._save_state()
+        # Tcl puede conservar tareas idle cuyo comando Python desaparece al destruir
+        # la ventana. Cancelarlas evita errores al cerrar/reabrir el programa.
+        for job in self.tk.splitlist(self.tk.call("after", "info")):
+            self.after_cancel(job)
+        self.store.close()
+        self.destroy()
+
+    def _editable(self):
+        valid = (bool(self.matches) and self.season == getattr(self, "current_season", None)
+                and self.round_no == getattr(self, "current_round_no", None)
+                and not parse_scrutiny(data_file("PRE", self.season), self.round_no))
+        if not valid:
+            return False
+        days = [datetime.strptime(m.kickoff[:10], "%d/%m/%Y").date() for m in self.matches
+                if re.match(r"\d{2}/\d{2}/\d{4}", m.kickoff)]
+        return bool(days) and max(days) >= date.today()
+
+    def _require_editable(self, identity=None):
+        if identity is not None and identity != (self.season, self.round_no):
+            messagebox.showwarning("La jornada ha cambiado", "Cierra este editor y vuelve a abrirlo en la jornada deseada.", parent=self)
+            return False
+        if not self._editable():
+            self.status.configure(text="Esta jornada es de consulta. Pulsa «En curso» para editar la quiniela vigente.")
+            return False
+        return True
+
+    def move_round(self, delta):
+        entries = published_rounds(self.season)
+        index = next((i for i, (n, _day) in enumerate(entries) if n == self.round_no), -1)
+        if 0 <= index + delta < len(entries):
+            self._save_state()
+            self.refresh(self.season, entries[index + delta][0])
+
+    def go_current_round(self):
+        self._save_state()
+        self.refresh(self.current_season, self.current_round_no)
+
+    def select_season(self):
+        self._save_state()
+        season = self.browse_season.get()
+        entries = published_rounds(season)
+        if entries:
+            self.refresh(season, entries[-1][0])
+
+    def change_probability_source(self):
+        old = self.store.get_meta("probability_source", "Modelo deportivo")
+        selected = self.probability_source.get()
+        if selected == "Porcentajes jugados" and any(not m.public_percentages for m in self.matches[:14]):
+            self.probability_source.set(old)
+            messagebox.showwarning("Fuente no disponible", "No hay porcentajes jugados válidos para esta jornada.", parent=self)
+            return
+        self.store.set_meta("probability_source", selected)
+        self.refresh(self.season, self.round_no)
+
+    def refresh(self, season=None, round_no=None):
         try:
-            self.season, self.round_no, self.matches = load_matches()
+            _dates, _hours, current_season = season_files()
+            current_number = detect_current_round(current_season)
+            season = season or (self.season if self.matches else current_season)
+            round_no = round_no or (self.round_no if self.matches else current_number)
+            source = self.probability_source.get()
+            if source == "Porcentajes jugados" and not read_percentages(season, round_no, CACHE_DIR):
+                self.probability_source.set("Modelo deportivo")
+                source = "Modelo deportivo"
+            result = load_matches(season=season, round_no=round_no, probability_source=source)
         except Exception as exc:
             messagebox.showerror("No se pudieron leer los datos", str(exc))
             return
-        self.subtitle.configure(text=f"Temporada {self.season} · Jornada {self.round_no}")
+        self.current_season, self.current_round_no = current_season, current_number
+        self.season, self.round_no, self.matches = result
+        active = self.store.active(self.season, self.round_no)
+        self.active_system_id = active["id"] if active else None
+        payload = active["payload"] if active else {}
+        self.current_development_columns = payload.get("columns")
+        self.original_development_columns = payload.get("original")
+        self.current_development_source = payload.get("source", "")
+        self.generation_snapshot = payload.get("generation")
+        for m, pick in zip(self.matches[:14], payload.get("picks", [""] * 14)):
+            self.predictions[self._key(m)] = pick
+        self.predictions[self._key(self.matches[14])] = payload.get("pleno", "")
+        self.browse_season.set(self.season)
+        self.season_selector.configure(values=sorted({p.stem[3:] for p in DATA.iterdir() if re.fullmatch(r"FEC\d{2}-\d{2}\.TXT", p.name.upper())}, reverse=True))
+        self.subtitle.configure(text=f"{self.season} · Jornada {self.round_no}")
+        self.data_tree.heading("prob", text="Modelo %" if source == "Modelo deportivo" else "Jugado %")
+        self.round_mode.set("EN CURSO · edición habilitada" if self._editable() else "SOLO CONSULTA · jornada anterior, futura o finalizada")
+        entries = published_rounds(self.season)
+        index = next((i for i, (n, _d) in enumerate(entries) if n == self.round_no), -1)
+        self.previous_round_button.configure(state="normal" if index > 0 else "disabled")
+        self.next_round_button.configure(state="normal" if 0 <= index < len(entries)-1 else "disabled")
+        for button in (*self.pick_buttons.values(), *self.pleno_buttons.values()):
+            button.configure(state="normal" if self._editable() else "disabled")
         for item in self.tree.get_children():
             self.tree.delete(item)
         for item in self.data_tree.get_children():
@@ -686,6 +861,7 @@ class QuinielaApp(tk.Tk):
             self.pleno_away_name.configure(text=pleno_match.away)
             saved = self.predictions.get(self._key(pleno_match), "")
             parts = saved.split("-") if re.fullmatch(r"[012M]-[012M]", saved) else ("", "")
+            parts = payload.get("pleno_selection", parts)
             self.pleno_home.set(parts[0])
             self.pleno_away.set(parts[1])
             self._render_pleno_buttons()
@@ -705,9 +881,13 @@ class QuinielaApp(tk.Tk):
         )
         if self.matches:
             self._select_match("1")
+        self.update_studio_summary()
+        self.after_idle(self._fit_match_list)
 
     def update_from_internet(self):
         """Descarga datos y porcentajes sin ejecutar herramientas de WIN1X2."""
+        self._save_state()
+        was_current = (self.season, self.round_no) == (self.current_season, self.current_round_no)
         self.update_data_button.configure(state="disabled", text="Descargando…")
         self.status.configure(text="Conectando con las fuentes de datos…")
 
@@ -715,16 +895,22 @@ class QuinielaApp(tk.Tk):
             try:
                 files = update_win1x2_files(DATA)
                 dates_file, _schedule_file, season = season_files()
-                round_no = current_round(parse_dates(dates_file))
+                round_no = detect_current_round(season)
                 fetch_percentages(season, round_no, CACHE_DIR)
             except Exception as exc:
-                self.after(0, lambda: finish_error(str(exc)))
+                if not self._closing:
+                    self.after(0, lambda error=str(exc): finish_error(error))
             else:
-                self.after(0, lambda: finish_ok(len(files), round_no))
+                if not self._closing:
+                    self.after(0, lambda: finish_ok(len(files), round_no))
 
         def finish_ok(file_count, round_no):
             self.update_data_button.configure(state="normal", text="↻  Descargar datos")
-            self.refresh()
+            if was_current:
+                _dates, _hours, updated_season = season_files()
+                self.refresh(updated_season, round_no)
+            else:
+                self.refresh()
             self.status.configure(
                 text=f"Actualización completada sin WebW1X2.exe · {file_count} archivos · porcentajes jornada {round_no}"
             )
@@ -803,6 +989,10 @@ class QuinielaApp(tk.Tk):
             table.tag_configure("loss", foreground="#ff8391")
 
     def open_prize_checker(self):
+        checker_season = self.season
+        checker_round = self.round_no
+        checker_columns = list(self.current_development_columns or [])
+        checker_pleno = self.predictions.get(self._key(self.matches[14]), "") if len(self.matches) == 15 else ""
         dialog = tk.Toplevel(self)
         dialog.title("Comprobar aciertos y premios")
         dialog.configure(background="#06162c")
@@ -812,6 +1002,7 @@ class QuinielaApp(tk.Tk):
         hero = ttk.Frame(dialog, padding=(12, 5), style="Hero.TFrame")
         hero.pack(fill="x")
         ttk.Label(hero, text="COMPRUEBA TUS APUESTAS", font=("DejaVu Sans Condensed", 17, "bold"), foreground="#75df91", style="Hero.TLabel").pack(anchor="w")
+        ttk.Label(hero, text=f"Temporada {checker_season} · Sistema capturado en jornada {checker_round}", style="Hero.TLabel").pack(anchor="w")
 
         bottom = ttk.Frame(dialog, padding=(10, 4, 10, 6))
         bottom.pack(side="bottom", fill="x")
@@ -1031,22 +1222,24 @@ class QuinielaApp(tk.Tk):
             page.bind("<Configure>", fit_rows)
 
         def current_bets():
-            if not self.current_development_columns:
+            if not checker_columns:
                 raise ValueError("No hay un desarrollo generado. Usa «Crear desarrollo» o carga un TXT.")
-            pleno = self.predictions.get(self._key(self.matches[14]), "") if len(self.matches) >= 15 else ""
+            pleno = checker_pleno
             suffix = pleno.replace("-", "") if re.fullmatch(r"[012M]-[012M]", pleno) else ""
-            return ["".join(column) + suffix for column in self.current_development_columns]
+            return ["".join(column) + suffix for column in checker_columns]
 
         def check_bets():
             try:
                 selected_round = int(round_var.get())
                 bets = current_bets() if source.get() == "current" else list(loaded_bets)
+                if source.get() == "current" and selected_round != checker_round:
+                    raise ValueError("El desarrollo capturado corresponde a otra jornada. Abre su sistema o utiliza un TXT asignado a esta jornada.")
                 if not bets:
                     raise ValueError("Selecciona primero un fichero TXT.")
             except (ValueError, tk.TclError) as exc:
                 messagebox.showwarning("Faltan datos", str(exc), parent=dialog)
                 return
-            pre_path = next(iter(DATA.glob(f"PRE{self.season}.txt")), None) or next(iter(DATA.glob(f"Pre{self.season}.txt")), None)
+            pre_path = data_file("PRE", checker_season)
             scrutiny = parse_scrutiny(pre_path, selected_round) if pre_path else None
             if not scrutiny:
                 result_label.configure(text=f"Jornada {selected_round}: todavía no hay resultados completos en los datos descargados.", foreground="#ffe066")
@@ -1057,13 +1250,14 @@ class QuinielaApp(tk.Tk):
             evaluations = evaluate_bets(bets, scrutiny["result"], scrutiny["pleno"])
             counts = defaultdict(int)
             for item in evaluations:
-                counts[item["category"]] += 1
-            estimated_total = 0.0
+                for category in item["categories"]:
+                    counts[category] += 1
+            estimated_total = Decimal("0")
             distribution.delete(*distribution.get_children())
             for category in (15, 14, 13, 12, 11, 10):
                 official_winners, prize = scrutiny["prizes"].get(category, (0, 0.0))
                 mine = counts[category]
-                subtotal = mine * prize
+                subtotal = mine * Decimal(str(prize))
                 estimated_total += subtotal
                 label = "14 + Pleno" if category == 15 else str(category)
                 distribution.insert("", "end", values=(label, mine, official_winners, f"{prize:,.2f} €", f"{subtotal:,.2f} €"))
@@ -1102,7 +1296,9 @@ class QuinielaApp(tk.Tk):
                 selected_round = int(round_var.get())
                 if not 1 <= selected_round <= 99:
                     raise ValueError("La jornada debe estar entre 1 y 99.")
-                bets = current_bets() if source.get() == "current" and self.current_development_columns else list(loaded_bets) if source.get() == "file" else []
+                if source.get() == "current" and checker_columns and selected_round != checker_round:
+                    raise ValueError("Este desarrollo corresponde a otra jornada. Carga el TXT o abre el sistema correcto.")
+                bets = current_bets() if source.get() == "current" and checker_columns else list(loaded_bets) if source.get() == "file" else []
             except (ValueError, tk.TclError) as exc:
                 result_label.configure(text=str(exc), foreground="#ffe066")
                 schedule()
@@ -1117,15 +1313,7 @@ class QuinielaApp(tk.Tk):
             def worker():
                 try:
                     actual_round = selected_round
-                    try:
-                        matches = fetch_live_results(self.season, actual_round)
-                    except ValueError as exc:
-                        # El calendario local puede avanzar un día antes de que el proveedor
-                        # retire la jornada que todavía está disputándose.
-                        if selected_round != self.round_no or selected_round <= 1 or "no ofrece el directo" not in str(exc):
-                            raise
-                        actual_round = selected_round - 1
-                        matches = fetch_live_results(self.season, actual_round)
+                    matches = fetch_live_results(checker_season, actual_round)
                     evaluations = evaluate_live_bets(bets, matches)
                     responses.put((generation, actual_round, matches, evaluations, None))
                 except Exception as exc:
@@ -1205,6 +1393,8 @@ class QuinielaApp(tk.Tk):
             self._toggle_pick_by_number(match.number, sign)
 
     def _toggle_pick_by_number(self, number: int, sign: str):
+        if not self._require_editable():
+            return
         self._select_match(str(number))
         match = self.matches[number - 1]
         key = self._key(match)
@@ -1220,6 +1410,8 @@ class QuinielaApp(tk.Tk):
             self.predictions.pop(key, None)
         self._render_match_pick(number, value)
         self.current_development_columns = None
+        self.original_development_columns = None
+        self.generation_snapshot = None
         self.current_development_source = "edición manual"
         self._save_state()
         self._update_main_price()
@@ -1267,7 +1459,7 @@ class QuinielaApp(tk.Tk):
             )
 
     def _set_pleno_goal(self, side: str, goals: str):
-        if not self.matches:
+        if not self._require_editable():
             return
         variable = self.pleno_home if side == "home" else self.pleno_away
         variable.set(goals)
@@ -1275,7 +1467,7 @@ class QuinielaApp(tk.Tk):
         if self.pleno_home.get() and self.pleno_away.get():
             match = self.matches[14]
             self.predictions[self._key(match)] = f"{self.pleno_home.get()}-{self.pleno_away.get()}"
-            self._save_state()
+        self._save_state()
 
     def _update_main_price(self):
         if len(self.matches) < 14:
@@ -1290,23 +1482,30 @@ class QuinielaApp(tk.Tk):
             return
         complete_columns = math.prod(len(set(value) & {"1", "X", "2"}) for value in values)
         columns = len(self.current_development_columns) if self.current_development_columns is not None else complete_columns
-        charged_columns = max(2, columns)
-        minimum_note = " · mínimo oficial: 2" if columns == 1 else ""
+        charged_columns = columns
+        minimum_note = " · una apuesta: revisa el mínimo del canal; no se añade otra automáticamente" if columns == 1 else ""
         source_note = f" · {self.current_development_source}" if self.current_development_source else ""
         base_note = f" · base completa {complete_columns:,}" if columns != complete_columns else ""
         self.main_price_label.configure(
-            text=(f"{columns:,} columna{'s' if columns != 1 else ''}{minimum_note}  ·  "
-                  f"PRECIO: {charged_columns * BET_PRICE:,.2f} €{base_note}{source_note}"),
+            text=(f"PRECIO: {charged_columns * BET_PRICE:,.2f} € · {columns:,} columna{'s' if columns != 1 else ''}"
+                  f"{minimum_note}{base_note}{source_note}"),
             foreground="#75df91" if columns <= 100 else "#ffe066",
         )
 
     def apply_development_to_main(
         self, *, columns: list[str] | list[tuple[str, ...]] | None = None,
-        selections: list[str] | None = None, source: str = "desarrollo",
+        selections: list[str] | None = None, source: str = "desarrollo", preserve_origin: bool = False,
     ):
         """Convierte cualquier resultado generado en la base visible principal."""
+        if not self._require_editable():
+            return
+        if columns is not None and not columns:
+            messagebox.showwarning("Sin columnas", "Las condiciones no dejan ninguna apuesta. La quiniela anterior se conserva.", parent=self)
+            return
         if columns:
             normalized = [tuple(column) for column in columns]
+            if any(len(c) != 14 or not set(c) <= set("1X2") for c in normalized):
+                raise ValueError("Columnas no válidas.")
             selections = [
                 "".join(sign for sign in ("1", "X", "2") if any(column[index] == sign for column in normalized))
                 for index in range(14)
@@ -1314,6 +1513,15 @@ class QuinielaApp(tk.Tk):
         if not selections or len(selections) < 14:
             return
         self.current_development_columns = ["".join(column) for column in normalized] if columns else None
+        if not preserve_origin:
+            self.original_development_columns = list(self.current_development_columns) if self.current_development_columns is not None else None
+            self.generation_snapshot = {
+                "source": self.probability_source.get(),
+                "probabilities": [[v / 100 for v in m.probabilities] for m in self.matches[:14]],
+                "created": datetime.now().isoformat(timespec="seconds"),
+                "data_updated": data_update_time(self.season).isoformat(timespec="seconds"),
+                "operation": source,
+            }
         self.current_development_source = source
         for match, value in zip(self.matches[:14], selections[:14]):
             normalized_value = "".join(sign for sign in ("1", "X", "2") if sign in value)
@@ -1326,6 +1534,8 @@ class QuinielaApp(tk.Tk):
         self.status.configure(text=f"Quiniela general actualizada desde {source}.")
 
     def set_pick(self, sign: str):
+        if not self._require_editable():
+            return
         match = self.selected()
         if not match:
             return
@@ -1340,16 +1550,23 @@ class QuinielaApp(tk.Tk):
             self._select_match(str(next_number))
 
     def use_suggestions(self):
+        if not self._require_editable():
+            return
         self.current_development_columns = None
+        self.original_development_columns = None
+        self.generation_snapshot = None
         self.current_development_source = "sugerencias"
-        for match in self.matches:
-            value = "1-1" if match.number == 15 else match.suggestion
+        for match in self.matches[:14]:
+            value = match.suggestion
             self.predictions[self._key(match)] = value
             self._update_pick_cells(match, value)
         self._save_state()
         self._update_main_price()
 
     def set_pleno(self, match: Match):
+        if not self._require_editable():
+            return
+        identity = (self.season, self.round_no)
         dialog = tk.Toplevel(self)
         dialog.title("Pleno al 15")
         dialog.configure(background="#071a33")
@@ -1368,6 +1585,8 @@ class QuinielaApp(tk.Tk):
         ttk.Combobox(frame, textvariable=away_goals, values=("0", "1", "2", "M"), state="readonly", width=8).grid(row=2, column=1, padx=6, pady=6)
 
         def save():
+            if not self._require_editable(identity):
+                return
             value = f"{home_goals.get()}-{away_goals.get()}"
             self.predictions[self._key(match)] = value
             self._update_pick_cells(match, value)
@@ -1378,7 +1597,11 @@ class QuinielaApp(tk.Tk):
         dialog.wait_window()
 
     def clear_picks(self):
+        if not self._require_editable():
+            return
         self.current_development_columns = None
+        self.original_development_columns = None
+        self.generation_snapshot = None
         self.current_development_source = ""
         for match in self.matches:
             self.predictions.pop(self._key(match), None)
@@ -1583,6 +1806,9 @@ class QuinielaApp(tk.Tk):
         return "\n".join(lines) + "\n"
 
     def open_budget_optimizer(self):
+        if not self._require_editable():
+            return
+        identity = (self.season, self.round_no)
         if self.current_development_columns is None:
             messagebox.showwarning(
                 "Primero crea el desarrollo",
@@ -1598,8 +1824,11 @@ class QuinielaApp(tk.Tk):
                 parent=self,
             )
             return
+        if len(self.original_development_columns or self.current_development_columns) < 2:
+            messagebox.showwarning("Solo una apuesta de origen", "Este optimizador necesita al menos dos apuestas de origen. No inventará otra apuesta para completar el desarrollo.", parent=self)
+            return
         base = [self.predictions.get(self._key(match), "") for match in self.matches[:14]]
-        optimizer_source_columns = list(self.current_development_columns) if self.current_development_columns is not None else None
+        optimizer_source_columns = list(self.original_development_columns or self.current_development_columns)
         dialog = tk.Toplevel(self)
         dialog.title("Optimizar por presupuesto")
         dialog.configure(background="#071a33")
@@ -1641,6 +1870,8 @@ class QuinielaApp(tk.Tk):
             return plans[int(selection[0])] if selection else None
 
         def show_detail(_event=None):
+            if identity != (self.season, self.round_no):
+                return
             plan = selected_plan()
             if not plan:
                 return
@@ -1649,12 +1880,14 @@ class QuinielaApp(tk.Tk):
             detail.insert("1.0", self.plan_text(plan))
             detail.configure(state="disabled")
             if plan.columns:
-                self.apply_development_to_main(columns=plan.columns, source=f"«{plan.name}»")
+                self.apply_development_to_main(columns=plan.columns, source=f"«{plan.name}»", preserve_origin=True)
             elif plan.selections:
                 self.apply_development_to_main(selections=plan.selections, source=f"«{plan.name}»")
 
         def calculate():
             nonlocal plans
+            if not self._require_editable(identity):
+                return
             try:
                 budget = float(budget_var.get().replace(",", "."))
             except ValueError:
@@ -1678,6 +1911,8 @@ class QuinielaApp(tk.Tk):
             show_detail()
 
         def copy_plan():
+            if not self._require_editable(identity):
+                return
             plan = selected_plan()
             if plan:
                 self.clipboard_clear()
@@ -1686,6 +1921,8 @@ class QuinielaApp(tk.Tk):
                 self.status.configure(text=f"Plan «{plan.name}» copiado; revisa la apuesta antes de comprar.")
 
         def export_plan():
+            if not self._require_editable(identity):
+                return
             plan = selected_plan()
             if not plan:
                 return
@@ -1717,6 +1954,9 @@ class QuinielaApp(tk.Tk):
         calculate()
 
     def open_system(self):
+        if not self._require_editable():
+            return
+        identity = (self.season, self.round_no)
         dialog = tk.Toplevel(self)
         dialog.title("Columnas más probables")
         dialog.configure(background="#071a33")
@@ -1748,6 +1988,8 @@ class QuinielaApp(tk.Tk):
         generated: list[tuple[str, float]] = []
 
         def generate():
+            if not self._require_editable(identity):
+                return
             nonlocal generated
             try:
                 requested = max(2, min(100, int(amount.get())))
@@ -1773,6 +2015,8 @@ class QuinielaApp(tk.Tk):
             )
 
         def copy_system():
+            if not self._require_editable(identity):
+                return
             if not generated:
                 generate()
             pleno = self.predictions.get(self._key(self.matches[14]), "")
@@ -1785,6 +2029,8 @@ class QuinielaApp(tk.Tk):
             self.status.configure(text=f"Sistema de {len(generated)} columnas copiado al portapapeles.")
 
         def export_system():
+            if not self._require_editable(identity):
+                return
             if not generated:
                 generate()
             pleno = self.predictions.get(self._key(self.matches[14]), "")
@@ -1809,6 +2055,9 @@ class QuinielaApp(tk.Tk):
 
     def open_advanced(self):
         """Editor de base, condiciones, reducción, análisis y exportación."""
+        if not self._require_editable():
+            return
+        identity = (self.season, self.round_no)
         dialog = tk.Toplevel(self)
         dialog.title("Asistente para crear un desarrollo")
         self._fit_dialog(dialog, 1120, 800, 820, 600)
@@ -1900,7 +2149,7 @@ class QuinielaApp(tk.Tk):
         def update_base_size(*_args):
             try:
                 size = development_size([tuple(variable.get()) for variable in base_vars])
-                cost = max(2, size) * BET_PRICE
+                cost = size * BET_PRICE
                 size_label.configure(text=f"{size:,} columnas posibles  ·  coste completo aproximado: {cost:,.2f} €")
             except ValueError:
                 size_label.configure(text="Selecciona al menos un signo en cada partido")
@@ -1932,16 +2181,16 @@ class QuinielaApp(tk.Tk):
             presets, from_=0, to=10, orient="horizontal", resolution=1, showvalue=False,
             background="#0c294b", foreground="white", troughcolor="#123b65",
             activebackground="#ffc83d", highlightthickness=0, sliderrelief="raised",
-            command=apply_base_level,
         )
         coverage_scale.pack(fill="x", padx=8)
         ticks = tk.Frame(presets, background="#0c294b")
         ticks.pack(fill="x", padx=9)
         for value in range(11):
             tk.Label(ticks, text=str(value), background="#0c294b", foreground="#8fcdf2", font=("DejaVu Sans", 8)).pack(side="left", expand=True)
-        coverage_description = ttk.Label(presets, text="Nivel 5/10", style="Card.TLabel", font=("DejaVu Sans", 10, "bold"))
+        coverage_description = ttk.Label(presets, text="Base actual · mueve la barra para proponer otra cobertura", style="Card.TLabel", font=("DejaVu Sans", 10, "bold"))
         coverage_description.pack(pady=(5, 0))
-        coverage_scale.set(5)
+        coverage_scale.set(min(10, sum(len(v.get()) > 1 for v in base_vars)))
+        self.after_idle(lambda: coverage_scale.configure(command=apply_base_level) if coverage_scale.winfo_exists() else None)
         for variable in base_vars:
             variable.trace_add("write", update_base_size)
         render_base_buttons()
@@ -2033,16 +2282,16 @@ class QuinielaApp(tk.Tk):
             help_card, from_=0, to=10, orient="horizontal", resolution=1, showvalue=False,
             background="#0c294b", foreground="white", troughcolor="#123b65",
             activebackground="#ff8a3d", highlightthickness=0, sliderrelief="raised",
-            command=apply_condition_level,
         )
         condition_scale.pack(fill="x")
         condition_ticks = tk.Frame(help_card, background="#0c294b")
         condition_ticks.pack(fill="x")
         for value in range(11):
             tk.Label(condition_ticks, text=str(value), background="#0c294b", foreground="#8fcdf2", font=("DejaVu Sans", 8)).pack(side="left", expand=True)
-        condition_description = ttk.Label(help_card, text="Nivel 5/10", style="Card.TLabel", wraplength=390)
+        condition_description = ttk.Label(help_card, text="Sin filtros recomendados activados · mueve la barra para aplicarlos", style="Card.TLabel", wraplength=390)
         condition_description.pack(pady=(6, 0))
-        condition_scale.set(5)
+        condition_scale.set(0)
+        self.after_idle(lambda: condition_scale.configure(command=apply_condition_level) if condition_scale.winfo_exists() else None)
 
         columns_tree = ttk.Treeview(result_tab, columns=("n", "column", "prob"), show="headings")
         columns_tree.heading("n", text="#")
@@ -2064,6 +2313,8 @@ class QuinielaApp(tk.Tk):
 
         def generate():
             nonlocal generated
+            if not self._require_editable(identity):
+                return
             try:
                 base = [tuple(variable.get()) for variable in base_vars]
                 total = development_size(base)
@@ -2116,6 +2367,8 @@ class QuinielaApp(tk.Tk):
             notebook.select(result_tab)
 
         def export_development():
+            if not self._require_editable(identity):
+                return
             if not generated:
                 messagebox.showwarning("Sin columnas", "Primero genera el desarrollo.", parent=dialog)
                 return
