@@ -69,6 +69,14 @@ estimación neutral.
 Por seguridad, Quiniela Local no guarda credenciales ni realiza compras. La
 confirmación final se hace siempre en la web de validación elegida por el usuario.
 
+## Ampliación de la versión de PC
+
+El [plano técnico de Quiniela AI Studio](docs/ESPECIFICACION_PC.md) recoge los
+15 módulos, siete secciones, estado real de la base, contratos matemáticos,
+filtros, arquitectura, fases y pruebas de aceptación. Es una especificación
+de desarrollo: no significa que las funciones nuevas ya estén implementadas.
+La ampliación está limitada al escritorio; Android queda sin cambios.
+
 ## Ejecución
 
 ```bash
