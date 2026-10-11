@@ -6,7 +6,7 @@ Aplicación de Quiniela para escritorio y Android. La versión de escritorio
 puede leer los datos instalados por WIN1X2; ambas versiones descargan datos,
 porcentajes y marcadores directamente de sus proveedores públicos.
 
-## Quiniela AI Studio — v0.1 ejecutable (revisión 0.1.5)
+## Quiniela AI Studio — v0.1 ejecutable (revisión 0.1.6)
 
 Interfaz gráfica en español que conserva la experiencia visual de Quiniela Local:
 fondo azul, boleto compacto siempre visible a la izquierda, casillas 1/X/2 y

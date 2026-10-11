@@ -139,3 +139,9 @@ en el indicador, reset de filtros y progreso tras invalidar el desarrollo.
 86 pruebas Studio correctas. GUI: barra visible en Optimizar, sincronización
 bidireccional, previsualización sin modificar apuestas, 3.456 combinaciones en
 nivel 10 y bloqueo conservado. Se usa el algoritmo existente; no hay nuevo reductor.
+
+## Ajustes rápidos 0.1.6
+
+94 pruebas Studio: parámetros históricos de condiciones, niveles anidados con
+oráculo independiente, límites nuevos inválidos y recuperación de 729 apuestas
+con Plenos/cantidades al ampliar el nivel. No se evalúa ningún modelo predictivo.

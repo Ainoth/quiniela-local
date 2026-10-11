@@ -196,3 +196,11 @@ RF-QUI-005 / T03 de ESPECIFICACION_PC: barra progresiva visible en Optimizar y
 sincronizada con Crear. Prueba GUI: previsualización sin mutar el sistema,
 aplicación nivel 10 con 3.456 combinaciones y conservación del partido bloqueado.
 El requisito general sigue parcial; no se añaden algoritmos de reducción.
+
+## Ajustes rápidos 0.1.6
+
+RF-FIL-002/009 / PC T03: barra de condiciones recuperada, distinta de la de
+creación. Límites locales versionados v2; cambios entre signos y racha de 1.
+Pruebas: extremos de referencia, oráculo sobre 729 apuestas, monotonía de
+niveles, GUI sin edición del boleto y recuperación desde origen al volver a 10.
+La barra de dobles/triples en Optimizar de 0.1.5 se retira; Crear la conserva.

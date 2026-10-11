@@ -296,23 +296,31 @@ def test_edit_clears_stale_progress_and_explains_missing_development(window):
     assert 'Pulsa Generar' in window.filter_feedback.text()
 
 
-def test_progressive_slider_in_optimize_previews_and_syncs_without_editing(window):
+
+def test_quick_condition_slider_populates_filters_and_recovers_original_bets(window):
     from quiniela_studio import engine
-    window.example_system();wait_for_generation(window)
+    window.new_system()
+    base=('1X2',)*6+tuple('1X21X21X')
+    window.set_system(window.service.edit(window.system,base,(False,)*14,'M1'))
+    window.set_system(window.service.generated(window.system,engine.generate(base,'M1')))
     original=window.system
     window.navigation.setCurrentRow(2);QTest.qWait(10)
-    assert window.optimization_coverage.isVisible()
-    window.optimization_coverage.setValue(10)
-    assert window.coverage.value()==10
+    assert window.quick_conditions_slider.isVisible()
+    window.quick_conditions_slider.setValue(0)
     assert window.system==original
-    assert '3,456 apuestas' in window.coverage_proposal.text()
-    window.coverage_apply.click()
-    assert engine.size(window.system.base)==3456
-    assert not window.system.bets
-    assert window.progress.value()==0
-    window.coverage.setValue(3)
-    assert window.optimization_coverage.value()==3
-    window.lock_buttons[0].click()
-    locked=window.system.base[0]
-    window.optimization_coverage.setValue(0);window.coverage_apply.click()
-    assert window.system.base[0]==locked and window.system.locks[0]
+    assert window.coverage.value()==0  # The creation slider is independent.
+    assert tuple(control.value() for control in window.filter_ranges['variants'])==(5,8)
+    assert tuple(control.value() for control in window.filter_ranges['x_count'])==(2,6)
+    assert tuple(control.value() for control in window.filter_ranges['changes'])==(5,10)
+    assert window.filter_max_one.value()==4
+    assert window.filter_checks['x_count'].isChecked()
+    assert not window.filter_checks['coincidences'].isChecked()
+    assert not window.filter_checks['x_distance'].isChecked()
+    window.filter_apply.click()
+    assert 0<window.system.quantity<original.quantity
+    window.quick_conditions_slider.setValue(10)
+    assert tuple(control.value() for control in window.filter_ranges['variants'])==(0,14)
+    window.filter_apply.click()
+    assert window.system.bets==original.bets
+    assert window.system.pleno==original.pleno
+    assert window.system.cost(window.round)==original.cost(window.round)

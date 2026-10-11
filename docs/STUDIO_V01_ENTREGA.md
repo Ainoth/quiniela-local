@@ -1,4 +1,4 @@
-# Entrega ejecutable v0.1 — revisión 0.1.5
+# Entrega ejecutable v0.1 — revisión 0.1.6
 
 11/10/2026. Esta revisión corrige la interfaz conforme a la preferencia del
 usuario: conservar la experiencia de Quiniela Local y su descarga de datos.
@@ -139,10 +139,28 @@ Escrutinio habla de resultados y premios; Mis Sistemas describe cómo se creó
 cada quiniela; Configuración habla de precio, archivos y copias de seguridad.
 Identificadores y detalles del historial están en ayuda, no en el flujo habitual.
 
-## Barra progresiva en Optimizar — 0.1.5
+## Ajustes rápidos en Optimizar — 0.1.6
 
-La barra 0–10 vuelve a estar visible en Optimizar y sigue disponible en Crear
-Quiniela. Las dos muestran el mismo nivel. Moverla propone dobles/triples y
-muestra apuestas y coste sin modificar la quiniela. Pulsa «Usar este nivel en
-el boleto» para aplicarlo, y después «Generar» para crear las nuevas apuestas.
-Respeta bloqueos y el precio guardado. No es una reducción con garantía.
+La barra correcta modifica automáticamente las condiciones: Total X y 2,
+número de empates, victorias visitantes, cambios entre signos y máximo de
+signos 1/X/2 seguidos. **0 propone menos apuestas; 10 admite todas las apuestas
+originales**. No modifica los signos del boleto mientras la mueves. Después
+pulsa Aplicar para guardar el resultado. Los límites se pueden revisar y editar.
+
+La barra de dobles y triples pertenece a Crear Quiniela: se retiró de Optimizar,
+donde se había añadido por una interpretación equivocada en 0.1.5.
+
+Se recuperan las fórmulas de condiciones de Quiniela Local invirtiendo el sentido
+para respetar la petición del usuario. Nivel 10 es neutro; no se aplica el tope
+histórico de 200/50 columnas. No es un reductor con garantía ni IA. Si las
+condiciones no dejan apuestas, se informa sin cambiar el sistema. Al pasar de
+un nivel estricto a uno más amplio, se toman las apuestas de origen, por lo que
+pueden recuperarse sin generar ni inventar columnas. Plenos y copias se conservan.
+
+Los ajustes rápidos no activan automáticamente comparación con otra quiniela ni
+separación entre X: estas condiciones se configuran por separado. «Cambios entre
+signos» y «separación entre X» son condiciones distintas.
+
+La barra ajusta condiciones; no limita el coste por sí sola. Para fijar un máximo
+de gasto, usa después «Elegir según mi presupuesto». El coste real de las
+apuestas preparadas se muestra en el pie antes de guardar cualquier archivo.

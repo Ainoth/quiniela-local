@@ -57,3 +57,15 @@
   con Crear, con propuesta de dobles/triples, apuestas y coste antes de aplicar.
 - Se reutiliza el motor de plantillas comprobado; mover la barra no altera
   apuestas ni crea versiones. Aplicar exige generar de nuevo.
+
+## 0.1.6 — 11/10/2026 · recuperación de Ajustes rápidos
+
+- Corregida la interpretación de la barra solicitada: Optimizar ajusta condiciones
+  automáticamente; dobles y triples quedan en Crear Quiniela.
+- RF-FIL-002/009: recuperados cambios entre signos y racha máxima de 1;
+  filtros locales versión 2 con valores neutros compatibles con los anteriores.
+- Niveles 0 menos / 10 máximo según petición, usando límites históricos invertidos
+  y nivel 10 neutro. Sin tope silencioso 200/50 ni garantía de reducción.
+- Aplicación desde las apuestas originales, para recuperar más al ampliar el nivel.
+- 94 pruebas Studio: oráculo independiente, niveles anidados, apuestas/Plenos/
+  cantidades intactos, parámetros inválidos y recuperación completa en nivel 10.

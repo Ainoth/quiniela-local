@@ -286,8 +286,7 @@ class MainWindow(QMainWindow):
         self.progress.setFormat('%p%' if generating or (self.system and self.system.bets) else 'Sin desarrollo generado')
         self.filter_group.setEnabled(round_.editable and not busy)
         self.update_filter_controls()
-        self.optimization_coverage.setEnabled(bool(self.system and round_.editable and not busy))
-        self.update_coverage_proposal()
+        self.quick_conditions_slider.setEnabled(round_.editable and not busy)
         system = self.system
         for i, match in enumerate(view_round.matches[:14]):
             kickoff=match.kickoff[:10]+' '+match.kickoff[10:] if len(match.kickoff)==15 else match.kickoff
@@ -487,21 +486,18 @@ class MainWindow(QMainWindow):
         outer=self.page_layout(2)
         scroll=QScrollArea();scroll.setWidgetResizable(True)
         content=QWidget();layout=QVBoxLayout(content);scroll.setWidget(content);outer.addWidget(scroll)
-        progressive=QGroupBox('Barra progresiva · añadir dobles y triples')
+        self.quick_level=None
+        progressive=QGroupBox('Ajustes rápidos · elegir condiciones automáticamente')
         progressive_layout=QVBoxLayout(progressive)
-        self.optimization_coverage=QSlider(Qt.Orientation.Horizontal);self.optimization_coverage.setRange(0,10)
-        self.optimization_coverage.setTickPosition(QSlider.TickPosition.TicksBelow);self.optimization_coverage.setTickInterval(1)
-        self.optimization_coverage.setAccessibleName('Nivel de la barra progresiva, de cero a diez')
-        progressive_layout.addWidget(self.optimization_coverage)
-        ends=QHBoxLayout();ends.addWidget(QLabel('0 · menos apuestas'));ends.addStretch();ends.addWidget(QLabel('10 · más apuestas'));progressive_layout.addLayout(ends)
-        self.coverage_proposal=QLabel();self.coverage_proposal.setWordWrap(True);progressive_layout.addWidget(self.coverage_proposal)
-        self.coverage_apply=self.button('Usar este nivel en el boleto',self.apply_template,progressive_layout,editable=True)
-        note=QLabel('Mover la barra solo muestra una propuesta. Para cambiar el boleto pulsa Usar este nivel y después Generar. Los partidos bloqueados se respetan.');note.setWordWrap(True);progressive_layout.addWidget(note)
+        self.quick_conditions_slider=QSlider(Qt.Orientation.Horizontal);self.quick_conditions_slider.setRange(0,10);self.quick_conditions_slider.setValue(10)
+        self.quick_conditions_slider.setTickPosition(QSlider.TickPosition.TicksBelow);self.quick_conditions_slider.setTickInterval(1)
+        self.quick_conditions_slider.setAccessibleName('Ajustes de optimización: cero menos apuestas, diez máximo de apuestas')
+        progressive_layout.addWidget(self.quick_conditions_slider)
+        ends=QHBoxLayout();ends.addWidget(QLabel('0 · menos apuestas'));ends.addStretch();ends.addWidget(QLabel('10 · máximo de apuestas'));progressive_layout.addLayout(ends)
+        self.quick_description=QLabel('Mueve la barra para ajustar las condiciones de abajo. No cambia los signos del boleto.');self.quick_description.setWordWrap(True);progressive_layout.addWidget(self.quick_description)
+        self.button('Usar los ajustes de este nivel',lambda:self.configure_quick_conditions(self.quick_conditions_slider.value()),progressive_layout,editable=True)
+        note=QLabel('0 pone condiciones más estrictas; 10 admite todas las apuestas originales. Después pulsa Aplicar. Puedes recuperar más apuestas al subir de nivel. Para limitar el gasto, usa también Elegir según mi presupuesto.');note.setWordWrap(True);progressive_layout.addWidget(note)
         layout.addWidget(progressive)
-        self.optimization_coverage.valueChanged.connect(self.coverage.setValue)
-        self.coverage.valueChanged.connect(self.optimization_coverage.setValue)
-        self.coverage.valueChanged.connect(self.update_coverage_proposal)
-        self.ranking_source.currentIndexChanged.connect(self.update_coverage_proposal)
         self.optimize_info=QLabel();self.optimize_info.setWordWrap(True);layout.addWidget(self.optimize_info)
         row=QHBoxLayout();row.addWidget(QLabel('Presupuesto máximo (€)'))
         self.budget=QDoubleSpinBox();self.budget.setRange(0,100000);self.budget.setDecimals(2);self.budget.setValue(10);row.addWidget(self.budget)
@@ -513,9 +509,9 @@ class MainWindow(QMainWindow):
         self.methods_status.setWordWrap(True);layout.addWidget(self.methods_status)
         self.filter_group=QGroupBox('2. Elige qué apuestas quieres conservar')
         grid=QGridLayout(self.filter_group);self.filter_ranges={};self.filter_checks={}
-        self.filter_tips={'variants':'Cuenta cuántos partidos llevan X o 2 en cada apuesta.', 'x_count':'Cuenta los empates (signo X) en cada apuesta.', 'two_count':'Cuenta las victorias del visitante (signo 2) en cada apuesta.', 'x_distance':'Cuenta las posiciones entre dos X consecutivas: dos X juntas tienen distancia 1. Con cero o una X, esta condición no descarta la apuesta.', 'coincidences':'Cuenta cuántos signos coinciden con la otra quiniela que escribas abajo.', 'max_x_run':'Máximo de signos X consecutivos que permites.', 'max_two_run':'Máximo de signos 2 consecutivos que permites.'}
-        self.filter_defaults={'variants':(0,14),'x_count':(0,14),'two_count':(0,14),'x_distance':(1,13),'coincidences':(0,14)}
-        for i,(key,label_text) in enumerate((('variants','Total de X y 2'),('x_count','Número de empates (X)'),('two_count','Victorias visitantes (2)'),('x_distance','Separación entre X'),('coincidences','Parecido a otra quiniela'))):
+        self.filter_tips={'variants':'Cuenta cuántos partidos llevan X o 2 en cada apuesta.', 'x_count':'Cuenta los empates (signo X) en cada apuesta.', 'changes':'Cuenta las veces que cambia el signo de un partido al siguiente. Por ejemplo, 1X2 tiene dos cambios.', 'max_one_run':'Máximo de victorias locales consecutivas que permites.', 'two_count':'Cuenta las victorias del visitante (signo 2) en cada apuesta.', 'x_distance':'Cuenta las posiciones entre dos X consecutivas: dos X juntas tienen distancia 1. Con cero o una X, esta condición no descarta la apuesta.', 'coincidences':'Cuenta cuántos signos coinciden con la otra quiniela que escribas abajo.', 'max_x_run':'Máximo de signos X consecutivos que permites.', 'max_two_run':'Máximo de signos 2 consecutivos que permites.'}
+        self.filter_defaults={'variants':(0,14),'x_count':(0,14),'two_count':(0,14),'changes':(0,13),'x_distance':(1,13),'coincidences':(0,14)}
+        for i,(key,label_text) in enumerate((('variants','Total de X y 2'),('x_count','Número de empates (X)'),('two_count','Victorias visitantes (2)'),('changes','Cambios entre signos'),('x_distance','Separación entre X'),('coincidences','Parecido a otra quiniela'))):
             lower,upper=self.filter_defaults[key]
             check=QCheckBox(label_text);check.setProperty('filterLabel',label_text);check.setToolTip(self.filter_tips[key]);self.filter_checks[key]=check
             check.toggled.connect(self.update_filter_controls);grid.addWidget(check,i,0)
@@ -523,35 +519,39 @@ class MainWindow(QMainWindow):
             maximum=QSpinBox();maximum.setRange(lower,upper);maximum.setValue(upper);maximum.setMaximumWidth(70)
             self.filter_ranges[key]=(minimum,maximum)
             grid.addWidget(QLabel('Desde'),i,1);grid.addWidget(minimum,i,2);grid.addWidget(QLabel('Hasta'),i,3);grid.addWidget(maximum,i,4)
+        self.filter_max_one=QSpinBox();self.filter_max_one.setRange(1,14);self.filter_max_one.setValue(14)
         self.filter_max_x=QSpinBox();self.filter_max_x.setRange(1,14);self.filter_max_x.setValue(14)
         self.filter_max_two=QSpinBox();self.filter_max_two.setRange(1,14);self.filter_max_two.setValue(14)
-        for row,key,label_text,control in ((5,'max_x_run','Empates seguidos (X)',self.filter_max_x),(6,'max_two_run','Victorias seguidas (2)',self.filter_max_two)):
+        for row,key,label_text,control in ((6,'max_one_run','Locales seguidos (1)',self.filter_max_one),(7,'max_x_run','Empates seguidos (X)',self.filter_max_x),(8,'max_two_run','Visitantes seguidos (2)',self.filter_max_two)):
             check=QCheckBox(label_text);check.setProperty('filterLabel',label_text);check.setToolTip(self.filter_tips[key]);self.filter_checks[key]=check
             check.toggled.connect(self.update_filter_controls);grid.addWidget(check,row,0);grid.addWidget(QLabel('Máximo'),row,1);grid.addWidget(control,row,2)
         self.filter_reference=QLineEdit();self.filter_reference.setMaxLength(14);self.filter_reference.setPlaceholderText('Ejemplo: 11111111111111 (14 signos)')
         self.filter_reference.setToolTip('Solo se usa con «Parecido a otra quiniela». Cuenta cuántos signos coinciden con esta columna.')
-        grid.addWidget(QLabel('La otra quiniela'),7,0);grid.addWidget(self.filter_reference,7,1,1,4)
-        filter_note=QLabel('Marca solo las condiciones que quieras usar. Si marcas varias, cada apuesta debe cumplirlas todas. «Desde» y «Hasta» indican el mínimo y el máximo que admites.');filter_note.setWordWrap(True);grid.addWidget(filter_note,8,0,1,5)
+        grid.addWidget(QLabel('La otra quiniela'),9,0);grid.addWidget(self.filter_reference,9,1,1,4)
+        filter_note=QLabel('Marca solo las condiciones que quieras usar. Si marcas varias, cada apuesta debe cumplirlas todas. «Desde» y «Hasta» indican el mínimo y el máximo que admites.');filter_note.setWordWrap(True);grid.addWidget(filter_note,10,0,1,5)
         self.filter_reset=QPushButton('Desactivar todos');self.filter_reset.clicked.connect(self.reset_filters)
         self.filter_feedback=QLabel();self.filter_feedback.setWordWrap(True)
         self.filter_apply=QPushButton('Marca al menos un filtro');self.filter_apply.clicked.connect(lambda:self.safe(self.apply_filters_ui))
         layout.addWidget(self.filter_group);layout.addStretch()
         outer.addWidget(self.filter_feedback)
         actions=QHBoxLayout();actions.addWidget(self.filter_reset);actions.addWidget(self.filter_apply);outer.addLayout(actions)
+        self.quick_conditions_slider.valueChanged.connect(self.configure_quick_conditions)
         self.update_filter_controls()
 
-    def update_coverage_proposal(self):
-        """Preview the existing template without changing saved bets or expanding it."""
-        level=self.coverage.value()
-        if not self.system:
-            self.coverage_proposal.setText(f'Nivel {level}/10 · crea o abre una quiniela para ver la propuesta.')
-            return
-        round_=self.frozen_round()
-        snapshot=round_.snapshot(self.ranking_source.currentData())
-        base=engine.coverage_template(self.system.base,self.system.locks,level,snapshot)
-        count=engine.size(base)
-        doubles=sum(len(signs)==2 for signs in base);triples=sum(len(signs)==3 for signs in base)
-        self.coverage_proposal.setText(f'Nivel {level}/10 · {doubles} dobles y {triples} triples\nPropuesta: {count:,} apuestas · coste {money(count*round_.price_cents)}')
+    def configure_quick_conditions(self, level):
+        """Populate filter controls; moving the slider never edits a saved system."""
+        from quiniela_ai_studio.domain.filters import quick_conditions
+        spec=quick_conditions(level)
+        self.quick_level=level
+        active={'variants','x_count','two_count','changes','max_one_run','max_x_run','max_two_run'}
+        for key,check in self.filter_checks.items():check.setChecked(key in active)
+        for key,(minimum,maximum) in self.filter_ranges.items():
+            limits=getattr(spec,key)
+            minimum.setValue(limits[0]);maximum.setValue(limits[1])
+        self.filter_max_one.setValue(spec.max_one_run)
+        self.filter_max_x.setValue(spec.max_x_run);self.filter_max_two.setValue(spec.max_two_run)
+        self.quick_description.setText(f'Nivel {level}/10 · Total X y 2: {spec.variants[0]}–{spec.variants[1]} · Empates: {spec.x_count[0]}–{spec.x_count[1]} · Visitantes: {spec.two_count[0]}–{spec.two_count[1]}\nLas condiciones ya están ajustadas. Pulsa Aplicar para elegir las apuestas.')
+        self.update_filter_controls()
 
     def update_filter_controls(self):
         """Make activation explicit; inactive limits remain editable only after selection."""
@@ -559,6 +559,7 @@ class MainWindow(QMainWindow):
             check.setText(('✓ ' if check.isChecked() else '')+check.property('filterLabel'))
         for key,controls in self.filter_ranges.items():
             for control in controls:control.setEnabled(self.filter_checks[key].isChecked())
+        self.filter_max_one.setEnabled(self.filter_checks['max_one_run'].isChecked())
         self.filter_max_x.setEnabled(self.filter_checks['max_x_run'].isChecked())
         self.filter_max_two.setEnabled(self.filter_checks['max_two_run'].isChecked())
         self.filter_reference.setEnabled(self.filter_checks['coincidences'].isChecked())
@@ -569,6 +570,8 @@ class MainWindow(QMainWindow):
         self.filter_feedback.setText('1. Pulsa Generar debajo del boleto. Todavía no hay apuestas guardadas. Si cambias el boleto después, vuelve a generarlas.' if not ready else 'Tus apuestas están listas. Elige una condición, ajusta sus límites y pulsa Aplicar. Puedes desmarcarla cuando quieras.')
 
     def reset_filters(self):
+        self.quick_level=None
+        self.quick_description.setText('Mueve la barra para ajustar las condiciones de abajo. No cambia los signos del boleto.')
         for check in self.filter_checks.values():check.setChecked(False)
         self.update_filter_controls()
 
@@ -587,11 +590,12 @@ class MainWindow(QMainWindow):
             raise ValueError('Para comparar, escribe la otra quiniela con 14 signos (por ejemplo, 11111111111111), o desmarca «Parecido a otra quiniela».')
         from quiniela_ai_studio.domain.filters import BasicFilters
         spec=BasicFilters(**{key:(a.value(),b.value()) if self.filter_checks[key].isChecked() else self.filter_defaults[key] for key,(a,b) in self.filter_ranges.items()},
+                          max_one_run=self.filter_max_one.value() if self.filter_checks['max_one_run'].isChecked() else 14,
                           max_x_run=self.filter_max_x.value() if self.filter_checks['max_x_run'].isChecked() else 14,
                           max_two_run=self.filter_max_two.value() if self.filter_checks['max_two_run'].isChecked() else 14,
                           reference=self.filter_reference.text().upper() if self.filter_checks['coincidences'].isChecked() else '')
-        before=self.system.quantity
-        self.set_system(self.service.filtered(self.system,spec))
+        before=sum(b.quantity for b in self.service.origin_bets(self.system)[1]) if self.quick_level is not None else self.system.quantity
+        self.set_system(self.service.filtered(self.system,spec,from_origin=self.quick_level is not None,quick_level=self.quick_level))
         self.statusBar().showMessage(f'Has conservado {self.system.quantity} de {before} apuestas. Puedes recuperar las anteriores con Recuperar apuestas anteriores.',15000)
 
     def restore_origin(self):

@@ -85,20 +85,22 @@ class SystemService:
         return self.version(system, round_snapshot=json.dumps(round_dict(updated)),
                             origin='actualización explícita de fuentes; apuestas y precio conservados', action='refresh_sources')
 
-    def filtered(self, system, spec):
+    def filtered(self, system, spec, *, from_origin=False, quick_level=None):
         self._editable(system)
         if not system.bets: raise ValueError('Genera o importa apuestas antes de aplicar filtros.')
-        bets = spec.apply(system.bets)
+        candidates = self.origin_bets(system)[1] if from_origin else system.bets
+        bets = spec.apply(candidates)
         if not bets: raise ValueError('Los filtros eliminarían todas las apuestas. El sistema anterior se conserva.')
         union = union_base(bets, system.base)
         base = tuple(system.base[i] if system.locks[i] else union[i] for i in range(14))
         return self.version(system, bets=bets, base=base, origin='filtros básicos de Quiniela Local', action='filter',
                             parameters=json.dumps(dict(input_revision=system.revision, input_hash=system.hash,
-                                                       filter_spec=spec.parameters(), input_quantity=system.quantity,
+                                                       filter_spec=spec.parameters(), input_quantity=sum(b.quantity for b in candidates),
+                                                       from_origin=from_origin, quick_level=quick_level,
                                                        output_quantity=sum(b.quantity for b in bets))))
 
-    def restore_origin(self, system):
-        self._editable(system)
+    def origin_bets(self, system):
+        """Read the original exact bets without creating a new saved version."""
         source = system
         while True:
             parameters = json.loads(source.parameters)
@@ -112,6 +114,11 @@ class SystemService:
         else:
             bets = source.bets
         if not bets: raise ValueError('No hay un desarrollo de origen disponible en esta versión.')
+        return source, bets
+
+    def restore_origin(self, system):
+        self._editable(system)
+        source, bets = self.origin_bets(system)
         union = union_base(bets, system.base)
         base = tuple(system.base[i] if system.locks[i] else union[i] for i in range(14))
         return self.version(system, bets=bets, base=base, origin=f'desarrollo original de v{source.revision}', action='restore_origin')
