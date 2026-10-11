@@ -121,3 +121,10 @@ Windows sigue sin ejecución nativa acreditada.
 
 La arquitectura y experiencia visual se describen en `STUDIO_V01_ENTREGA.md`.
 Los resultados no acreditan fases v0.2–v1.0, predicciones ni garantías.
+
+## Corrección 0.1.3 — 11/10/2026
+
+83 pruebas Studio: clics reales en casillas de filtro, activación independiente,
+valores inactivos ignorados y referencia obligatoria sin modificar el sistema.
+Captura Qt/X11 a 1024×768 revisada con datos sintéticos; panel con desplazamiento.
+Los avisos de reductores e IA pendientes no representan su implementación.

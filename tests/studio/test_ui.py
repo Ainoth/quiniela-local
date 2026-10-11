@@ -139,8 +139,9 @@ def test_live_partial_and_cached_result_respects_quantities(window,monkeypatch):
 
 def test_filters_and_restore_origin_ui(window):
     window.example_system();wait_for_generation(window)
+    window.navigation.setCurrentRow(2);QTest.qWait(10)
     original=window.system.bets
-    window.filter_group.setChecked(True)
+    QTest.mouseClick(window.filter_checks['x_count'],Qt.MouseButton.LeftButton)
     window.filter_ranges['x_count'][0].setValue(1)
     window.apply_filters()
     assert 0<window.system.quantity<6
@@ -222,3 +223,41 @@ def test_direct_export_qt_preserves_system_and_records_audit(window,tmp_path,mon
     _,loaded=read_system(path)
     assert loaded.bets==original.bets and window.system==original
     assert any(row[1]=='export_development' for row in window.repository.audit())
+
+
+def test_filter_activation_is_independent_and_inactive_values_are_ignored(window):
+    window.example_system();wait_for_generation(window)
+    window.navigation.setCurrentRow(2);QTest.qWait(10)
+    original=window.system.bets
+    assert not window.filter_apply.isEnabled()
+    assert not window.filter_ranges['x_count'][0].isEnabled()
+    # Click the visible checkbox exactly as a user would.
+    QTest.mouseClick(window.filter_checks['x_count'],Qt.MouseButton.LeftButton)
+    assert window.filter_apply.isEnabled()
+    assert window.filter_checks['x_count'].text().startswith('✓')
+    assert window.filter_ranges['x_count'][0].isEnabled()
+    window.filter_ranges['x_count'][0].setValue(14)
+    QTest.mouseClick(window.filter_checks['x_count'],Qt.MouseButton.LeftButton)
+    QTest.mouseClick(window.filter_checks['two_count'],Qt.MouseButton.LeftButton)
+    window.filter_ranges['two_count'][1].setValue(0)
+    window.filter_reference.setText('INVALIDA')
+    window.apply_filters()
+    assert window.system.bets==tuple(b for b in original if '2' not in b.column)
+    assert window.system.quantity>0
+    assert not window.filter_ranges['x_count'][0].isEnabled()
+    assert 'pendientes' in window.methods_status.text()
+    assert 'pendiente' in window.ai_status.text()
+
+
+def test_reference_filter_requires_reference_without_creating_revision(window):
+    window.example_system();wait_for_generation(window)
+    revision=window.system.revision
+    window.filter_checks['coincidences'].setChecked(True)
+    assert window.filter_reference.isEnabled()
+    with pytest.raises(ValueError,match='referencia de 14 signos'):
+        window.apply_filters()
+    assert window.system.revision==revision
+    window.filter_checks['coincidences'].setChecked(False)
+    with pytest.raises(ValueError,match='al menos un filtro'):
+        window.apply_filters()
+    assert window.system.revision==revision

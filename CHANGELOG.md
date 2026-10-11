@@ -26,3 +26,12 @@
 - Exportación directa TXT/JSON perezosa, atómica y cancelable, con apuestas
   exactas de sistemas reducidos. Importación del fixture original de 12 apuestas.
 - Se conservan descarga, importación y recuperación de la entrega anterior.
+
+## 0.1.3 — 11/10/2026 · corrección de filtros
+
+- RF-FIL-009: casillas individuales visibles para los siete filtros básicos,
+  límites habilitados solo al activarlos y valores desactivados ignorados.
+- Referencia obligatoria al activar coincidencias; error sin guardar versión.
+- RF-RED-002: estado explícito de reductores pendientes en Optimizar; la selección
+  por presupuesto sigue sin garantía. Estado de IA pendiente (v0.6) en Análisis.
+- 83 pruebas Studio, incluidas interacción por clic, desactivación y validación.

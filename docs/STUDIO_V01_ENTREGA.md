@@ -1,4 +1,4 @@
-# Entrega ejecutable v0.1 — revisión 0.1.2
+# Entrega ejecutable v0.1 — revisión 0.1.3
 
 11/10/2026. Esta revisión corrige la interfaz conforme a la preferencia del
 usuario: conservar la experiencia de Quiniela Local y su descarga de datos.
@@ -104,3 +104,18 @@ marcado pendiente. No hay rentabilidad, IA entrenada, garantías, Elige8 operati
 sellado ni pagos. No se modifica Android. Windows necesita validación nativa antes
 de anunciarse probado. La fase siguiente del plan original es v0.2, filtros;
 no se incluye por cambiar la revisión de v0.1.
+
+## Corrección 0.1.3: filtros y funciones pendientes
+
+En Optimizar marca la casilla junto a cada filtro. La marca ✓ y los límites
+habilitados indican su activación. Solo se aplican las condiciones marcadas,
+combinadas con AND. Desmarcar una condición ignora sus valores aunque permanezcan
+visibles. Coincidencias exige una referencia válida de 14 signos. El botón
+muestra cuántos filtros aplicar; al terminar muestra apuestas antes/después.
+En ventanas pequeñas desplaza el panel derecho para ver el botón.
+
+Disponible: selección por presupuesto y siete condiciones básicas. Pendientes:
+reductores de cobertura/greedy (v0.3), búsqueda local y reinicios (v0.7), y
+IA predictiva calibrada con evaluación retrospectiva (v0.6). La app muestra
+estos límites en Optimizar y Análisis. Las plantillas 0–10 no son reductores
+con garantías. Esta corrección no entrega esas fases futuras.

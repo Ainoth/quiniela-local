@@ -1,2 +1,2 @@
 """Quiniela AI Studio: dominio independiente, servicios y escritorio Qt."""
-__version__ = "0.1.2"
+__version__ = "0.1.3"

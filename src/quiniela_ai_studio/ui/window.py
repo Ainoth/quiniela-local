@@ -47,6 +47,10 @@ QTabBar::tab:selected {background:#087fbe; color:white;}
 QScrollArea {border:none;}
 QGroupBox {border:1px solid #2a6698; border-radius:4px; margin-top:12px; padding-top:12px;}
 QGroupBox::title {color:#57d4ff;}
+QCheckBox::indicator {width:18px; height:18px; border:2px solid #86bfe8; border-radius:3px; background:#eef7ff;}
+QCheckBox::indicator:checked {background:#18864b; border-color:#35d27f;}
+QCheckBox::indicator:disabled {background:#24405b; border-color:#62768b;}
+QLineEdit:disabled, QSpinBox:disabled {background:#173451; color:#8ba5be; border-color:#35536e;}
 QProgressBar {border:1px solid #2a6698; text-align:center;}
 QProgressBar::chunk {background:#159881;}
 QWidget#ballot QLabel {color:#082b70; background:#f6f7fb;}
@@ -270,6 +274,8 @@ class MainWindow(QMainWindow):
         busy = bool((self.worker and self.worker.isRunning()) or (self.data_worker and self.data_worker.isRunning()))
         for button in self.edit_buttons:
             button.setEnabled(round_.editable and not busy)
+        self.filter_group.setEnabled(round_.editable and not busy)
+        self.update_filter_controls()
         system = self.system
         for i, match in enumerate(view_round.matches[:14]):
             kickoff=match.kickoff[:10]+' '+match.kickoff[10:] if len(match.kickoff)==15 else match.kickoff
@@ -475,32 +481,55 @@ class MainWindow(QMainWindow):
         self.button('Restaurar desarrollo de origen',self.restore_origin,layout,editable=True)
         label=QLabel('Con deportiva: orden por probabilidad bajo independencia. Sin deportiva: orden lexicográfico explícito.\nNo es un reductor con garantía, ni una estimación de rentabilidad. El presupuesto nunca aumenta automáticamente.')
         label.setWordWrap(True);layout.addWidget(label)
-        self.filter_group=QGroupBox('Filtros de Quiniela Local · activar y revisar límites')
-        self.filter_group.setCheckable(True);self.filter_group.setChecked(False)
-        grid=QGridLayout(self.filter_group);self.filter_ranges={}
-        for i,(key,label_text,lower,upper) in enumerate((('variants','Variantes X+2',0,14),('x_count','Cantidad de X',0,14),('two_count','Cantidad de 2',0,14),('x_distance','Distancia entre X',1,13),('coincidences','Coincidencias con referencia',0,14))):
-            grid.addWidget(QLabel(label_text),i,0)
-            minimum=QSpinBox();minimum.setRange(lower,upper);minimum.setValue(lower)
-            maximum=QSpinBox();maximum.setRange(lower,upper);maximum.setValue(upper)
+        self.methods_status=QLabel('Disponible: selección por presupuesto. Reductores de cobertura, búsqueda local y garantías: pendientes (v0.3/v0.7).')
+        self.methods_status.setWordWrap(True);layout.addWidget(self.methods_status)
+        self.filter_group=QGroupBox('Filtros de Quiniela Local · marca cada filtro que quieras usar')
+        grid=QGridLayout(self.filter_group);self.filter_ranges={};self.filter_checks={}
+        self.filter_defaults={'variants':(0,14),'x_count':(0,14),'two_count':(0,14),'x_distance':(1,13),'coincidences':(0,14)}
+        for i,(key,label_text) in enumerate((('variants','Variantes X+2'),('x_count','Cantidad de X'),('two_count','Cantidad de 2'),('x_distance','Distancia entre X'),('coincidences','Coincidencias con referencia'))):
+            lower,upper=self.filter_defaults[key]
+            check=QCheckBox(label_text);check.setProperty('filterLabel',label_text);self.filter_checks[key]=check
+            check.toggled.connect(self.update_filter_controls);grid.addWidget(check,i,0)
+            minimum=QSpinBox();minimum.setRange(lower,upper);minimum.setValue(lower);minimum.setMaximumWidth(70)
+            maximum=QSpinBox();maximum.setRange(lower,upper);maximum.setValue(upper);maximum.setMaximumWidth(70)
             self.filter_ranges[key]=(minimum,maximum)
             grid.addWidget(QLabel('Mín.'),i,1);grid.addWidget(minimum,i,2);grid.addWidget(QLabel('Máx.'),i,3);grid.addWidget(maximum,i,4)
         self.filter_max_x=QSpinBox();self.filter_max_x.setRange(1,14);self.filter_max_x.setValue(14)
         self.filter_max_two=QSpinBox();self.filter_max_two.setRange(1,14);self.filter_max_two.setValue(14)
-        grid.addWidget(QLabel('Racha máxima X / 2'),5,0);grid.addWidget(self.filter_max_x,5,2);grid.addWidget(self.filter_max_two,5,4)
-        self.filter_reference=QLineEdit();self.filter_reference.setMaxLength(14);self.filter_reference.setPlaceholderText('14 signos; vacío = sin referencia')
-        grid.addWidget(QLabel('Referencia'),6,0);grid.addWidget(self.filter_reference,6,1,1,4)
-        filter_note=QLabel('Límites inclusivos. Si hay menos de dos X, distancia satisfecha. Se conservan apuestas exactas, Plenos y cantidades. No se generan garantías.');filter_note.setWordWrap(True);grid.addWidget(filter_note,7,0,1,5)
-        button=QPushButton('Aplicar filtros al desarrollo');button.clicked.connect(lambda:self.safe(self.apply_filters));grid.addWidget(button,8,0,1,5)
-        self.edit_buttons.append(button)
+        for row,key,label_text,control in ((5,'max_x_run','Racha máxima de X',self.filter_max_x),(6,'max_two_run','Racha máxima de 2',self.filter_max_two)):
+            check=QCheckBox(label_text);check.setProperty('filterLabel',label_text);self.filter_checks[key]=check
+            check.toggled.connect(self.update_filter_controls);grid.addWidget(check,row,0);grid.addWidget(control,row,2)
+        self.filter_reference=QLineEdit();self.filter_reference.setMaxLength(14);self.filter_reference.setPlaceholderText('14 signos 1/X/2; obligatoria al activar coincidencias')
+        grid.addWidget(QLabel('Referencia'),7,0);grid.addWidget(self.filter_reference,7,1,1,4)
+        filter_note=QLabel('Solo se aplican los filtros marcados, combinados con AND. Límites inclusivos. Con menos de dos X, distancia satisfecha. Se conservan apuestas exactas, Plenos y cantidades.');filter_note.setWordWrap(True);grid.addWidget(filter_note,8,0,1,5)
+        self.filter_apply=QPushButton('Marca al menos un filtro');self.filter_apply.clicked.connect(lambda:self.safe(self.apply_filters));grid.addWidget(self.filter_apply,9,0,1,5)
         layout.addWidget(self.filter_group);layout.addStretch()
+        self.update_filter_controls()
+
+    def update_filter_controls(self):
+        """Make activation explicit; inactive limits remain editable only after selection."""
+        for check in self.filter_checks.values():
+            check.setText(('✓ ' if check.isChecked() else '')+check.property('filterLabel'))
+        for key,controls in self.filter_ranges.items():
+            for control in controls:control.setEnabled(self.filter_checks[key].isChecked())
+        self.filter_max_x.setEnabled(self.filter_checks['max_x_run'].isChecked())
+        self.filter_max_two.setEnabled(self.filter_checks['max_two_run'].isChecked())
+        self.filter_reference.setEnabled(self.filter_checks['coincidences'].isChecked())
+        count=sum(check.isChecked() for check in self.filter_checks.values())
+        self.filter_apply.setText(f'Aplicar {count} filtros al desarrollo' if count else 'Marca al menos un filtro')
+        self.filter_apply.setEnabled(bool(count))
 
     def apply_filters(self):
-        if not self.filter_group.isChecked():raise ValueError('Activa los filtros y revisa sus límites antes de aplicarlos.')
+        if not any(check.isChecked() for check in self.filter_checks.values()):
+            raise ValueError('Marca al menos un filtro antes de aplicarlo.')
         if not self.system:raise ValueError('Abre primero un sistema.')
+        if self.filter_checks['coincidences'].isChecked() and not self.filter_reference.text().strip():
+            raise ValueError('Introduce una referencia de 14 signos para el filtro de coincidencias.')
         from quiniela_ai_studio.domain.filters import BasicFilters
-        spec=BasicFilters(**{key:(a.value(),b.value()) for key,(a,b) in self.filter_ranges.items()},
-                          max_x_run=self.filter_max_x.value(),max_two_run=self.filter_max_two.value(),
-                          reference=self.filter_reference.text().upper())
+        spec=BasicFilters(**{key:(a.value(),b.value()) if self.filter_checks[key].isChecked() else self.filter_defaults[key] for key,(a,b) in self.filter_ranges.items()},
+                          max_x_run=self.filter_max_x.value() if self.filter_checks['max_x_run'].isChecked() else 14,
+                          max_two_run=self.filter_max_two.value() if self.filter_checks['max_two_run'].isChecked() else 14,
+                          reference=self.filter_reference.text().upper() if self.filter_checks['coincidences'].isChecked() else '')
         before=self.system.quantity
         self.set_system(self.service.filtered(self.system,spec))
         self.statusBar().showMessage(f'Filtros: {before} → {self.system.quantity} apuestas. El desarrollo de origen sigue guardado.',15000)
@@ -517,6 +546,7 @@ class MainWindow(QMainWindow):
     def build_analysis(self):
         layout=self.page_layout(3);self.analysis_info=QLabel();self.analysis_info.setWordWrap(True);layout.addWidget(self.analysis_info)
         self.analysis_view,self.analysis_model=self.table(('Partido','Deportiva (%)','Público (%)'),layout)
+        self.ai_status=QLabel('IA predictiva: pendiente de desarrollar (v0.6). Esta versión muestra datos importados; no entrena ni ejecuta un modelo predictivo. Requiere histórico fechado, calibración y evaluación retrospectiva.');self.ai_status.setWordWrap(True);layout.addWidget(self.ai_status)
         note=QLabel('Valores en orden 1 / X / 2. Los porcentajes jugados no son probabilidad deportiva.');note.setWordWrap(True);layout.addWidget(note)
 
     def analysis_text(self):

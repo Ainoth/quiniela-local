@@ -42,7 +42,7 @@ RF-FIL-005,v0.2/v0.7,PARCIAL,"Filtros de diferencias, coincidencias, rangos, fig
 RF-FIL-006,v0.2/v0.7,PENDIENTE,"Filtro de valoraciones (suma, productos/logaritmos con gestión numérica segura)."
 RF-FIL-007,v0.2/v0.7,PENDIENTE,"Filtro `IF THEN`, condiciones vinculadas y grupos generales."
 RF-FIL-008,v0.2/v0.7,PENDIENTE,Reservas: tolerancia controlada al incumplimiento de condiciones con reglas explícitas.
-RF-FIL-009,v0.2/v0.7,PENDIENTE,"Activación independiente, orden, presets, clonación, import/export versionado de condiciones."
+RF-FIL-009,v0.2/v0.7,PARCIAL,"Activación independiente, orden, presets, clonación, import/export versionado de condiciones."
 RF-FIL-010,v0.2/v0.7,PENDIENTE,"Estudio previo de cada filtro: límites posibles, distribución, efecto y recomendación **sin prometer resultados**."
 RF-FIL-011,v0.2/v0.7,PENDIENTE,Informe de fallo: qué condición descartó una columna/resultado ganador y por qué.
 RF-FIL-012,v0.2/v0.7,PENDIENTE,"Guardar opcionalmente descartes por filtro, en modo streaming."

@@ -47,7 +47,7 @@ Esta tabla está generada inicialmente a partir de `01_ESPECIFICACION_FUNCIONAL.
 | `RF-FIL-006` | v0.2/v0.7 | PENDIENTE | Filtro de valoraciones (suma, productos/logaritmos con gestión numérica segura). |
 | `RF-FIL-007` | v0.2/v0.7 | PENDIENTE | Filtro `IF THEN`, condiciones vinculadas y grupos generales. |
 | `RF-FIL-008` | v0.2/v0.7 | PENDIENTE | Reservas: tolerancia controlada al incumplimiento de condiciones con reglas explícitas. |
-| `RF-FIL-009` | v0.2/v0.7 | PENDIENTE | Activación independiente, orden, presets, clonación, import/export versionado de condiciones. |
+| `RF-FIL-009` | v0.2/v0.7 | PARCIAL | Activación independiente, orden, presets, clonación, import/export versionado de condiciones. |
 | `RF-FIL-010` | v0.2/v0.7 | PENDIENTE | Estudio previo de cada filtro: límites posibles, distribución, efecto y recomendación **sin prometer resultados**. |
 | `RF-FIL-011` | v0.2/v0.7 | PENDIENTE | Informe de fallo: qué condición descartó una columna/resultado ganador y por qué. |
 | `RF-FIL-012` | v0.2/v0.7 | PENDIENTE | Guardar opcionalmente descartes por filtro, en modo streaming. |
@@ -169,3 +169,12 @@ visible al cambiar de sección.
 Estructura canónica: `src/quiniela_ai_studio/{domain,application,infrastructure,ui}`.
 Guía actual: [STUDIO_V01_ENTREGA.md](STUDIO_V01_ENTREGA.md). Se mantienen estados
 PARCIAL para los requisitos completos que incluyen funcionalidades de fases futuras.
+
+## Corrección de filtros 0.1.3
+
+RF-FIL-009: activación independiente mediante casillas visibles y marca textual;
+los límites inactivos no filtran. Pruebas GUI de clic, AND con valores neutrales
+para condiciones inactivas y error de referencia sin crear versión. Presets,
+ordenación e intercambio de condiciones siguen pendientes. RF-RED-002 continúa
+pendiente: aviso de estado en Optimizar, sin nuevos algoritmos. Análisis señala
+que IA predictiva v0.6 no está implementada.
