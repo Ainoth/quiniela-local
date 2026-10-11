@@ -35,3 +35,18 @@
 - RF-RED-002: estado explícito de reductores pendientes en Optimizar; la selección
   por presupuesto sigue sin garantía. Estado de IA pendiente (v0.6) en Análisis.
 - 83 pruebas Studio, incluidas interacción por clic, desactivación y validación.
+
+## 0.1.4 — 11/10/2026 · recuperación del flujo de filtros
+
+- RF-FIL-009: desactivar todos los filtros; errores de configuración dentro del
+  panel, sin diálogo que bloquee desmarcar casillas.
+- RF-FIL-001: aplicación deshabilitada si no hay apuestas exactas guardadas y
+  explicación de cómo generar el desarrollo antes de filtrar.
+- La barra vuelve a cero y muestra «Sin desarrollo generado» si una edición
+  invalida las apuestas; no mantiene el 100 % de una generación anterior.
+- 85 pruebas Studio: error seguido de desmarcado por clic, desactivar todos,
+  versión intacta tras error y progreso coherente después de editar signos.
+- Instrucciones de tres pasos y condiciones con nombres cotidianos; los detalles
+  de separación entre X pasan a ayuda contextual, sin jerga AND en el panel.
+- RF-AUD-004: revisión del lenguaje de las siete secciones, archivos descritos
+  por su contenido, precio visible y detalles técnicos del historial plegados.

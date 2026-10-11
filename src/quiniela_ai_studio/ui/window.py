@@ -45,6 +45,9 @@ QHeaderView::section {background:#123b65; padding:6px; color:#ffffff; font-weigh
 QTabBar::tab {background:#102f52; color:#c9e8ff; padding:9px 13px; font-weight:bold;}
 QTabBar::tab:selected {background:#087fbe; color:white;}
 QScrollArea {border:none;}
+QScrollBar:vertical {background:#102f52; width:14px;}
+QScrollBar::handle:vertical {background:#3c88b8; min-height:30px;}
+QScrollBar::handle:vertical:hover {background:#57d4ff;}
 QGroupBox {border:1px solid #2a6698; border-radius:4px; margin-top:12px; padding-top:12px;}
 QGroupBox::title {color:#57d4ff;}
 QCheckBox::indicator {width:18px; height:18px; border:2px solid #86bfe8; border-radius:3px; background:#eef7ff;}
@@ -255,25 +258,30 @@ class MainWindow(QMainWindow):
         self.live_matches = None
         self.live_model.update_rows([])
         cached = self.repository.setting('live:' + self.round.key)
-        self.live_status.setText(f'Última consulta guardada: {cached["captured_at"]} · pulsa «Ver directo guardado».' if cached else 'Sin marcador guardado para esta jornada.')
+        self.live_status.setText(f'Última consulta guardada: {cached["captured_at"]} · pulsa «Ver último marcador».' if cached else 'Sin marcador guardado para esta jornada.')
         self.refresh()
 
     def refresh(self):
         round_ = self.round
         view_round = round_from_dict(json.loads(self.system.round_snapshot)) if self.system and self.system.round_snapshot else round_
-        self.system_label.setText(f'{self.system.name} · v{self.system.revision}' if self.system else 'Sin sistema activo')
-        modes = dict(simulation='DEMO FICTICIA · datos de ejemplo', current='EN CURSO · editable', past='HISTÓRICA · consulta', future='FUTURA · consulta')
-        mode_label = modes[round_.mode] if round_.mode != 'current' or round_.editable else 'CONSULTA · fecha nominal vencida'
-        self.metadata.setText(f'{mode_label} · {view_round.source}\nDatos congelados: {datetime.fromisoformat(view_round.captured_at).astimezone():%d/%m/%Y %H:%M} · Regla de precio: {view_round.rules_version}')
+        self.system_label.setText(f'{self.system.name} · v{self.system.revision}' if self.system else 'Ninguna quiniela abierta')
+        modes = dict(simulation='DEMO FICTICIA · datos de ejemplo', current='EN CURSO · puedes editar', past='ANTERIOR · solo consulta', future='FUTURA · consulta')
+        mode_label = modes[round_.mode] if round_.mode != 'current' or round_.editable else 'SOLO CONSULTA · jornada pasada'
+        self.metadata.setText(f'{mode_label} · {view_round.source}\nDatos usados: {datetime.fromisoformat(view_round.captured_at).astimezone():%d/%m/%Y %H:%M} · Precio por apuesta: {money(view_round.price_cents)} (referencia local)')
+        self.metadata.setToolTip(f'Versión de reglas: {view_round.rules_version}\nProveedor: {view_round.source}')
         quantity = self.system.quantity if self.system else 0
         pending = sum(b.quantity for b in self.system.bets if not b.pleno) if self.system else 0
-        self.footer.setText(f'{quantity:,} apuestas exactas · coste {money(self.system.cost(round_) if self.system else 0)} · {pending} Plenos pendientes · Desarrollo / selección, sin garantía de reducción')
-        self.home_info.setText(f'{round_.key}\n15 partidos disponibles · {len(self.repository.systems(round_.key))} sistemas guardados\nPrecio configurado: {money(round_.price_cents)} por apuesta. Exportar no valida ni paga apuestas.')
-        self.data_info.setText('Datos guardados: ' + (self.repository.setting('data_directory') or 'ninguna importación todavía') + '\nWIN1X2: jornadas/calendario/premios. Quinielista: porcentajes jugados y marcador; no son probabilidades deportivas.')
+        self.footer.setText(f'{quantity:,} apuestas preparadas · coste {money(self.system.cost(round_) if self.system else 0)} · {pending} apuestas sin Pleno · Sin garantía de premio')
+        self.home_info.setText(f'{round_.key}\n15 partidos · {len(self.repository.systems(round_.key))} quinielas guardadas\nPrecio por apuesta: {money(round_.price_cents)} por apuesta. Guardar un archivo no envía ni paga la apuesta.')
+        self.data_info.setText('Datos guardados: ' + (self.repository.setting('data_directory') or 'todavía no has añadido datos') + '\nWIN1X2 aporta partidos y premios. Quinielista aporta elecciones de otros jugadores y marcadores.')
         self.rule_price.setValue(round_.price_cents)
         busy = bool((self.worker and self.worker.isRunning()) or (self.data_worker and self.data_worker.isRunning()))
         for button in self.edit_buttons:
             button.setEnabled(round_.editable and not busy)
+        generating=bool(self.worker and self.worker.isRunning())
+        if not generating:
+            self.progress.setValue(100 if self.system and self.system.bets else 0)
+        self.progress.setFormat('%p%' if generating or (self.system and self.system.bets) else 'Sin desarrollo generado')
         self.filter_group.setEnabled(round_.editable and not busy)
         self.update_filter_controls()
         system = self.system
@@ -302,25 +310,26 @@ class MainWindow(QMainWindow):
                 button.setChecked(self.pleno_combos[side].currentText()==goal)
                 button.setEnabled(bool(system and round_.editable and not busy))
         self.preview_model.update_rows([(b.column,b.pleno or '—',b.quantity) for b in system.bets[:100]] if system else [])
-        self.preview_info.setText(f'{quantity:,} apuestas guardadas. Selecciona signos en el boleto y pulsa Generar.' if system else 'Crea un sistema para editar el boleto.')
+        self.preview_info.setText(f'{quantity:,} apuestas guardadas. Selecciona signos en el boleto y pulsa Generar.' if system else 'Pulsa Nuevo para empezar una quiniela.')
         self.name_input.blockSignals(True); self.name_input.setText(system.name if system else ''); self.name_input.blockSignals(False)
         self.name_input.setEnabled(bool(system and round_.editable and not busy))
-        self.builder_info.setText(f'Base: {engine.size(system.base):,} · {sum(len(p)==1 for p in system.base)} fijos / {sum(len(p)==2 for p in system.base)} dobles / {sum(len(p)==3 for p in system.base)} triples\nCoste de la base: {money(engine.size(system.base)*view_round.price_cents)} · apuestas guardadas: {system.quantity:,}' if system else 'Crea un sistema para seleccionar signos.')
+        self.builder_info.setText(f'Apuestas posibles: {engine.size(system.base):,} · {sum(len(p)==1 for p in system.base)} fijos / {sum(len(p)==2 for p in system.base)} dobles / {sum(len(p)==3 for p in system.base)} triples\nCoste si juegas todas: {money(engine.size(system.base)*view_round.price_cents)} · apuestas guardadas: {system.quantity:,}' if system else 'Pulsa Nuevo y elige los signos de cada partido.')
         self.update_system_list()
         self.analysis_info.setText(self.analysis_text())
         def percentages(kind,index):
             snap=view_round.snapshot(kind)
             return ' / '.join(f'{100*v:.1f}' for v in snap.values[index]) if snap else 'Sin datos'
         self.analysis_model.update_rows([(f'{i+1}. {m.home} – {m.away}',percentages('sport',i),percentages('public',i)) for i,m in enumerate(view_round.matches[:14])])
-        self.optimize_info.setText(f'Origen: {system.name} v{system.revision}\n{system.quantity:,} apuestas · hash {system.hash[:16]}\nLa selección crea una nueva versión. El origen sigue guardado.' if system else 'Abre o genera primero un sistema.')
+        self.optimize_info.setToolTip(f'Identificador de contenido: {system.hash}' if system else '')
+        self.optimize_info.setText(f'Quiniela: {system.name} · guardado {system.revision}\n{system.quantity:,} apuestas guardadas. Las anteriores se conservan para poder recuperarlas.' if system else 'Crea una quiniela o abre una de Mis Sistemas.')
         self.update_data_buttons()
 
     def build_home(self):
         layout = self.page_layout(0)
         self.home_info = QLabel(); self.home_info.setWordWrap(True); layout.addWidget(self.home_info)
         row = QHBoxLayout()
-        self.button('Crear sistema manual', self.new_system, row, primary=True, editable=True)
-        self.button('Probar ejemplo de 6 columnas', self.example_system, row, editable=True)
+        self.button('Crear una quiniela', self.new_system, row, primary=True, editable=True)
+        self.button('Probar ejemplo de 6 apuestas', self.example_system, row, editable=True)
         self.button('Consultar aciertos', lambda: self.navigation.setCurrentRow(4), row)
         layout.addLayout(row)
         row = QHBoxLayout()
@@ -328,7 +337,7 @@ class MainWindow(QMainWindow):
         self.data_button('Importar datos locales', self.import_win1x2, row)
         self.button('En curso', self.go_current, row)
         layout.addLayout(row)
-        note = QLabel('v0.1 · Constructor, versiones, archivos y cálculo verificable.\nIA entrenada, rentabilidad, simulaciones, garantías y peñas quedan para fases posteriores.\nEl ejemplo inicial es sintético y funciona sin conexión.')
+        note = QLabel('Empieza con un ejemplo o crea tu quiniela. Elige 1 si gana el local, X si empatan y 2 si gana el visitante.\nEl ejemplo usa partidos inventados y funciona sin Internet. IA y reducción avanzada todavía no están disponibles.')
         note.setWordWrap(True); layout.addWidget(note); layout.addStretch()
 
     def new_system(self):
@@ -344,7 +353,7 @@ class MainWindow(QMainWindow):
     def build_builder(self):
         layout = self.ballot.layout()
         title=QLabel('PARTIDOS DE LA JORNADA');title.setObjectName('title');layout.addWidget(title)
-        row = QHBoxLayout(); self.name_input = QLineEdit(); self.name_input.setPlaceholderText('Nombre del sistema')
+        row = QHBoxLayout(); self.name_input = QLineEdit(); self.name_input.setPlaceholderText('Nombre de tu quiniela')
         self.name_input.editingFinished.connect(lambda: self.safe(self.rename))
         row.addWidget(self.name_input)
         self.button('Nuevo', self.new_system, row, editable=True)
@@ -384,15 +393,15 @@ class MainWindow(QMainWindow):
                 row.addWidget(button);buttons[goal]=button
             row.addStretch();layout.addLayout(row);self.goal_buttons.append(buttons)
         left_layout=layout;layout=self.page_layout(1)
-        row=QHBoxLayout();row.addWidget(QLabel('Cobertura 0–10'))
+        row=QHBoxLayout();row.addWidget(QLabel('Añadir dobles y triples (0–10)'))
         self.coverage=QSlider(Qt.Orientation.Horizontal);self.coverage.setRange(0,10);row.addWidget(self.coverage,1)
         self.coverage_label=QLabel('0');row.addWidget(self.coverage_label);self.coverage.valueChanged.connect(lambda v:self.coverage_label.setText(str(v)))
-        self.button('Aplicar plantilla', self.apply_template, row, editable=True);layout.addLayout(row)
-        note=QLabel('Nivel 10: 3 triples + 7 dobles = 3.456. Bloqueos respetados. Público indica popularidad.')
+        self.button('Cambiar el boleto', self.apply_template, row, editable=True);layout.addLayout(row)
+        note=QLabel('Un nivel mayor añade más signos y aumenta el coste. El nivel 10 puede producir 3.456 apuestas. Los partidos bloqueados no cambian.')
         note.setWordWrap(True);note.setObjectName('muted');layout.addWidget(note)
-        row=QHBoxLayout();row.addWidget(QLabel('Fuente'))
-        self.ranking_source=QComboBox();self.ranking_source.addItem('Deportiva / orden 1X2 si falta','sport');self.ranking_source.addItem('Público: popularidad','public');row.addWidget(self.ranking_source,1)
-        self.button('Actualizar fuentes',self.refresh_system_sources,row,editable=True);layout.addLayout(row)
+        row=QHBoxLayout();row.addWidget(QLabel('Elegir signos según'))
+        self.ranking_source=QComboBox();self.ranking_source.addItem('Datos deportivos, si hay','sport');self.ranking_source.addItem('Elecciones de otros jugadores','public');row.addWidget(self.ranking_source,1)
+        self.button('Usar los últimos datos',self.refresh_system_sources,row,editable=True);layout.addLayout(row)
         layout=left_layout
         row=QHBoxLayout();self.generate_button=self.button('Generar',self.start_generation,row,primary=True,editable=True)
         self.cancel_button=self.button('Cancelar',self.cancel_generation,row);self.cancel_button.setEnabled(False)
@@ -401,8 +410,8 @@ class MainWindow(QMainWindow):
         self.preview_info=QLabel();self.preview_info.setWordWrap(True);preview.addWidget(self.preview_info)
         self.preview_view,self.preview_model=self.table(('Columna','Pleno','Cantidad'),preview)
         note=QLabel('El boleto permanece visible a la izquierda. La vista muestra hasta 100 filas; el archivo exportado conserva todas las apuestas.');note.setWordWrap(True);preview.addWidget(note)
-        row=QHBoxLayout();self.button('Exportar TXT',self.export_txt,row);self.button('Exportar JSON',self.export_json,row);preview.addLayout(row)
-        self.data_button('Exportar desarrollo directo completo',self.export_development,preview)
+        row=QHBoxLayout();self.button('Guardar apuestas (TXT)',self.export_txt,row);self.button('Guardar quiniela (JSON)',self.export_json,row);preview.addLayout(row)
+        self.data_button('Guardar todas las combinaciones…',self.export_development,preview)
 
     def rename(self):
         if self.system and self.name_input.text().strip()!=self.system.name:
@@ -435,21 +444,21 @@ class MainWindow(QMainWindow):
         if self.system:self.set_system(self.service.undo(self.system))
 
     def apply_template(self):
-        if not self.system:raise ValueError('Crea primero un sistema.')
+        if not self.system:raise ValueError('Pulsa Nuevo para crear una quiniela.')
         kind=self.ranking_source.currentData()
-        if kind=='public' and not self.frozen_round().snapshot(kind):raise ValueError('Actualiza las fuentes del sistema para incorporar los porcentajes jugados.')
+        if kind=='public' and not self.frozen_round().snapshot(kind):raise ValueError('Pulsa Usar los últimos datos para añadir las elecciones de otros jugadores.')
         self.set_system(self.service.template(self.system,self.coverage.value(),kind))
 
     def refresh_system_sources(self):
-        if not self.system:raise ValueError('Crea primero un sistema.')
+        if not self.system:raise ValueError('Pulsa Nuevo para crear una quiniela.')
         self.set_system(self.service.refresh_sources(self.system))
 
     def start_generation(self):
-        if not self.system:raise ValueError('Crea primero un sistema.')
+        if not self.system:raise ValueError('Pulsa Nuevo para crear una quiniela.')
         if self.worker and self.worker.isRunning():return
         if self.data_worker and self.data_worker.isRunning():raise ValueError('Espera a que termine la actualización de datos.')
-        if not self.system.pleno:raise ValueError('Selecciona los dos valores del Pleno antes de generar.')
-        if engine.size(self.system.base)>engine.MAX_GENERATED:raise ValueError('La base supera el límite de v0.1: 100.000 columnas. Reduce dobles o triples.')
+        if not self.system.pleno:raise ValueError('En el Pleno, elige los goles del local y del visitante: 0, 1, 2 o M (3 o más). Después pulsa Generar.')
+        if engine.size(self.system.base)>engine.MAX_GENERATED:raise ValueError('Has elegido más de 100.000 apuestas. Quita algunos dobles o triples, o usa Guardar todas las combinaciones para escribirlas en un archivo.')
         version=self.system
         self.worker=GenerationTask(version)
         self.worker.completed.connect(lambda bets:self.safe(lambda:self.generation_done(version,bets)))
@@ -462,7 +471,7 @@ class MainWindow(QMainWindow):
         created=self.service.generated(version,bets)
         if self.round.key==created.round_key and self.system and self.system.system_id==created.system_id:
             self.set_system(created)
-        self.statusBar().showMessage(f'{len(bets):,} columnas guardadas en {created.round_key}.',10000)
+        self.statusBar().showMessage(f'{len(bets):,} apuestas guardadas en {created.round_key}.',10000)
 
     def generation_finished(self):
         self.cancel_button.setEnabled(False);self.refresh()
@@ -477,33 +486,39 @@ class MainWindow(QMainWindow):
         self.optimize_info=QLabel();self.optimize_info.setWordWrap(True);layout.addWidget(self.optimize_info)
         row=QHBoxLayout();row.addWidget(QLabel('Presupuesto máximo (€)'))
         self.budget=QDoubleSpinBox();self.budget.setRange(0,100000);self.budget.setDecimals(2);self.budget.setValue(10);row.addWidget(self.budget)
-        self.button('Seleccionar apuestas del origen',self.optimize,row,primary=True,editable=True);layout.addLayout(row)
-        self.button('Restaurar desarrollo de origen',self.restore_origin,layout,editable=True)
-        label=QLabel('Con deportiva: orden por probabilidad bajo independencia. Sin deportiva: orden lexicográfico explícito.\nNo es un reductor con garantía, ni una estimación de rentabilidad. El presupuesto nunca aumenta automáticamente.')
+        self.button('Elegir según mi presupuesto',self.optimize,row,primary=True,editable=True);layout.addLayout(row)
+        self.button('Recuperar apuestas anteriores',self.restore_origin,layout,editable=True)
+        label=QLabel('Con datos deportivos, se eligen primero las apuestas con mayor probabilidad calculada. Sin esos datos, se usa un orden fijo de signos.\nSe respeta tu presupuesto. Esta selección no garantiza aciertos ni beneficios.')
         label.setWordWrap(True);layout.addWidget(label)
-        self.methods_status=QLabel('Disponible: selección por presupuesto. Reductores de cobertura, búsqueda local y garantías: pendientes (v0.3/v0.7).')
+        self.methods_status=QLabel('Puedes elegir apuestas según tu presupuesto o quitar las que no cumplen tus condiciones. Otros métodos de reducción están pendientes.')
         self.methods_status.setWordWrap(True);layout.addWidget(self.methods_status)
-        self.filter_group=QGroupBox('Filtros de Quiniela Local · marca cada filtro que quieras usar')
+        self.filter_group=QGroupBox('2. Elige qué apuestas quieres conservar')
         grid=QGridLayout(self.filter_group);self.filter_ranges={};self.filter_checks={}
+        self.filter_tips={'variants':'Cuenta cuántos partidos llevan X o 2 en cada apuesta.', 'x_count':'Cuenta los empates (signo X) en cada apuesta.', 'two_count':'Cuenta las victorias del visitante (signo 2) en cada apuesta.', 'x_distance':'Cuenta las posiciones entre dos X consecutivas: dos X juntas tienen distancia 1. Con cero o una X, esta condición no descarta la apuesta.', 'coincidences':'Cuenta cuántos signos coinciden con la otra quiniela que escribas abajo.', 'max_x_run':'Máximo de signos X consecutivos que permites.', 'max_two_run':'Máximo de signos 2 consecutivos que permites.'}
         self.filter_defaults={'variants':(0,14),'x_count':(0,14),'two_count':(0,14),'x_distance':(1,13),'coincidences':(0,14)}
-        for i,(key,label_text) in enumerate((('variants','Variantes X+2'),('x_count','Cantidad de X'),('two_count','Cantidad de 2'),('x_distance','Distancia entre X'),('coincidences','Coincidencias con referencia'))):
+        for i,(key,label_text) in enumerate((('variants','Total de X y 2'),('x_count','Número de empates (X)'),('two_count','Victorias visitantes (2)'),('x_distance','Separación entre X'),('coincidences','Parecido a otra quiniela'))):
             lower,upper=self.filter_defaults[key]
-            check=QCheckBox(label_text);check.setProperty('filterLabel',label_text);self.filter_checks[key]=check
+            check=QCheckBox(label_text);check.setProperty('filterLabel',label_text);check.setToolTip(self.filter_tips[key]);self.filter_checks[key]=check
             check.toggled.connect(self.update_filter_controls);grid.addWidget(check,i,0)
             minimum=QSpinBox();minimum.setRange(lower,upper);minimum.setValue(lower);minimum.setMaximumWidth(70)
             maximum=QSpinBox();maximum.setRange(lower,upper);maximum.setValue(upper);maximum.setMaximumWidth(70)
             self.filter_ranges[key]=(minimum,maximum)
-            grid.addWidget(QLabel('Mín.'),i,1);grid.addWidget(minimum,i,2);grid.addWidget(QLabel('Máx.'),i,3);grid.addWidget(maximum,i,4)
+            grid.addWidget(QLabel('Desde'),i,1);grid.addWidget(minimum,i,2);grid.addWidget(QLabel('Hasta'),i,3);grid.addWidget(maximum,i,4)
         self.filter_max_x=QSpinBox();self.filter_max_x.setRange(1,14);self.filter_max_x.setValue(14)
         self.filter_max_two=QSpinBox();self.filter_max_two.setRange(1,14);self.filter_max_two.setValue(14)
-        for row,key,label_text,control in ((5,'max_x_run','Racha máxima de X',self.filter_max_x),(6,'max_two_run','Racha máxima de 2',self.filter_max_two)):
-            check=QCheckBox(label_text);check.setProperty('filterLabel',label_text);self.filter_checks[key]=check
-            check.toggled.connect(self.update_filter_controls);grid.addWidget(check,row,0);grid.addWidget(control,row,2)
-        self.filter_reference=QLineEdit();self.filter_reference.setMaxLength(14);self.filter_reference.setPlaceholderText('14 signos 1/X/2; obligatoria al activar coincidencias')
-        grid.addWidget(QLabel('Referencia'),7,0);grid.addWidget(self.filter_reference,7,1,1,4)
-        filter_note=QLabel('Solo se aplican los filtros marcados, combinados con AND. Límites inclusivos. Con menos de dos X, distancia satisfecha. Se conservan apuestas exactas, Plenos y cantidades.');filter_note.setWordWrap(True);grid.addWidget(filter_note,8,0,1,5)
-        self.filter_apply=QPushButton('Marca al menos un filtro');self.filter_apply.clicked.connect(lambda:self.safe(self.apply_filters));grid.addWidget(self.filter_apply,9,0,1,5)
+        for row,key,label_text,control in ((5,'max_x_run','Empates seguidos (X)',self.filter_max_x),(6,'max_two_run','Victorias seguidas (2)',self.filter_max_two)):
+            check=QCheckBox(label_text);check.setProperty('filterLabel',label_text);check.setToolTip(self.filter_tips[key]);self.filter_checks[key]=check
+            check.toggled.connect(self.update_filter_controls);grid.addWidget(check,row,0);grid.addWidget(QLabel('Máximo'),row,1);grid.addWidget(control,row,2)
+        self.filter_reference=QLineEdit();self.filter_reference.setMaxLength(14);self.filter_reference.setPlaceholderText('Ejemplo: 11111111111111 (14 signos)')
+        self.filter_reference.setToolTip('Solo se usa con «Parecido a otra quiniela». Cuenta cuántos signos coinciden con esta columna.')
+        grid.addWidget(QLabel('La otra quiniela'),7,0);grid.addWidget(self.filter_reference,7,1,1,4)
+        filter_note=QLabel('Marca solo las condiciones que quieras usar. Si marcas varias, cada apuesta debe cumplirlas todas. «Desde» y «Hasta» indican el mínimo y el máximo que admites.');filter_note.setWordWrap(True);grid.addWidget(filter_note,8,0,1,5)
+        self.filter_reset=QPushButton('Desactivar todos');self.filter_reset.clicked.connect(self.reset_filters)
+        self.filter_feedback=QLabel();self.filter_feedback.setWordWrap(True)
+        self.filter_apply=QPushButton('Marca al menos un filtro');self.filter_apply.clicked.connect(lambda:self.safe(self.apply_filters_ui))
         layout.addWidget(self.filter_group);layout.addStretch()
+        outer.addWidget(self.filter_feedback)
+        actions=QHBoxLayout();actions.addWidget(self.filter_reset);actions.addWidget(self.filter_apply);outer.addLayout(actions)
         self.update_filter_controls()
 
     def update_filter_controls(self):
@@ -516,15 +531,28 @@ class MainWindow(QMainWindow):
         self.filter_max_two.setEnabled(self.filter_checks['max_two_run'].isChecked())
         self.filter_reference.setEnabled(self.filter_checks['coincidences'].isChecked())
         count=sum(check.isChecked() for check in self.filter_checks.values())
-        self.filter_apply.setText(f'Aplicar {count} filtros al desarrollo' if count else 'Marca al menos un filtro')
-        self.filter_apply.setEnabled(bool(count))
+        self.filter_apply.setText(f'3. Aplicar {count} condiciones a mis apuestas' if count else 'Marca al menos una condición')
+        ready=bool(self.system and self.system.bets)
+        self.filter_apply.setEnabled(bool(count) and ready)
+        self.filter_feedback.setText('1. Pulsa Generar debajo del boleto. Todavía no hay apuestas guardadas. Si cambias el boleto después, vuelve a generarlas.' if not ready else 'Tus apuestas están listas. Elige una condición, ajusta sus límites y pulsa Aplicar. Puedes desmarcarla cuando quieras.')
+
+    def reset_filters(self):
+        for check in self.filter_checks.values():check.setChecked(False)
+        self.update_filter_controls()
+
+    def apply_filters_ui(self):
+        try:
+            self.apply_filters()
+        except ValueError as exc:
+            self.filter_feedback.setText(f'{exc} Puedes corregir los datos o desmarcar el filtro; no se han cambiado tus apuestas.')
 
     def apply_filters(self):
         if not any(check.isChecked() for check in self.filter_checks.values()):
             raise ValueError('Marca al menos un filtro antes de aplicarlo.')
         if not self.system:raise ValueError('Abre primero un sistema.')
+        if not self.system.bets:raise ValueError('Pulsa Generar antes de aplicar filtros.')
         if self.filter_checks['coincidences'].isChecked() and not self.filter_reference.text().strip():
-            raise ValueError('Introduce una referencia de 14 signos para el filtro de coincidencias.')
+            raise ValueError('Para comparar, escribe la otra quiniela con 14 signos (por ejemplo, 11111111111111), o desmarca «Parecido a otra quiniela».')
         from quiniela_ai_studio.domain.filters import BasicFilters
         spec=BasicFilters(**{key:(a.value(),b.value()) if self.filter_checks[key].isChecked() else self.filter_defaults[key] for key,(a,b) in self.filter_ranges.items()},
                           max_x_run=self.filter_max_x.value() if self.filter_checks['max_x_run'].isChecked() else 14,
@@ -532,7 +560,7 @@ class MainWindow(QMainWindow):
                           reference=self.filter_reference.text().upper() if self.filter_checks['coincidences'].isChecked() else '')
         before=self.system.quantity
         self.set_system(self.service.filtered(self.system,spec))
-        self.statusBar().showMessage(f'Filtros: {before} → {self.system.quantity} apuestas. El desarrollo de origen sigue guardado.',15000)
+        self.statusBar().showMessage(f'Has conservado {self.system.quantity} de {before} apuestas. Puedes recuperar las anteriores con Recuperar apuestas anteriores.',15000)
 
     def restore_origin(self):
         if not self.system:raise ValueError('Abre primero un sistema.')
@@ -545,39 +573,39 @@ class MainWindow(QMainWindow):
 
     def build_analysis(self):
         layout=self.page_layout(3);self.analysis_info=QLabel();self.analysis_info.setWordWrap(True);layout.addWidget(self.analysis_info)
-        self.analysis_view,self.analysis_model=self.table(('Partido','Deportiva (%)','Público (%)'),layout)
-        self.ai_status=QLabel('IA predictiva: pendiente de desarrollar (v0.6). Esta versión muestra datos importados; no entrena ni ejecuta un modelo predictivo. Requiere histórico fechado, calibración y evaluación retrospectiva.');self.ai_status.setWordWrap(True);layout.addWidget(self.ai_status)
-        note=QLabel('Valores en orden 1 / X / 2. Los porcentajes jugados no son probabilidad deportiva.');note.setWordWrap(True);layout.addWidget(note)
+        self.analysis_view,self.analysis_model=self.table(('Partido','Datos deportivos (%)','Jugadores (%)'),layout)
+        self.ai_status=QLabel('IA: pendiente. La app todavía no aprende de los resultados ni hace pronósticos propios. Aquí puedes consultar los datos que has descargado.');self.ai_status.setWordWrap(True);layout.addWidget(self.ai_status)
+        note=QLabel('Cada grupo muestra 1 / X / 2. Los datos deportivos estiman resultados; las elecciones de otros jugadores muestran qué signos prefieren.');note.setWordWrap(True);layout.addWidget(note)
 
     def analysis_text(self):
         round_=self.round;system=self.system
         if system and system.round_snapshot: round_=round_from_dict(json.loads(system.round_snapshot))
         lines=[]
-        for kind,label in (('sport','Probabilidad deportiva'),('public','Porcentaje jugado')):
+        for kind,label in (('sport','Datos deportivos'),('public','Elecciones de otros jugadores')):
             snap=round_.snapshot(kind)
             lines.append(f'{label}: {snap.source if snap else "sin datos disponibles"}')
         if system:
-            lines.extend((f'Columnas distintas de 14: {len({b.column for b in system.bets}):,}',f'Apuestas con cantidad: {system.quantity:,}',f'Hash: {system.hash}'))
+            lines.extend((f'Combinaciones de signos diferentes: {len({b.column for b in system.bets}):,}',f'Total de apuestas: {system.quantity:,}','Puedes consultar cómo se creó en el historial de operaciones.'))
             if round_.snapshot('sport') and system.bets:
-                lines.append(f'Masa P14 de columnas únicas: {engine.probability_mass(system.bets,round_.snapshot("sport")):.6%} (independencia; no incluye Pleno).')
-        lines.append('Garantías, beneficio esperado y modelos entrenados: pendientes de fases posteriores.')
+                lines.append(f'Probabilidad calculada de acertar los 14 con estas combinaciones: {engine.probability_mass(system.bets,round_.snapshot("sport")):.6%} (supone partidos independientes y no incluye el Pleno).')
+        lines.append('La app no calcula todavía ganancias previstas ni verifica garantías de aciertos.')
         return '\n\n'.join(lines)
 
     def build_evaluation(self):
         layout=self.page_layout(4)
-        row=QHBoxLayout();self.result_input=QLineEdit('-'*14);self.result_input.setMaxLength(14);row.addWidget(QLabel('Resultado 1/X/2 · - pendiente'));row.addWidget(self.result_input)
-        self.result_pleno=QLineEdit();self.result_pleno.setMaxLength(2);self.result_pleno.setMaximumWidth(70);row.addWidget(QLabel('P15'));row.addWidget(self.result_pleno);layout.addLayout(row)
+        row=QHBoxLayout();self.result_input=QLineEdit('-'*14);self.result_input.setMaxLength(14);row.addWidget(QLabel('Resultados: 1/X/2; - si falta'));row.addWidget(self.result_input)
+        self.result_pleno=QLineEdit();self.result_pleno.setMaxLength(2);self.result_pleno.setMaximumWidth(70);row.addWidget(QLabel('Pleno'));row.addWidget(self.result_pleno);layout.addLayout(row)
         row=QHBoxLayout();self.final_check=QCheckBox('Resultados definitivos');row.addWidget(self.final_check)
-        self.button('Comprobar',self.evaluate,row,primary=True);self.button('Leer escrutinio PRE',self.read_scrutiny,row);self.button('Premios guardados',self.read_cached_scrutiny,row);layout.addLayout(row)
+        self.button('Comprobar',self.evaluate,row,primary=True);self.button('Cargar resultados de un archivo',self.read_scrutiny,row);self.button('Premios guardados',self.read_cached_scrutiny,row);layout.addLayout(row)
         self.eval_summary=QLabel();self.eval_summary.setWordWrap(True);layout.addWidget(self.eval_summary)
-        self.eval_view,self.eval_model=self.table(('Columna','Pleno','Cantidad','Ahora','Confirm.','Máximo'),layout)
+        self.eval_view,self.eval_model=self.table(('Apuesta','Pleno','Copias','Ahora','Finales','Máximo'),layout)
         row=QHBoxLayout()
         self.data_button('Actualizar marcador',self.fetch_live,row)
-        self.button('Ver directo guardado',self.restore_live,row)
-        self.button('Comprobar con el directo',self.evaluate_live,row);layout.addLayout(row)
+        self.button('Ver último marcador',self.restore_live,row)
+        self.button('Comparar con el marcador',self.evaluate_live,row);layout.addLayout(row)
         self.live_status=QLabel();self.live_status.setWordWrap(True);layout.addWidget(self.live_status)
         self.live_view,self.live_model=self.table(('Nº','Partido','Marcador','Estado'),layout)
-        note=QLabel('El directo distingue pendientes, provisionales y finalizados. No calcula premios económicos. «Premios guardados» utiliza el PRE de los datos importados, si contiene escrutinio definitivo.')
+        note=QLabel('Los marcadores en directo pueden cambiar. Los premios solo se muestran si están publicados en los datos guardados.')
         note.setWordWrap(True);layout.addWidget(note)
 
     def evaluate(self,prizes=None):
@@ -588,7 +616,7 @@ class MainWindow(QMainWindow):
         self.eval_model.update_rows([(r['column'],r['pleno'] or '—',r['quantity'],r['hits'],r['confirmed'],r['maximum']) for r in outcome['rows']])
         prize=f' · premio bruto {money(outcome["prize_cents"])}' if outcome['prize_cents'] is not None else ' · premios no disponibles'
         categories=' · '.join(f'{c}: {n}' for c,n in outcome['counts'].items() if n)
-        self.eval_summary.setText(f'{outcome["known"]}/14 resultados conocidos · {"definitivos" if outcome["definitive"] else "provisionales"}{prize}\nCategorías acumulables: {categories or "sin categorías definitivas"}')
+        self.eval_summary.setText(f'{outcome["known"]}/14 resultados conocidos · {"definitivos" if outcome["definitive"] else "provisionales"}{prize}\nApuestas premiadas por categoría: {categories or "sin categorías definitivas"}')
 
     def read_scrutiny(self):
         path,_=QFileDialog.getOpenFileName(self,'Seleccionar PRE de esta temporada',filter='WIN1X2 (PRE*.txt Pre*.txt)')
@@ -601,17 +629,18 @@ class MainWindow(QMainWindow):
         self.evaluate(scrutiny['prizes'])
 
     def build_systems(self):
-        layout=self.page_layout(5);self.system_view,self.system_model=self.table(('Nombre','Jornada','Versión','Apuestas','Origen'),layout)
+        layout=self.page_layout(5);self.system_view,self.system_model=self.table(('Nombre','Jornada','Guardado','Apuestas','Cómo se creó'),layout)
         row=QHBoxLayout()
         self.button('Abrir',self.open_selected,row);self.button('Duplicar',self.duplicate,row)
-        self.button('Importar TXT',self.import_txt,row);self.button('Importar JSON',self.import_json,row)
-        self.button('Exportar TXT',self.export_txt,row);self.button('Exportar JSON',self.export_json,row);layout.addLayout(row)
-        self.import_quantity=QCheckBox('Conservar repetidos como cantidad al importar TXT');self.import_quantity.setChecked(True);layout.addWidget(self.import_quantity)
+        self.button('Abrir apuestas (TXT)',self.import_txt,row);self.button('Abrir quiniela (JSON)',self.import_json,row)
+        self.button('Guardar apuestas (TXT)',self.export_txt,row);self.button('Guardar quiniela (JSON)',self.export_json,row);layout.addLayout(row)
+        self.import_quantity=QCheckBox('Si una apuesta aparece varias veces en el archivo, contar todas las copias');self.import_quantity.setChecked(True);layout.addWidget(self.import_quantity)
         self.system_view.doubleClicked.connect(lambda _:self.safe(self.open_selected))
 
     def update_system_list(self):
         self.listed_systems=self.repository.systems(self.round.key)
-        self.system_model.update_rows([(s.name,s.round_key,s.revision,s.quantity,s.origin) for s in self.listed_systems])
+        names={'manual':'Editada a mano','desarrollo cartesiano exacto':'Todas las combinaciones','selección del desarrollo de origen':'Elegida por presupuesto','filtros básicos de Quiniela Local':'Condiciones aplicadas','actualización explícita de fuentes; apuestas y precio conservados':'Datos actualizados'}
+        self.system_model.update_rows([(s.name,s.round_key,s.revision,s.quantity,names.get(s.origin,s.origin)) for s in self.listed_systems])
 
     def selected_system(self):
         index=self.system_view.currentIndex()
@@ -655,21 +684,21 @@ class MainWindow(QMainWindow):
         outer=self.page_layout(6)
         scroll=QScrollArea();scroll.setWidgetResizable(True)
         content=QWidget();layout=QVBoxLayout(content);scroll.setWidget(content);outer.addWidget(scroll)
-        label=QLabel(f'Almacenamiento SQLite local:\n{self.repository.path}\n\nDatos y cálculos disponibles sin conexión. No se envían apuestas ni credenciales.\nv0.1 utiliza precio configurado por jornada; confirma el precio del canal antes de jugar.')
+        label=QLabel(f'Tus datos se guardan en este equipo:\n{self.repository.path}\n\nPuedes trabajar sin Internet con los datos guardados. La app no envía ni paga apuestas.\nEl precio sirve para calcular el coste; comprueba el precio real antes de jugar.')
         label.setWordWrap(True);layout.addWidget(label)
         self.data_info=QLabel();self.data_info.setWordWrap(True);layout.addWidget(self.data_info)
-        self.data_message=QLabel('Elige una fuente para incorporar datos reales.');self.data_message.setWordWrap(True);layout.addWidget(self.data_message)
+        self.data_message=QLabel('Descarga los partidos o abre una carpeta con datos que ya tengas.');self.data_message.setWordWrap(True);layout.addWidget(self.data_message)
         self.data_button('Descargar partidos y porcentajes',self.download_data,layout,primary=True)
         self.data_button('Importar carpeta WIN1X2 / Datosg',self.import_win1x2,layout)
         self.data_button('Importar ZIP WIN1X2',self.import_data_zip,layout)
-        self.data_button('Importar porcentajes públicos XML',self.import_public_xml,layout)
+        self.data_button('Abrir elecciones de jugadores (XML)',self.import_public_xml,layout)
         self.data_cancel=self.button('Cancelar descarga / importación',self.cancel_data,layout);self.data_cancel.setEnabled(False)
         self.button('Importar jornada JSON',self.import_round_json,layout)
-        rules=QGroupBox('Regla de precio local · aplica a sistemas nuevos');rules_layout=QHBoxLayout(rules)
+        rules=QGroupBox('Precio por apuesta · solo para quinielas nuevas');rules_layout=QHBoxLayout(rules)
         self.rule_price=QSpinBox();self.rule_price.setRange(1,100000);self.rule_price.setSuffix(' céntimos');rules_layout.addWidget(self.rule_price)
-        self.button('Guardar regla',self.change_rules,rules_layout);layout.addWidget(rules)
-        self.data_button('Recuperar sistemas SQLite de Quiniela Local',self.import_pc_systems,layout)
-        self.button('Crear copia de seguridad SQLite',self.backup,layout)
+        self.button('Guardar precio',self.change_rules,rules_layout);layout.addWidget(rules)
+        self.data_button('Recuperar quinielas de Quiniela Local',self.import_pc_systems,layout)
+        self.button('Crear copia de seguridad',self.backup,layout)
         self.button('Recuperar pronósticos de la app anterior',self.migrate,layout)
         self.button('Ver historial de operaciones',self.show_audit,layout)
         layout.addStretch()
@@ -800,7 +829,7 @@ class MainWindow(QMainWindow):
         path,_=QFileDialog.getOpenFileName(self,'Porcentajes jugados de esta jornada',filter='Quinielista (*.xml)')
         if not path:return
         updated=public_snapshot(self.round,files.read_bytes(path))
-        if QMessageBox.question(self,'Revisar porcentajes',f'Incorporar porcentajes jugados de {updated.key}?\nLas fuentes congeladas de sistemas existentes no cambian.')!=QMessageBox.StandardButton.Yes:return
+        if QMessageBox.question(self,'Revisar porcentajes',f'Incorporar porcentajes jugados de {updated.key}?\nLas quinielas ya guardadas mantienen los datos que usaron.')!=QMessageBox.StandardButton.Yes:return
         self.repository.save_round(updated);self.refresh()
 
     def frozen_round(self):
@@ -823,7 +852,7 @@ class MainWindow(QMainWindow):
         validate_teams(self.frozen_round(),[(m.home,m.away) for m in matches])
         self.live_matches=tuple(matches)
         self.live_model.update_rows([(m.number,f'{m.home} – {m.away}',m.score,m.status) for m in matches])
-        self.live_status.setText(f'Quinielista / Dataradar · {"consulta guardada" if cached else "última consulta"}: {captured_at}\nMarcador provisional; sin importes económicos.')
+        self.live_status.setText(f'Quinielista / Dataradar · {"consulta guardada" if cached else "última consulta"}: {captured_at}\nMarcador todavía provisional; sin premios calculados.')
 
     def restore_live(self):
         cached=self.repository.setting('live:'+self.round.key)
@@ -859,7 +888,7 @@ class MainWindow(QMainWindow):
     def change_rules(self):
         version=('demo' if self.round.mode=='simulation' else 'regla-local-no-verificada')+'-'+datetime.now().strftime('%Y%m%dT%H%M%S')
         self.repository.change_rules(replace(self.round,price_cents=self.rule_price.value(),rules_version=version))
-        self.refresh();self.statusBar().showMessage('Regla guardada para sistemas nuevos; los existentes conservan su precio.',12000)
+        self.refresh();self.statusBar().showMessage('Precio guardado para nuevas quinielas. Las anteriores mantienen su precio.',12000)
 
     def export_development(self):
         if not self.system:raise ValueError('Crea o abre primero un sistema.')
@@ -882,11 +911,13 @@ class MainWindow(QMainWindow):
         path,_=QFileDialog.getOpenFileName(self,'Seleccionar pronosticos.json; se copiará el original',filter='Pronósticos (*.json)')
         if not path:return
         count,target=migrate_legacy(path,self.repository,self.service)
-        self.refresh();QMessageBox.information(self,'Recuperación',f'{count} sistemas recuperados.\nCopia y columnas sin asignar:\n{target}\nLas columnas globales no se atribuyen automáticamente a una jornada.')
+        self.refresh();QMessageBox.information(self,'Recuperación',f'{count} sistemas recuperados.\nCopia y columnas sin asignar:\n{target}\nLas apuestas sin jornada quedan en la copia para que puedas revisarlas.')
 
     def show_audit(self):
         rows=self.repository.audit()
-        QMessageBox.information(self,'Últimas operaciones','\n'.join(f'{date} · {action} · v{revision} · {detail}' for date,action,revision,detail in rows) or 'Sin operaciones.')
+        names={'edit':'Boleto modificado','create':'Quiniela creada','generate':'Apuestas generadas','filter':'Condiciones aplicadas','optimize':'Apuestas elegidas','import':'Archivo abierto','export_development':'Archivo guardado','change_rules':'Precio cambiado','restore_origin':'Apuestas recuperadas','undo':'Último cambio deshecho','refresh_sources':'Datos actualizados'}
+        dialog=QMessageBox(self);dialog.setWindowTitle('Qué has hecho');dialog.setText('\n'.join(f'{date} · {names.get(action, "Quiniela o datos guardados")} · guardado {revision}' for date,action,revision,detail in rows) or 'Todavía no hay operaciones.')
+        dialog.setDetailedText('\n'.join(f'{date} · {action} · {detail}' for date,action,revision,detail in rows));dialog.exec()
 
     def closeEvent(self,event):
         if self.data_worker and self.data_worker.isRunning():

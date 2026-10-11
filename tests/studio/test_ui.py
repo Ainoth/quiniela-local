@@ -254,10 +254,43 @@ def test_reference_filter_requires_reference_without_creating_revision(window):
     revision=window.system.revision
     window.filter_checks['coincidences'].setChecked(True)
     assert window.filter_reference.isEnabled()
-    with pytest.raises(ValueError,match='referencia de 14 signos'):
+    with pytest.raises(ValueError,match='otra quiniela con 14 signos'):
         window.apply_filters()
     assert window.system.revision==revision
     window.filter_checks['coincidences'].setChecked(False)
     with pytest.raises(ValueError,match='al menos un filtro'):
         window.apply_filters()
     assert window.system.revision==revision
+
+
+def test_filter_validation_does_not_block_unchecking(window,application):
+    from PySide6.QtCore import QPoint
+    window.example_system();wait_for_generation(window)
+    window.navigation.setCurrentRow(2);QTest.qWait(10)
+    original=window.system
+    check=window.filter_checks['coincidences']
+    QTest.mouseClick(check,Qt.MouseButton.LeftButton,pos=QPoint(9,check.height()//2))
+    assert check.isChecked()
+    window.filter_apply.click();application.processEvents()
+    assert QApplication.activeModalWidget() is None
+    assert 'otra quiniela con 14 signos' in window.filter_feedback.text()
+    assert window.system==original
+    QTest.mouseClick(check,Qt.MouseButton.LeftButton,pos=QPoint(9,check.height()//2))
+    assert not check.isChecked()
+    for control in window.filter_checks.values():control.setChecked(True)
+    window.filter_reset.click()
+    assert not any(control.isChecked() for control in window.filter_checks.values())
+    assert not window.filter_apply.isEnabled()
+    assert window.system==original
+
+
+def test_edit_clears_stale_progress_and_explains_missing_development(window):
+    window.example_system();wait_for_generation(window)
+    assert window.system.bets and window.progress.value()==100
+    QTest.mouseClick(window.sign_buttons[0]['2'],Qt.MouseButton.LeftButton)
+    assert not window.system.bets
+    assert window.progress.value()==0
+    assert window.progress.format()=='Sin desarrollo generado'
+    window.filter_checks['x_count'].setChecked(True)
+    assert not window.filter_apply.isEnabled()
+    assert 'Pulsa Generar' in window.filter_feedback.text()

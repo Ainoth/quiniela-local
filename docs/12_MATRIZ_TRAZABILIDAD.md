@@ -178,3 +178,14 @@ para condiciones inactivas y error de referencia sin crear versión. Presets,
 ordenación e intercambio de condiciones siguen pendientes. RF-RED-002 continúa
 pendiente: aviso de estado en Optimizar, sin nuevos algoritmos. Análisis señala
 que IA predictiva v0.6 no está implementada.
+
+## Corrección del flujo 0.1.4
+
+RF-FIL-001/009: diferencia visible entre base y apuestas generadas, botón de
+aplicación deshabilitado sin desarrollo, desactivar todos y validación inline.
+Pruebas GUI: error seguido de clic para desmarcar, sin ventana modal; reset de
+condiciones sin cambiar apuestas; editar signos elimina el progreso obsoleto.
+
+RF-AUD-004: revisión transversal de textos y acciones en las siete secciones;
+proveniencia técnica accesible mediante ayuda y detalles del historial. No se
+modifican modelos, precios, formatos ni cálculos por simplificar el lenguaje.

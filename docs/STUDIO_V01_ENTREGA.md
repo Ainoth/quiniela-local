@@ -1,4 +1,4 @@
-# Entrega ejecutable v0.1 — revisión 0.1.3
+# Entrega ejecutable v0.1 — revisión 0.1.4
 
 11/10/2026. Esta revisión corrige la interfaz conforme a la preferencia del
 usuario: conservar la experiencia de Quiniela Local y su descarga de datos.
@@ -39,7 +39,7 @@ py -3 -m venv .venv-studio
 
 1. Abre el acceso **Quiniela AI Studio**. En un perfil nuevo aparece una jornada
    **DEMO FICTICIA** sin conexión, con 15 partidos inventados e identificados.
-2. Inicio → **Probar ejemplo de 6 columnas**. Se guardan 6 apuestas por 450
+2. Inicio → **Probar ejemplo de 6 apuestas**. Se guardan 6 apuestas por 450
    céntimos con la regla demo de 75 céntimos. No es una tarifa oficial verificada.
 3. Los 14 partidos y Pleno quedan a la izquierda incluso al cambiar de sección.
    Los signos seleccionados se muestran por color. El Pleno tiene dos filas
@@ -49,7 +49,7 @@ py -3 -m venv .venv-studio
 5. En Escrutinio introduce 14 signos; usa `-` para pendientes. Marca definitivos
    solo con resultados completos. El Pleno requiere también 14 para su categoría.
 6. Cierra y abre: jornada, sistema, base, selecciones y versiones siguen en SQLite.
-7. Configuración → regla de precio local cambia el precio de sistemas nuevos;
+7. Configuración → precio por apuesta cambia el precio de sistemas nuevos;
    los ya guardados conservan su coste. Elige8 se reserva como modalidad separada
    y se rechaza si se intenta utilizar en esta versión.
 8. Descarga en la cabecera, importación de carpeta/ZIP/XML y copias SQLite antiguas
@@ -62,8 +62,7 @@ céntimos**. `resultados_demo_v1.json` verifica 14 + Pleno sin premio económico
 ## Desarrollo grande
 
 Generar dentro de la aplicación conserva el límite explícito de 100.000 filas.
-Para una base grande selecciona el Pleno y usa **Exportar desarrollo directo
-completo**: TXT o JSON se escribe mediante un iterador, con progreso/cancelación,
+Para una base grande selecciona el Pleno y usa **Guardar todas las combinaciones**: TXT o JSON se escribe mediante un iterador, con progreso/cancelación,
 sin crear millones de objetos en memoria. 14 triples son 4.782.969 columnas
 por pareja de Pleno. No se exportan columnas nuevas desde un sistema reducido:
 si hay apuestas exactas activas, se exportan exclusivamente esas apuestas.
@@ -119,3 +118,23 @@ reductores de cobertura/greedy (v0.3), búsqueda local y reinicios (v0.7), y
 IA predictiva calibrada con evaluación retrospectiva (v0.6). La app muestra
 estos límites en Optimizar y Análisis. Las plantillas 0–10 no son reductores
 con garantías. Esta corrección no entrega esas fases futuras.
+
+## Corrección 0.1.4: base frente a desarrollo
+
+«Base» cuenta combinaciones posibles; «apuestas guardadas» cuenta el desarrollo
+generado/importado sobre el que trabajan los filtros. Cambiar signos o Pleno
+invalida ese desarrollo y exige generar de nuevo; la barra pasa a cero con
+«Sin desarrollo generado». El panel impide aplicar filtros sin apuestas y
+explica el siguiente paso.
+
+Los errores de filtros se muestran dentro del panel, sin bloquear las casillas.
+Puedes desmarcar cualquier condición o pulsar «Desactivar todos los filtros»;
+esto no borra apuestas ni restaura un desarrollo ya filtrado. Para recuperarlo
+usa «Recuperar apuestas anteriores».
+
+La revisión de lenguaje abarca las siete secciones. Inicio explica 1/X/2; Crear
+distingue apuestas posibles y guardadas; Optimizar explica presupuesto y
+condiciones; Análisis separa datos deportivos y elecciones de jugadores;
+Escrutinio habla de resultados y premios; Mis Sistemas describe cómo se creó
+cada quiniela; Configuración habla de precio, archivos y copias de seguridad.
+Identificadores y detalles del historial están en ayuda, no en el flujo habitual.
