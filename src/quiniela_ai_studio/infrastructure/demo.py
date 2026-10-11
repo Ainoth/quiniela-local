@@ -1,4 +1,4 @@
-from .domain import Round, Match, ProbabilitySnapshot, utcnow
+from quiniela_ai_studio.domain.models import Round, Match, ProbabilitySnapshot, utcnow
 
 
 def demo_round():

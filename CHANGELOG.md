@@ -14,3 +14,15 @@
 - Constructor muestra horarios y los equipos del Pleno al 15.
 - Se conserva el lanzador Tkinter. Android queda intacto; paridad completa y
   ejecución nativa Windows siguen pendientes.
+
+## 0.1.2 — 11/10/2026 · revisión de aceptación v0.1
+
+- Recuperada la experiencia visual de Quiniela Local: fondo azul, quiniela
+  permanente, pestañas, descarga en cabecera y Pleno con casillas de goles.
+- Contadores y coste de base en vivo; selección parcial del Pleno persistente.
+- Proyecto organizado en src con domain/application/infrastructure/ui y aliases
+  compatibles; Python >=3.11 y rutas estándar mediante platformdirs.
+- Reglas locales de precio configurables para sistemas nuevos y auditadas.
+- Exportación directa TXT/JSON perezosa, atómica y cancelable, con apuestas
+  exactas de sistemas reducidos. Importación del fixture original de 12 apuestas.
+- Se conservan descarga, importación y recuperación de la entrega anterior.

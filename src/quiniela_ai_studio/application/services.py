@@ -2,8 +2,8 @@
 from dataclasses import replace
 import json
 import uuid
-from .domain import SystemVersion, normalize_base, utcnow, round_dict, round_from_dict
-from .engine import coverage_template, optimize, union_base
+from quiniela_ai_studio.domain.models import SystemVersion, normalize_base, utcnow, round_dict, round_from_dict
+from quiniela_ai_studio.domain.engine import coverage_template, optimize, union_base
 
 
 class SystemService:
@@ -30,11 +30,16 @@ class SystemService:
         self.repository.save(updated, action)
         return updated
 
-    def edit(self, system, base, locks, pleno):
+    def edit(self, system, base, locks, pleno, pleno_choices=None):
         normalized = normalize_base(base)
         if any(system.locks[i] and normalized[i] != system.base[i] for i in range(14)):
             raise ValueError('Desbloquea el partido antes de cambiar sus signos.')
-        return self.version(system, base=normalized, locks=tuple(locks), pleno=pleno, bets=(), origin='manual')
+        changes = {}
+        if pleno_choices is not None:
+            if len(pleno_choices)!=2 or any(p not in ('','0','1','2','M') for p in pleno_choices):
+                raise ValueError('Selección parcial de Pleno inválida.')
+            changes['parameters']=json.dumps({**json.loads(system.parameters),'pleno_choices':list(pleno_choices)})
+        return self.version(system, base=normalized, locks=tuple(locks), pleno=pleno, bets=(), origin='manual', **changes)
 
     def template(self, system, level, kind='sport'):
         round_ = self._editable(system)
@@ -102,7 +107,7 @@ class SystemService:
             source = self.repository.load(system.system_id, previous)
         legacy = json.loads(source.parameters).get('legacy_parameters', {})
         if legacy.get('original'):
-            from .domain import Bet
+            from quiniela_ai_studio.domain.models import Bet
             bets = tuple(Bet(column, legacy.get('pleno', '').replace('-', '')) for column in legacy['original'])
         else:
             bets = source.bets

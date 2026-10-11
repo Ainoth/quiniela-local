@@ -185,3 +185,40 @@ def test_sqlite_pc_copies_in_qt(window,tmp_path,monkeypatch):
     window.system_view.selectRow(0);window.open_selected()
     assert window.system.quantity==2 and window.system.pleno=='M0'
     assert window.system.cost(window.round)==150
+
+
+def test_local_ballot_remains_visible_in_all_sections(window):
+    window.new_system()
+    for index in range(7):
+        window.tabs.setCurrentIndex(index);QTest.qWait(5)
+        assert window.sign_buttons[0]['1'].isVisible()
+        assert window.goal_buttons[0]['M'].isVisible()
+        assert window.pages.currentIndex()==index
+    window.tabs.setCurrentIndex(1)
+    QTest.mouseClick(window.goal_buttons[0]['M'],Qt.MouseButton.LeftButton)
+    QTest.mouseClick(window.goal_buttons[1]['0'],Qt.MouseButton.LeftButton)
+    assert window.system.pleno=='M0'
+    assert 'fijos' in window.builder_info.text() and '0,75' in window.builder_info.text()
+
+
+def test_partial_pleno_survives_restart(window,application):
+    window.new_system()
+    QTest.mouseClick(window.goal_buttons[0]['M'],Qt.MouseButton.LeftButton)
+    assert window.pleno_combos[0].currentText()=='M'
+    path=window.repository.path;window.close()
+    repo=Repository(path);reopened=MainWindow(repo)
+    assert reopened.pleno_combos[0].currentText()=='M' and reopened.system.pleno==''
+    reopened.pleno_combos[1].setCurrentText('2')
+    assert reopened.system.pleno=='M2'
+    reopened.close()
+
+
+def test_direct_export_qt_preserves_system_and_records_audit(window,tmp_path,monkeypatch):
+    from quiniela_ai_studio.infrastructure.files import read_system
+    window.example_system();wait_for_generation(window)
+    original=window.system;path=tmp_path/'direct.json'
+    monkeypatch.setattr(QFileDialog,'getSaveFileName',lambda *a:(str(path),'JSON (*.json)'))
+    window.export_development();wait_for_data(window)
+    _,loaded=read_system(path)
+    assert loaded.bets==original.bets and window.system==original
+    assert any(row[1]=='export_development' for row in window.repository.audit())

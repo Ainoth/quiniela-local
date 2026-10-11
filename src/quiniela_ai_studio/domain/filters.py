@@ -6,7 +6,7 @@ from dataclasses import asdict, dataclass
 
 from quiniela_engine import FilterConfig
 
-from .domain import validate_column
+from quiniela_ai_studio.domain.models import validate_column
 
 
 @dataclass(frozen=True)

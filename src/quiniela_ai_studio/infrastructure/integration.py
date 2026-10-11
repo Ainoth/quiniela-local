@@ -16,10 +16,10 @@ from xml.etree import ElementTree
 import data_updater
 from live_results import LiveMatch, fetch_live_results
 
-from .domain import Bet, ProbabilitySnapshot, Round, SystemVersion, round_dict, utcnow
-from .engine import Cancelled, union_base
-from .files import read_bytes
-from .providers import load_win1x2, scrutiny_record, text
+from quiniela_ai_studio.domain.models import Bet, ProbabilitySnapshot, Round, SystemVersion, round_dict, utcnow
+from quiniela_ai_studio.domain.engine import Cancelled, union_base
+from quiniela_ai_studio.infrastructure.files import read_bytes
+from quiniela_ai_studio.infrastructure.providers import load_win1x2, scrutiny_record, text
 
 # Variantes nominales documentadas, sin coincidencia difusa ni orden implícito.
 TEAM_ALIASES = {

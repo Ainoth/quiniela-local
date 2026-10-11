@@ -159,7 +159,12 @@ class SystemVersion:
         if not self.name.strip() or self.revision < 1 or not self.system_id:
             raise ValueError("Sistema inválido.")
         validate_datetime(self.created_at)
-        json.loads(self.parameters)
+        parameters = json.loads(self.parameters)
+        if not isinstance(parameters, dict):raise ValueError('Los parámetros deben ser un objeto JSON.')
+        if 'pleno_choices' in parameters:
+            choices=parameters['pleno_choices']
+            if not isinstance(choices,list) or len(choices)!=2 or any(p not in ('','0','1','2','M') for p in choices):
+                raise ValueError('Selección parcial de Pleno inválida.')
         if self.round_snapshot and round_from_dict(json.loads(self.round_snapshot)).key != self.round_key:
             raise ValueError("Instantánea de otra jornada.")
 

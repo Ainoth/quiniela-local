@@ -12,10 +12,10 @@ Esta tabla está generada inicialmente a partir de `01_ESPECIFICACION_FUNCIONAL.
 | `RF-JOR-006` | v0.1/v0.5 | PENDIENTE | Historial de temporadas, jornadas, recaudación, premios y acertantes cuando estén publicados. |
 | `RF-JOR-007` | v0.1/v0.5 | PARCIAL | Política de caché, reintentos, actualización explícita y modo offline. |
 | `RF-JOR-008` | v0.1/v0.5 | PARCIAL | Comparación y conciliación entre proveedores; nunca sobrescribir un dato manual sin informar. |
-| `RF-QUI-001` | v0.1/v0.8 | PENDIENTE | Editor de 14 casillas con subconjuntos no vacíos de `{1,X,2}`: fijo, doble, triple. |
-| `RF-QUI-002` | v0.1/v0.8 | PENDIENTE | Selector de Pleno al 15 con marcadores `{0,1,2,M}` por equipo; permitir múltiples resultados o uno fijo. |
-| `RF-QUI-003` | v0.1/v0.8 | PENDIENTE | Contador de fijos, dobles, triples y columnas, multiplicando por selecciones del Pleno al 15. |
-| `RF-QUI-004` | v0.1/v0.8 | PENDIENTE | Precio configurable/versionado, presupuesto y coste total en céntimos. |
+| `RF-QUI-001` | v0.1/v0.8 | PARCIAL | Editor de 14 casillas con subconjuntos no vacíos de `{1,X,2}`: fijo, doble, triple. |
+| `RF-QUI-002` | v0.1/v0.8 | PARCIAL | Selector de Pleno al 15 con marcadores `{0,1,2,M}` por equipo; permitir múltiples resultados o uno fijo. |
+| `RF-QUI-003` | v0.1/v0.8 | PARCIAL | Contador de fijos, dobles, triples y columnas, multiplicando por selecciones del Pleno al 15. |
+| `RF-QUI-004` | v0.1/v0.8 | PARCIAL | Precio configurable/versionado, presupuesto y coste total en céntimos. |
 | `RF-QUI-005` | v0.1/v0.8 | PENDIENTE | Bloquear signos, deshacer/rehacer, duplicar sistema, plantillas, iniciar, vaciar y completar. |
 | `RF-QUI-006` | v0.1/v0.8 | PENDIENTE | Elegir jornadas, asociar sistemas a jornada y registrar objetivo/estrategia. |
 | `RF-QUI-007` | v0.1/v0.8 | PENDIENTE | Sistemas mixtos: combinar columnas concretas, bloques múltiples y reducciones sin duplicación involuntaria. |
@@ -155,3 +155,17 @@ El plan está en [planes/FUSION_ESCRITORIO.md](planes/FUSION_ESCRITORIO.md).
 Se mantienen pendientes el cierre autorizado, automatismos de red, formatos
 externos, filtros expertos y la paridad completa. Los fixtures son sintéticos;
 la comprobación manual de proveedores reales no añade datos personales al repo.
+
+## Aceptación v0.1, revisión 0.1.2
+
+RF-QUI-001/002/003/004, RF-ARC-001 y RF-AUD-001/004/008 cuentan con evidencias
+del encargo inicial en `tests/studio/test_original_v01.py` y `test_ui.py`.
+El oráculo original produce 12 apuestas / 900 céntimos, conserva draw_id/reglas
+y verifica 14 + Pleno. El universo de 14 triples se inicia perezosamente sin
+materializar millones de resultados. La regla local cambia solo sistemas nuevos.
+La selección parcial de Pleno se recupera al reiniciar y la quiniela permanece
+visible al cambiar de sección.
+
+Estructura canónica: `src/quiniela_ai_studio/{domain,application,infrastructure,ui}`.
+Guía actual: [STUDIO_V01_ENTREGA.md](STUDIO_V01_ENTREGA.md). Se mantienen estados
+PARCIAL para los requisitos completos que incluyen funcionalidades de fases futuras.

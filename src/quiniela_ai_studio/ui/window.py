@@ -1,6 +1,6 @@
 """Escritorio Qt en español: siete secciones y un sistema activo."""
 from datetime import datetime
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from decimal import Decimal
 from functools import partial
 from pathlib import Path
@@ -15,37 +15,47 @@ from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QGridLayout, QLabel, QPushButton, QListWidget, QStackedWidget, QComboBox,
     QTableView, QHeaderView, QLineEdit, QSpinBox, QDoubleSpinBox, QSlider,
     QCheckBox, QFileDialog, QMessageBox, QScrollArea, QProgressBar, QAbstractItemView,
-    QDialog, QDialogButtonBox, QGroupBox)
-from . import __version__
-from .domain import utcnow, round_from_dict
-from . import engine, files
-from .services import SystemService
-from .providers import migrate_legacy, scrutiny_record, text
-from .integration import (prepare_data, reconcile_import, public_snapshot, live_for_round,
+    QDialog, QDialogButtonBox, QGroupBox, QTabBar, QSplitter)
+from quiniela_ai_studio import __version__
+from quiniela_ai_studio.domain.models import utcnow, round_from_dict
+from quiniela_ai_studio.domain import engine
+from quiniela_ai_studio.infrastructure import files
+from quiniela_ai_studio.application.services import SystemService
+from quiniela_ai_studio.infrastructure.providers import migrate_legacy, scrutiny_record, text
+from quiniela_ai_studio.infrastructure.integration import (prepare_data, reconcile_import, public_snapshot, live_for_round,
                           read_legacy_systems, scrutiny_from_cache)
 from live_results import LiveMatch
 
-STYLE = '''
-QWidget {font-family: "DejaVu Sans", "Segoe UI"; font-size: 13px; color: #173050; background: #f2f5fa;}
-QMainWindow {background: #f2f5fa;}
-QLabel#brand {font-size: 24px; font-weight: bold; color: #0c3454;}
-QLabel#title {font-size: 22px; font-weight: bold; color: #0c3454;}
-QLabel#muted {color: #586b80;}
-QListWidget {background: #0c2440; color: #dce8f5; border: none; padding: 8px; font-size: 14px;}
-QListWidget::item {padding: 13px 7px; border-radius: 6px;}
-QListWidget::item:selected {background: #146a8c; color: white;}
-QPushButton {background: white; border: 1px solid #c8d3df; border-radius: 5px; padding: 7px 11px;}
-QPushButton:hover {border-color: #1682a4; background: #e6f5fb;}
-QPushButton:checked {background: #dc4b62; color: white; border: 2px solid #9c2440; font-weight: bold;}
-QPushButton#primary {background: #097860; color: white; border-color: #097860; font-weight: bold;}
-QPushButton:disabled {color: #8896a6; background: #e6ebf1; border-color: #d4dce6;}
-QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox {background: white; border: 1px solid #c8d3df; padding: 5px; border-radius: 4px;}
-QTableView {background: white; alternate-background-color: #eef3f8; gridline-color: #dae3ed; border: 1px solid #c4d2e0;}
-QHeaderView::section {background: #e6edf5; padding: 7px; border: none; font-weight: bold;}
-QScrollArea {border: none;}
-QProgressBar {border: 1px solid #c8d3df; border-radius: 4px; text-align: center;}
-QProgressBar::chunk {background: #159881;}
-'''
+STYLE = """
+QWidget {font-family: "DejaVu Sans", "Segoe UI"; font-size: 12px; color: #eaf4ff; background: #071a33;}
+QLabel#brand {font-size:24px; font-weight:bold; color:#49dbff; background:#0b315c;}
+QLabel#title {font-size:20px; font-weight:bold; color:#ffc83d;}
+QLabel#muted {color:#8fb5d8;}
+QLabel#footer {background:#d89b12; color:#10213a; font-weight:bold; padding:7px;}
+QWidget#hero {background:#0b315c;}
+QPushButton {background:#123b65; border:1px solid #2d6b9e; border-radius:4px; padding:6px 9px; color:#eaf6ff;}
+QPushButton:hover {background:#1a568c; border-color:#35c8ff;}
+QPushButton:checked {background:#d82848; color:white; border:1px solid #ff6678; font-weight:bold;}
+QPushButton#primary {background:#18864b; border-color:#35d27f; font-weight:bold;}
+QPushButton:disabled {color:#7c92a8; background:#112b43; border-color:#24405b;}
+QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox {background:#eef7ff; color:#10243b; border:1px solid #53a8d2; padding:4px; border-radius:3px;}
+QComboBox QAbstractItemView {background:#eef7ff; color:#10243b;}
+QTableView {background:#0b2442; alternate-background-color:#10304f; gridline-color:#2a5b88; border:1px solid #2a5b88;}
+QHeaderView::section {background:#123b65; padding:6px; color:#ffffff; font-weight:bold;}
+QTabBar::tab {background:#102f52; color:#c9e8ff; padding:9px 13px; font-weight:bold;}
+QTabBar::tab:selected {background:#087fbe; color:white;}
+QScrollArea {border:none;}
+QGroupBox {border:1px solid #2a6698; border-radius:4px; margin-top:12px; padding-top:12px;}
+QGroupBox::title {color:#57d4ff;}
+QProgressBar {border:1px solid #2a6698; text-align:center;}
+QProgressBar::chunk {background:#159881;}
+QWidget#ballot QLabel {color:#082b70; background:#f6f7fb;}
+QWidget#ballot {background:#f6f7fb; border-radius:5px;}
+QWidget#ballot QPushButton {background:#fffafa; color:#b33448; border:1px solid #ffaaaa;}
+QWidget#ballot QPushButton:checked {background:#d82848; color:white; border-color:#b12038;}
+QWidget#ballot QPushButton:disabled {color:#a0a9b3; background:#edf0f4;}
+"""
+
 
 
 def money(cents):
@@ -66,7 +76,7 @@ class RowsModel(QAbstractTableModel):
     def data(self, index, role=Qt.ItemDataRole.DisplayRole):
         if not index.isValid():
             return None
-        if role == Qt.ItemDataRole.DisplayRole:
+        if role in (Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.ToolTipRole):
             return str(self.rows[index.row()][index.column()])
 
     def headerData(self, section, orientation, role=Qt.ItemDataRole.DisplayRole):
@@ -120,7 +130,7 @@ class DataTask(QThread):
     def run(self):
         try:
             result = self.operation(self.cancel_event.is_set, self.status.emit)
-            if self.cancel_event.is_set():
+            if self.cancel_event.is_set() and not (isinstance(result,dict) and result.get('published')):
                 if hasattr(result, 'directory'): shutil.rmtree(result.directory)
                 raise engine.Cancelled('Operación cancelada; los datos anteriores se conservan.')
             self.completed.emit(result)
@@ -144,32 +154,39 @@ class MainWindow(QMainWindow):
         self.edit_buttons = []
         self.setWindowTitle(f'Quiniela AI Studio · v{__version__}')
         self.resize(1200, 820)
-        self.setMinimumSize(760, 540)
+        self.setMinimumSize(900, 650)
         body = QWidget(); self.setCentralWidget(body)
-        root = QHBoxLayout(body); root.setContentsMargins(0, 0, 0, 0)
-        sidebar = QWidget(); sidebar.setFixedWidth(184)
-        side = QVBoxLayout(sidebar)
-        logo = QLabel('QUINIELA\nAI STUDIO'); logo.setObjectName('brand'); logo.setStyleSheet('color:#dce8f5; background:#0c2440; font-size:21px; padding:12px;')
-        sidebar.setStyleSheet('background:#0c2440;')
-        side.addWidget(logo)
-        self.navigation = QListWidget(); self.navigation.addItems(self.SECTIONS)
-        side.addWidget(self.navigation)
-        tag = QLabel(f'v{__version__} · Escritorio local'); tag.setStyleSheet('color:#aec2d9; background:#0c2440; font-size:11px;')
-        side.addWidget(tag); root.addWidget(sidebar)
-        right = QWidget(); layout = QVBoxLayout(right); layout.setContentsMargins(18, 12, 18, 10)
+        root = QVBoxLayout(body); root.setContentsMargins(12, 10, 12, 8)
+        hero = QWidget(); hero.setObjectName('hero'); bar = QHBoxLayout(hero)
+        logo = QLabel('QUINIELA  AI STUDIO'); logo.setObjectName('brand'); bar.addWidget(logo)
+        bar.addStretch()
+        self.data_button('↻ Descargar datos', self.download_data, bar, primary=True)
+        self.button('Mis sistemas', lambda: self.navigation.setCurrentRow(5), bar)
+        root.addWidget(hero)
+        self.tabs = QTabBar(); self.tabs.setExpanding(False)
+        for name in self.SECTIONS:self.tabs.addTab(name)
+        root.addWidget(self.tabs)
+        self.navigation = QListWidget(); self.navigation.addItems(self.SECTIONS); self.navigation.hide()
+        self.navigation.currentRowChanged.connect(self.tabs.setCurrentIndex)
+        self.tabs.currentChanged.connect(self.navigation.setCurrentRow)
         bar = QHBoxLayout()
-        self.round_picker = QComboBox(); self.round_picker.setMinimumWidth(180)
-        bar.addWidget(QLabel('Temporada / jornada')); bar.addWidget(self.round_picker); bar.addStretch()
-        self.system_label = QLabel(); bar.addWidget(self.system_label)
-        layout.addLayout(bar)
-        self.metadata = QLabel(); self.metadata.setObjectName('muted'); self.metadata.setWordWrap(True); layout.addWidget(self.metadata)
-        self.pages = QStackedWidget(); layout.addWidget(self.pages, 1)
+        self.button('‹ Anterior', lambda:self.move_round(-1), bar)
+        self.round_picker = QComboBox(); self.round_picker.setMinimumWidth(150)
+        bar.addWidget(self.round_picker)
+        self.button('Siguiente ›', lambda:self.move_round(1), bar)
+        self.button('En curso',self.go_current,bar);bar.addStretch()
+        self.system_label = QLabel(); bar.addWidget(self.system_label);root.addLayout(bar)
+        self.metadata = QLabel(); self.metadata.setObjectName('muted'); self.metadata.setWordWrap(True); root.addWidget(self.metadata)
+        self.splitter=QSplitter(Qt.Orientation.Horizontal)
+        self.ballot=QWidget();self.ballot.setMinimumWidth(450);QVBoxLayout(self.ballot)
+        self.splitter.addWidget(self.ballot)
+        self.pages=QStackedWidget();self.pages.setMinimumWidth(360);self.splitter.addWidget(self.pages)
+        self.splitter.setSizes([480,700]);root.addWidget(self.splitter,1)
         for name in self.SECTIONS:
-            page = QWidget(); page_layout = QVBoxLayout(page)
-            title = QLabel(name); title.setObjectName('title'); page_layout.addWidget(title)
+            page=QWidget();page_layout=QVBoxLayout(page)
+            title=QLabel(name);title.setObjectName('title');page_layout.addWidget(title)
             self.pages.addWidget(page)
-        self.footer = QLabel(); self.footer.setWordWrap(True); layout.addWidget(self.footer)
-        root.addWidget(right, 1)
+        self.footer = QLabel();self.footer.setObjectName('footer');self.footer.setWordWrap(True);root.addWidget(self.footer)
         self.build_home(); self.build_builder(); self.build_optimize(); self.build_analysis()
         self.build_evaluation(); self.build_systems(); self.build_settings()
         self.navigation.currentRowChanged.connect(self.pages.setCurrentIndex)
@@ -241,7 +258,7 @@ class MainWindow(QMainWindow):
         round_ = self.round
         view_round = round_from_dict(json.loads(self.system.round_snapshot)) if self.system and self.system.round_snapshot else round_
         self.system_label.setText(f'{self.system.name} · v{self.system.revision}' if self.system else 'Sin sistema activo')
-        modes = dict(simulation='SIMULACIÓN · datos de ejemplo', current='EN CURSO · editable', past='HISTÓRICA · consulta', future='FUTURA · consulta')
+        modes = dict(simulation='DEMO FICTICIA · datos de ejemplo', current='EN CURSO · editable', past='HISTÓRICA · consulta', future='FUTURA · consulta')
         mode_label = modes[round_.mode] if round_.mode != 'current' or round_.editable else 'CONSULTA · fecha nominal vencida'
         self.metadata.setText(f'{mode_label} · {view_round.source}\nDatos congelados: {datetime.fromisoformat(view_round.captured_at).astimezone():%d/%m/%Y %H:%M} · Regla de precio: {view_round.rules_version}')
         quantity = self.system.quantity if self.system else 0
@@ -249,32 +266,46 @@ class MainWindow(QMainWindow):
         self.footer.setText(f'{quantity:,} apuestas exactas · coste {money(self.system.cost(round_) if self.system else 0)} · {pending} Plenos pendientes · Desarrollo / selección, sin garantía de reducción')
         self.home_info.setText(f'{round_.key}\n15 partidos disponibles · {len(self.repository.systems(round_.key))} sistemas guardados\nPrecio configurado: {money(round_.price_cents)} por apuesta. Exportar no valida ni paga apuestas.')
         self.data_info.setText('Datos guardados: ' + (self.repository.setting('data_directory') or 'ninguna importación todavía') + '\nWIN1X2: jornadas/calendario/premios. Quinielista: porcentajes jugados y marcador; no son probabilidades deportivas.')
+        self.rule_price.setValue(round_.price_cents)
         busy = bool((self.worker and self.worker.isRunning()) or (self.data_worker and self.data_worker.isRunning()))
         for button in self.edit_buttons:
             button.setEnabled(round_.editable and not busy)
         system = self.system
         for i, match in enumerate(view_round.matches[:14]):
             kickoff=match.kickoff[:10]+' '+match.kickoff[10:] if len(match.kickoff)==15 else match.kickoff
-            self.match_labels[i].setText(f'{i+1:02}  {match.home} – {match.away}\n{kickoff}' if kickoff else f'{i+1:02}  {match.home} – {match.away}')
+            self.match_labels[i].setText(f'{i+1:02}  {match.home} – {match.away}')
+            self.match_labels[i].setToolTip(f'{match.home} – {match.away}\n{kickoff}')
             snapshot = view_round.snapshot('sport'); public = view_round.snapshot('public')
             fmt = lambda snap: ' / '.join(f'{100*v:.0f}' for v in snap.values[i]) if snap else 'Sin datos'
             self.prob_labels[i].setText(f'{fmt(snapshot)}   |   {fmt(public)}')
+            self.match_labels[i].setToolTip(f'{match.home} – {match.away}\n{kickoff}\nDeportiva 1/X/2: {fmt(snapshot)}\nPúblico 1/X/2: {fmt(public)}')
             for sign, button in self.sign_buttons[i].items():
                 button.blockSignals(True); button.setChecked(bool(system and sign in system.base[i])); button.blockSignals(False)
                 button.setEnabled(bool(system and round_.editable and not system.locks[i] and not busy))
             lock = self.lock_buttons[i]; lock.blockSignals(True)
-            lock.setChecked(bool(system and system.locks[i])); lock.setText('Bloqueado' if lock.isChecked() else 'Bloquear')
+            lock.setChecked(bool(system and system.locks[i])); lock.setText('Fijo' if lock.isChecked() else 'Libre')
             lock.setEnabled(bool(system and round_.editable and not busy)); lock.blockSignals(False)
         for i, combo in enumerate(self.pleno_combos):
-            combo.blockSignals(True); combo.setCurrentText(system.pleno[i] if system and len(system.pleno)==2 else '—')
+            pending=json.loads(system.parameters).get('pleno_choices',['','']) if system else ['','']
+            combo.blockSignals(True); combo.setCurrentText(system.pleno[i] if system and len(system.pleno)==2 else pending[i] or '—')
             combo.setEnabled(bool(system and round_.editable and not busy)); combo.blockSignals(False)
         pleno_match=view_round.matches[14]
         self.pleno_match_label.setText(f'Pleno al 15 · {pleno_match.home} – {pleno_match.away}')
+        for side,buttons in enumerate(self.goal_buttons):
+            for goal,button in buttons.items():
+                button.setChecked(self.pleno_combos[side].currentText()==goal)
+                button.setEnabled(bool(system and round_.editable and not busy))
+        self.preview_model.update_rows([(b.column,b.pleno or '—',b.quantity) for b in system.bets[:100]] if system else [])
+        self.preview_info.setText(f'{quantity:,} apuestas guardadas. Selecciona signos en el boleto y pulsa Generar.' if system else 'Crea un sistema para editar el boleto.')
         self.name_input.blockSignals(True); self.name_input.setText(system.name if system else ''); self.name_input.blockSignals(False)
         self.name_input.setEnabled(bool(system and round_.editable and not busy))
-        self.builder_info.setText(f'Base visible: {engine.size(system.base):,} combinaciones · columnas activas: {system.quantity:,}. Editar signos crea un borrador sin apuestas.' if system else 'Crea un sistema para seleccionar signos.')
+        self.builder_info.setText(f'Base: {engine.size(system.base):,} · {sum(len(p)==1 for p in system.base)} fijos / {sum(len(p)==2 for p in system.base)} dobles / {sum(len(p)==3 for p in system.base)} triples\nCoste de la base: {money(engine.size(system.base)*view_round.price_cents)} · apuestas guardadas: {system.quantity:,}' if system else 'Crea un sistema para seleccionar signos.')
         self.update_system_list()
         self.analysis_info.setText(self.analysis_text())
+        def percentages(kind,index):
+            snap=view_round.snapshot(kind)
+            return ' / '.join(f'{100*v:.1f}' for v in snap.values[index]) if snap else 'Sin datos'
+        self.analysis_model.update_rows([(f'{i+1}. {m.home} – {m.away}',percentages('sport',i),percentages('public',i)) for i,m in enumerate(view_round.matches[:14])])
         self.optimize_info.setText(f'Origen: {system.name} v{system.revision}\n{system.quantity:,} apuestas · hash {system.hash[:16]}\nLa selección crea una nueva versión. El origen sigue guardado.' if system else 'Abre o genera primero un sistema.')
         self.update_data_buttons()
 
@@ -305,49 +336,67 @@ class MainWindow(QMainWindow):
         self.refresh(); self.start_generation()
 
     def build_builder(self):
-        layout = self.page_layout(1)
+        layout = self.ballot.layout()
+        title=QLabel('PARTIDOS DE LA JORNADA');title.setObjectName('title');layout.addWidget(title)
         row = QHBoxLayout(); self.name_input = QLineEdit(); self.name_input.setPlaceholderText('Nombre del sistema')
         self.name_input.editingFinished.connect(lambda: self.safe(self.rename))
         row.addWidget(self.name_input)
         self.button('Nuevo', self.new_system, row, editable=True)
         self.button('Deshacer', self.undo, row, editable=True); layout.addLayout(row)
-        self.builder_info = QLabel(); self.builder_info.setWordWrap(True); layout.addWidget(self.builder_info)
+        self.builder_info = QLabel(); self.builder_info.setWordWrap(True);self.builder_info.setMinimumHeight(38); layout.addWidget(self.builder_info)
         scroll = QScrollArea(); scroll.setWidgetResizable(True)
-        grid_widget = QWidget(); grid = QGridLayout(grid_widget); grid.setSpacing(3)
-        for col, title in enumerate(('Partidos', 'Deportiva | Público (%)', '1', 'X', '2', 'Bloqueo')):
+        grid_widget = QWidget(); grid = QGridLayout(grid_widget); grid.setSpacing(1);grid.setContentsMargins(6,4,6,4)
+        grid_widget.setObjectName('ballot')
+        for col, title in enumerate(('Partidos', '1', 'X', '2', 'Bloq.')):
             grid.addWidget(QLabel(title), 0, col)
         self.match_labels=[]; self.prob_labels=[]; self.sign_buttons=[]; self.lock_buttons=[]
         for i in range(14):
-            label=QLabel(); label.setMinimumWidth(160); label.setWordWrap(True); self.match_labels.append(label); grid.addWidget(label,i+1,0)
-            prob=QLabel(); prob.setObjectName('muted'); self.prob_labels.append(prob); grid.addWidget(prob,i+1,1)
+            label=QLabel(); label.setMinimumWidth(160);label.setStyleSheet("font-size:11px;"); label.setWordWrap(True); self.match_labels.append(label); grid.addWidget(label,i+1,0)
+            prob=QLabel();prob.hide();self.prob_labels.append(prob)
             signs={}
             for j, sign in enumerate('1X2'):
-                button=QPushButton(sign); button.setCheckable(True); button.setFixedSize(35,24); button.setStyleSheet("padding: 1px;")
+                button=QPushButton(sign); button.setCheckable(True); button.setFixedSize(27,20); button.setStyleSheet("padding: 1px;")
                 button.setAccessibleName(f'Partido {i+1}, signo {sign}')
-                button.clicked.connect(partial(self.toggle_sign,i,sign)); grid.addWidget(button,i+1,j+2); signs[sign]=button
+                button.clicked.connect(partial(self.toggle_sign,i,sign)); grid.addWidget(button,i+1,j+1); signs[sign]=button
             self.sign_buttons.append(signs)
-            lock=QPushButton('Bloquear');lock.setCheckable(True);lock.setFixedHeight(24);lock.setStyleSheet('padding:1px 5px;')
-            lock.clicked.connect(partial(self.toggle_lock,i));grid.addWidget(lock,i+1,5);self.lock_buttons.append(lock)
+            lock=QPushButton('Bloquear');lock.setCheckable(True);lock.setFixedSize(44,20);lock.setStyleSheet('padding:1px 5px;')
+            lock.clicked.connect(partial(self.toggle_lock,i));grid.addWidget(lock,i+1,4);self.lock_buttons.append(lock)
         grid.setColumnStretch(0,1)
         scroll.setWidget(grid_widget);layout.addWidget(scroll,1)
         row=QHBoxLayout();self.pleno_match_label=QLabel();self.pleno_match_label.setWordWrap(True);row.addWidget(self.pleno_match_label)
         self.pleno_combos=[]
         for _ in range(2):
             combo=QComboBox();combo.addItems(['—','0','1','2','M']);combo.currentIndexChanged.connect(self.change_pleno)
-            row.addWidget(combo);self.pleno_combos.append(combo)
-        row.addStretch();layout.addLayout(row)
+            combo.hide();self.pleno_combos.append(combo)
+        layout.addLayout(row)
+        self.goal_buttons=[]
+        for side,label_text in enumerate(('Local','Visitante')):
+            row=QHBoxLayout();row.addWidget(QLabel(label_text));buttons={}
+            for goal in '012M':
+                button=QPushButton(goal);button.setCheckable(True);button.setFixedSize(35,25)
+                button.clicked.connect(lambda checked=False,i=side,g=goal:self.pleno_combos[i].setCurrentText(g))
+                row.addWidget(button);buttons[goal]=button
+            row.addStretch();layout.addLayout(row);self.goal_buttons.append(buttons)
+        left_layout=layout;layout=self.page_layout(1)
         row=QHBoxLayout();row.addWidget(QLabel('Cobertura 0–10'))
         self.coverage=QSlider(Qt.Orientation.Horizontal);self.coverage.setRange(0,10);row.addWidget(self.coverage,1)
         self.coverage_label=QLabel('0');row.addWidget(self.coverage_label);self.coverage.valueChanged.connect(lambda v:self.coverage_label.setText(str(v)))
         self.button('Aplicar plantilla', self.apply_template, row, editable=True);layout.addLayout(row)
-        note=QLabel('Nivel 10: 3 triples + 7 dobles + 4 fijos = 3.456. Respeta bloqueos. Sin deportiva usa orden 1/X/2; no usa porcentajes públicos como modelo.')
+        note=QLabel('Nivel 10: 3 triples + 7 dobles = 3.456. Bloqueos respetados. Público indica popularidad.')
         note.setWordWrap(True);note.setObjectName('muted');layout.addWidget(note)
-        row=QHBoxLayout();row.addWidget(QLabel('Fuente para plantilla / presupuesto'))
-        self.ranking_source=QComboBox();self.ranking_source.addItem('Deportiva (o orden 1/X/2 si falta)','sport');self.ranking_source.addItem('Público: popularidad, sin probabilidad deportiva','public');row.addWidget(self.ranking_source,1)
-        self.button('Actualizar fuentes del sistema',self.refresh_system_sources,row,editable=True);layout.addLayout(row)
-        row=QHBoxLayout();self.generate_button=self.button('Generar columnas exactas',self.start_generation,row,primary=True,editable=True)
+        row=QHBoxLayout();row.addWidget(QLabel('Fuente'))
+        self.ranking_source=QComboBox();self.ranking_source.addItem('Deportiva / orden 1X2 si falta','sport');self.ranking_source.addItem('Público: popularidad','public');row.addWidget(self.ranking_source,1)
+        self.button('Actualizar fuentes',self.refresh_system_sources,row,editable=True);layout.addLayout(row)
+        layout=left_layout
+        row=QHBoxLayout();self.generate_button=self.button('Generar',self.start_generation,row,primary=True,editable=True)
         self.cancel_button=self.button('Cancelar',self.cancel_generation,row);self.cancel_button.setEnabled(False)
         self.progress=QProgressBar();self.progress.setValue(0);row.addWidget(self.progress,1);layout.addLayout(row)
+        preview=self.page_layout(1)
+        self.preview_info=QLabel();self.preview_info.setWordWrap(True);preview.addWidget(self.preview_info)
+        self.preview_view,self.preview_model=self.table(('Columna','Pleno','Cantidad'),preview)
+        note=QLabel('El boleto permanece visible a la izquierda. La vista muestra hasta 100 filas; el archivo exportado conserva todas las apuestas.');note.setWordWrap(True);preview.addWidget(note)
+        row=QHBoxLayout();self.button('Exportar TXT',self.export_txt,row);self.button('Exportar JSON',self.export_json,row);preview.addLayout(row)
+        self.data_button('Exportar desarrollo directo completo',self.export_development,preview)
 
     def rename(self):
         if self.system and self.name_input.text().strip()!=self.system.name:
@@ -370,7 +419,8 @@ class MainWindow(QMainWindow):
         if not self.system:return
         pleno=''.join(c.currentText() for c in self.pleno_combos)
         if '—' in pleno:pleno=''
-        self.safe(lambda:self.set_system(self.service.edit(self.system,self.system.base,self.system.locks,pleno)))
+        choices=[c.currentText().replace('—','') for c in self.pleno_combos]
+        self.safe(lambda:self.set_system(self.service.edit(self.system,self.system.base,self.system.locks,pleno,pleno_choices=choices)))
 
     def set_system(self,system):
         self.system=system;self.refresh()
@@ -447,7 +497,7 @@ class MainWindow(QMainWindow):
     def apply_filters(self):
         if not self.filter_group.isChecked():raise ValueError('Activa los filtros y revisa sus límites antes de aplicarlos.')
         if not self.system:raise ValueError('Abre primero un sistema.')
-        from .filters import BasicFilters
+        from quiniela_ai_studio.domain.filters import BasicFilters
         spec=BasicFilters(**{key:(a.value(),b.value()) for key,(a,b) in self.filter_ranges.items()},
                           max_x_run=self.filter_max_x.value(),max_two_run=self.filter_max_two.value(),
                           reference=self.filter_reference.text().upper())
@@ -465,7 +515,9 @@ class MainWindow(QMainWindow):
         self.set_system(self.service.optimized(self.system,cents,self.ranking_source.currentData()))
 
     def build_analysis(self):
-        layout=self.page_layout(3);self.analysis_info=QLabel();self.analysis_info.setWordWrap(True);layout.addWidget(self.analysis_info);layout.addStretch()
+        layout=self.page_layout(3);self.analysis_info=QLabel();self.analysis_info.setWordWrap(True);layout.addWidget(self.analysis_info)
+        self.analysis_view,self.analysis_model=self.table(('Partido','Deportiva (%)','Público (%)'),layout)
+        note=QLabel('Valores en orden 1 / X / 2. Los porcentajes jugados no son probabilidad deportiva.');note.setWordWrap(True);layout.addWidget(note)
 
     def analysis_text(self):
         round_=self.round;system=self.system
@@ -485,10 +537,10 @@ class MainWindow(QMainWindow):
         layout=self.page_layout(4)
         row=QHBoxLayout();self.result_input=QLineEdit('-'*14);self.result_input.setMaxLength(14);row.addWidget(QLabel('Resultado 1/X/2 · - pendiente'));row.addWidget(self.result_input)
         self.result_pleno=QLineEdit();self.result_pleno.setMaxLength(2);self.result_pleno.setMaximumWidth(70);row.addWidget(QLabel('P15'));row.addWidget(self.result_pleno);layout.addLayout(row)
-        row=QHBoxLayout();self.final_check=QCheckBox('Los 14 resultados son definitivos');row.addWidget(self.final_check)
+        row=QHBoxLayout();self.final_check=QCheckBox('Resultados definitivos');row.addWidget(self.final_check)
         self.button('Comprobar',self.evaluate,row,primary=True);self.button('Leer escrutinio PRE',self.read_scrutiny,row);self.button('Premios guardados',self.read_cached_scrutiny,row);layout.addLayout(row)
         self.eval_summary=QLabel();self.eval_summary.setWordWrap(True);layout.addWidget(self.eval_summary)
-        self.eval_view,self.eval_model=self.table(('Columna','Pleno','Cantidad','Ahora','Confirmados','Máximo'),layout)
+        self.eval_view,self.eval_model=self.table(('Columna','Pleno','Cantidad','Ahora','Confirm.','Máximo'),layout)
         row=QHBoxLayout()
         self.data_button('Actualizar marcador',self.fetch_live,row)
         self.button('Ver directo guardado',self.restore_live,row)
@@ -551,7 +603,7 @@ class MainWindow(QMainWindow):
         round_,system=files.read_system(path)
         # No reemplazar instantáneas de una jornada existente silenciosamente.
         existing=next((r for r in self.repository.rounds() if r.key==round_.key),None)
-        if existing and existing!=round_:raise ValueError('Esta jornada ya tiene otros datos. Importa las apuestas por TXT para revisarlas sin sobrescribir fuentes.')
+        if existing and existing!=round_ and round_.mode!='simulation':raise ValueError('Esta jornada ya tiene otros datos. Importa las apuestas por TXT para revisarlas sin sobrescribir fuentes.')
         if not existing:self.repository.save_round(round_)
         imported=self.service.imported(round_,system.name,system.bets)
         # Conserva base y bloqueos también en sistemas sin generar.
@@ -583,6 +635,9 @@ class MainWindow(QMainWindow):
         self.data_button('Importar porcentajes públicos XML',self.import_public_xml,layout)
         self.data_cancel=self.button('Cancelar descarga / importación',self.cancel_data,layout);self.data_cancel.setEnabled(False)
         self.button('Importar jornada JSON',self.import_round_json,layout)
+        rules=QGroupBox('Regla de precio local · aplica a sistemas nuevos');rules_layout=QHBoxLayout(rules)
+        self.rule_price=QSpinBox();self.rule_price.setRange(1,100000);self.rule_price.setSuffix(' céntimos');rules_layout.addWidget(self.rule_price)
+        self.button('Guardar regla',self.change_rules,rules_layout);layout.addWidget(rules)
         self.data_button('Recuperar sistemas SQLite de Quiniela Local',self.import_pc_systems,layout)
         self.button('Crear copia de seguridad SQLite',self.backup,layout)
         self.button('Recuperar pronósticos de la app anterior',self.migrate,layout)
@@ -603,6 +658,11 @@ class MainWindow(QMainWindow):
         busy=bool((self.data_worker and self.data_worker.isRunning()) or (self.worker and self.worker.isRunning()))
         for button in self.data_buttons:button.setEnabled(not busy)
         self.data_cancel.setEnabled(bool(self.data_worker and self.data_worker.isRunning()))
+
+    def move_round(self,delta):
+        keys=[r.key for r in sorted(self.repository.rounds(),key=lambda r:(r.season,r.number))]
+        index=keys.index(self.round.key)+delta
+        if 0<=index<len(keys):self.load_rounds(keys[index])
 
     def go_current(self):
         current=next((r for r in self.repository.rounds() if r.mode=='current'),None)
@@ -664,6 +724,13 @@ class MainWindow(QMainWindow):
         return dialog.exec()==QDialog.DialogCode.Accepted
 
     def background_done(self,result):
+        if self.close_pending:
+            if hasattr(result,'directory'):shutil.rmtree(result.directory)
+            return
+        if self.data_kind=='export':
+            self.repository.record_event('export_development',{**self.data_context, 'file':result['file'],'quantity':result['quantity']})
+            self.background_status(f'{result["quantity"]:,} apuestas exportadas a {result["file"]}. El sistema de origen se conserva.')
+            return
         if self.close_pending or self.data_worker.cancel_event.is_set():
             if hasattr(result,'directory'):shutil.rmtree(result.directory)
             return
@@ -722,7 +789,7 @@ class MainWindow(QMainWindow):
         self.start_background('live',context,lambda cancel,status:live_for_round(context))
 
     def display_live(self,matches,captured_at,cached):
-        from .integration import validate_teams
+        from quiniela_ai_studio.infrastructure.integration import validate_teams
         validate_teams(self.frozen_round(),[(m.home,m.away) for m in matches])
         self.live_matches=tuple(matches)
         self.live_model.update_rows([(m.number,f'{m.home} – {m.away}',m.score,m.status) for m in matches])
@@ -731,7 +798,7 @@ class MainWindow(QMainWindow):
     def restore_live(self):
         cached=self.repository.setting('live:'+self.round.key)
         if not cached:raise ValueError('No hay directo guardado para esta jornada.')
-        from .integration import validate_teams
+        from quiniela_ai_studio.infrastructure.integration import validate_teams
         matches=tuple(LiveMatch(**m) for m in cached['matches'])
         validate_teams(self.frozen_round(),[(m.home,m.away) for m in matches])
         self.display_live(matches,cached['captured_at'],cached=True)
@@ -739,7 +806,7 @@ class MainWindow(QMainWindow):
     def evaluate_live(self):
         if not self.live_matches:raise ValueError('Actualiza o recupera primero el marcador de esta jornada.')
         if not self.system or not self.system.bets:raise ValueError('Abre un sistema con apuestas para comprobarlo.')
-        from .integration import validate_teams
+        from quiniela_ai_studio.infrastructure.integration import validate_teams
         validate_teams(self.frozen_round(),[(m.home,m.away) for m in self.live_matches])
         result=''.join(m.sign or '-' for m in self.live_matches[:14])
         finalized=tuple(bool(m.final and m.sign) for m in self.live_matches[:14])
@@ -758,6 +825,24 @@ class MainWindow(QMainWindow):
         path,_=QFileDialog.getOpenFileName(self,'Importar jornada con fuentes normalizadas',filter='Jornada (*.json)')
         if path:
             round_=files.read_round(path);self.repository.save_round(round_);self.load_rounds(round_.key)
+
+    def change_rules(self):
+        version=('demo' if self.round.mode=='simulation' else 'regla-local-no-verificada')+'-'+datetime.now().strftime('%Y%m%dT%H%M%S')
+        self.repository.change_rules(replace(self.round,price_cents=self.rule_price.value(),rules_version=version))
+        self.refresh();self.statusBar().showMessage('Regla guardada para sistemas nuevos; los existentes conservan su precio.',12000)
+
+    def export_development(self):
+        if not self.system:raise ValueError('Crea o abre primero un sistema.')
+        if not self.system.bets and not self.system.pleno:raise ValueError('Completa el Pleno antes de exportar.')
+        path,selected=QFileDialog.getSaveFileName(self,'Exportar desarrollo completo sin validar ni pagar',self.system.name+'.txt','TXT (*.txt);;JSON (*.json)')
+        if not path:return
+        system=self.system;round_=self.round
+        format='json' if Path(path).suffix.lower()=='.json' or selected.startswith('JSON') else 'txt'
+        def operation(cancel,status):
+            quantity=files.write_development(path,system,round_,format=format,cancelled=cancel,
+                                            progress=lambda done,total:status(f'Exportación: {done:,} / {total:,} apuestas'))
+            return dict(file=path,quantity=quantity,published=True)
+        self.start_background('export',dict(system_id=system.system_id,revision=system.revision,input_hash=system.hash,format=format),operation)
 
     def backup(self):
         path,_=QFileDialog.getSaveFileName(self,'Crear archivo nuevo de copia',f'studio-copia-{datetime.now():%Y%m%d-%H%M%S}.sqlite3','SQLite (*.sqlite3)')

@@ -6,8 +6,8 @@ import json
 from pathlib import Path
 import re
 import uuid
-from .domain import Round, Match, utcnow
-from .files import read_bytes, atomic_text
+from quiniela_ai_studio.domain.models import Round, Match, utcnow
+from quiniela_ai_studio.infrastructure.files import read_bytes, atomic_text
 
 
 def text(path):
@@ -130,7 +130,7 @@ def migrate_legacy(path, repository, service):
         try:
             round_ = repository.round(key)
             base = tuple(values.get(i, '1') for i in range(1, 15))
-            from .domain import SystemVersion, normalize_base
+            from quiniela_ai_studio.domain.models import SystemVersion, normalize_base
             base = normalize_base(base)
             pleno = str(values.get(15, '')).replace('-', '')
             system = SystemVersion(str(uuid.uuid4()), 1, key, 'Pronóstico recuperado', base,
@@ -147,7 +147,7 @@ def migrate_legacy(path, repository, service):
     with repository.db:
         for system in prepared:
             repository.db.execute('INSERT INTO systems VALUES (?,?)', (system.system_id, system.round_key))
-            from .domain import system_dict
+            from quiniela_ai_studio.domain.models import system_dict
             repository.db.execute('INSERT INTO versions VALUES (?,?,?,?)', (system.system_id, 1, json.dumps(system_dict(system)), system.hash))
             repository.db.execute('INSERT INTO audit(created_at,action,system_id,revision,details) VALUES (?,?,?,?,?)',
                                   (utcnow(), 'migration', system.system_id, 1, str(backup)))

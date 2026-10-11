@@ -1,3 +1,4 @@
 # Versiones comprobadas en esta entrega; dependencias Qt nativas mediante pip.
 PySide6==6.12.0
 pytest==9.1.1
+platformdirs==4.13.0

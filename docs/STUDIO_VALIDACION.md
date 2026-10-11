@@ -105,3 +105,19 @@ Windows sigue sin ejecución nativa acreditada.
   importación del wheel en un directorio separado y la inicialización de Qt.
 - Acceso de escritorio existente apunta a `run_studio.sh`; no se sustituyen
   accesos de la versión anterior. Windows sigue sin prueba nativa.
+
+## Revisión de aceptación 0.1.2 — 11/10/2026
+
+- 81 pruebas Studio, con fixture original de 12 apuestas / 900 céntimos,
+  round-trip, escrutinio, streaming con memoria acotada, reglas de precio,
+  quiniela permanente, casillas de Pleno y recuperación de selección parcial.
+- 32 pruebas históricas/Tkinter con GUI, correctas.
+- Qt real X11 en perfil temporal y capturas revisadas a 1024×768: los 14
+  partidos se muestran completos; exportación, Pleno y pie accesibles.
+- Ruff: F en src/tests Studio y chequeo completo de los nuevos selección/tests.
+- Benchmark: 59.049 apuestas en 0,7698 s, 8,985 MiB Python, cancelación 0,0258 s.
+- Paquetes 0.1.2 y dependencias actualizados; comprobación del wheel separado.
+- Linux verificado. Windows preparado pero sin ejecución nativa; Android intacto.
+
+La arquitectura y experiencia visual se describen en `STUDIO_V01_ENTREGA.md`.
+Los resultados no acreditan fases v0.2–v1.0, predicciones ni garantías.

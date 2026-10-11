@@ -1,9 +1,25 @@
 """Motor de referencia de v0.1; límites explícitos, sin garantías de reducción."""
 import itertools
 import math
-from .domain import Bet, SIGNS, normalize_base
+from quiniela_ai_studio.domain.models import Bet, SIGNS, normalize_base
 
 MAX_GENERATED = 100_000
+
+
+def iter_bets(base, plenos, cancelled=lambda: False, progress=lambda done, total: None):
+    """Itera todo el desarrollo sin materializar el universo ni multiplicar parejas P15."""
+    from .selection import Selection
+    selection = Selection(tuple(base), tuple(plenos))
+    index = 0
+    for column in itertools.product(*selection.base):
+        for pleno in selection.plenos:
+            if index % 4096 == 0:
+                if cancelled(): raise Cancelled('Exportación cancelada; el archivo anterior se conserva.')
+                progress(index, selection.quantity)
+            yield Bet(''.join(column), pleno)
+            index += 1
+    if cancelled(): raise Cancelled('Exportación cancelada; el archivo anterior se conserva.')
+    progress(selection.quantity, selection.quantity)
 
 
 class Cancelled(Exception):
@@ -15,7 +31,7 @@ def size(base):
 
 
 def column_id(column):
-    from .domain import validate_column
+    from quiniela_ai_studio.domain.models import validate_column
     validate_column(column)
     value = 0
     for sign in column:

@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 import sqlite3
 import uuid
-from .domain import round_dict, round_from_dict, system_dict, system_from_dict, utcnow
+from quiniela_ai_studio.domain.models import round_dict, round_from_dict, system_dict, system_from_dict, utcnow
 
 
 class Repository:
@@ -62,6 +62,19 @@ class Repository:
         with self.db:
             self.db.execute('INSERT INTO rounds VALUES (?,?) ON CONFLICT(key) DO UPDATE SET payload=excluded.payload',
                             (round_.key, json.dumps(round_dict(round_), ensure_ascii=False)))
+
+    def change_rules(self, round_):
+        from quiniela_ai_studio.domain.selection import GameRuleset
+        rule = GameRuleset(round_.rules_version, round_.price_cents)
+        with self.db:
+            self.db.execute('UPDATE rounds SET payload=? WHERE key=?', (json.dumps(round_dict(round_)), round_.key))
+            self.db.execute('INSERT INTO audit(created_at,action,details) VALUES (?,?,?)',
+                            (utcnow(), 'change_rules', json.dumps(dict(round=round_.key, version=rule.version, price_cents=rule.price_cents))))
+
+    def record_event(self, action, details):
+        with self.db:
+            self.db.execute('INSERT INTO audit(created_at,action,details) VALUES (?,?,?)',
+                            (utcnow(), action, json.dumps(details, ensure_ascii=False)))
 
     def import_system_copies(self, systems):
         """Copias idempotentes y atómicas de sistemas del escritorio anterior."""

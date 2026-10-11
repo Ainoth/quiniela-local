@@ -1,3 +1,5 @@
+Documento histórico de v0.1.0. La guía actual es [Entrega v0.1](STUDIO_V01_ENTREGA.md).
+
 # Quiniela AI Studio v0.1.0 — escritorio ejecutable
 
 Entrega inicial acotada a partir de `ESPECIFICACION_PC.md`.

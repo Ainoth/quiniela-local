@@ -6,46 +6,47 @@ Aplicación de Quiniela para escritorio y Android. La versión de escritorio
 puede leer los datos instalados por WIN1X2; ambas versiones descargan datos,
 porcentajes y marcadores directamente de sus proveedores públicos.
 
-## Quiniela AI Studio v0.1.1 — escritorio integrado
+## Quiniela AI Studio — v0.1 ejecutable (revisión 0.1.2)
 
-La nueva interfaz modular Qt en español está en `quiniela_studio/`.
-Incluye constructor con bloqueos y plantillas 0–10, generación cancelable,
-sistemas/versiones SQLite, selección por presupuesto, fuentes separadas,
-TXT/JSON y escrutinio local. Ahora reúne descarga/importación WIN1X2, porcentajes
-públicos, marcador, copias de sistemas antiguos y filtros básicos de Quiniela Local.
-Es una entrega acotada: no supone paridad
-completa, IA entrenada ni garantías de reducción. Android no se modifica.
+Interfaz gráfica en español que conserva la experiencia visual de Quiniela Local:
+fondo azul, boleto compacto siempre visible a la izquierda, casillas 1/X/2 y
+Pleno 0/1/2/M, secciones a la derecha y **Descargar datos** en la cabecera.
+El núcleo está en `src/quiniela_ai_studio/{domain,application,infrastructure,ui}`.
+
+Linux Mint, Python **3.11 o posterior**:
 
 ```bash
 ./run_studio.sh
 ```
 
-En **Inicio → Descargar / actualizar datos**, revisa la lista de jornadas y pulsa
-**Importar datos revisados**. Para datos ya instalados, usa **Importar datos
-locales**; Configuración también admite ZIP WIN1X2 y porcentajes XML.
-Los datos quedan disponibles sin conexión. El precio sigue siendo una regla
-local de referencia que debes confirmar antes de jugar.
+El primer arranque crea el entorno e instala PySide6 y platformdirs. Después
+funciona sin conexión con la demo y los datos ya importados. Windows:
+`run_studio.bat` (preparado, pendiente de ejecución nativa).
 
-En Configuración puedes recuperar `desktop_data/systems.sqlite3` como copias
-sin modificar la base anterior. En Escrutinio están el marcador y los premios
-PRE guardados. En Optimizar están los filtros y restauración del origen.
-[Funciones integradas y límites](docs/STUDIO_FUSION.md).
+1. En Inicio, pulsa **Probar ejemplo de 6 columnas**: 6 apuestas, 4,50 € de demo.
+2. Edita signos y Pleno en el boleto; las selecciones parciales se guardan.
+3. En Crear Quiniela, genera, revisa hasta 100 filas y exporta TXT/JSON.
+4. Para datos reales, **Descargar datos** o Configuración → importar carpeta/ZIP.
+5. En Escrutinio introduce resultados; `-` significa pendiente. No se inventan premios.
 
-Windows: `run_studio.bat` (preparado; pendiente de validación nativa).
-
-[Instalación, uso y alcance real](docs/STUDIO_V0_1.md) ·
-[Índice de documentación](docs/00_INDICE.md) ·
-[Guía de desarrollo](CODEX_EMPEZAR_AQUI.md)
-
-Para comprobar la nueva versión:
+Los desarrollos grandes tienen **Exportar desarrollo directo completo**,
+que escribe sin expandir todo el universo en RAM. Los sistemas reducidos
+exportan sus apuestas exactas. El precio se configura en Configuración para
+sistemas nuevos; los existentes conservan su regla y fuente congeladas.
 
 ```bash
 ./run_studio.sh --self-check
 .venv-studio/bin/python -m pytest -q
+RUN_PC_GUI_TESTS=1 python3 -m unittest discover -q
 ```
 
-El lanzador `update_and_run.sh` mantiene la aplicación anterior mientras se
-completa y prueba la paridad de escritorio.
+[Instalación, recorrido y aceptación v0.1](docs/STUDIO_V01_ENTREGA.md) ·
+[Funciones de datos integradas](docs/STUDIO_FUSION.md) ·
+[Índice](docs/00_INDICE.md)
+
+Se conserva `python3 app.py` y el acceso Quiniela Local como respaldo.
+No se declara paridad completa, IA entrenada, garantías ni soporte nativo Windows
+comprobado. Android queda fuera de este desarrollo.
 
 ## Aplicación Android autónoma
 

@@ -114,3 +114,20 @@ la base ni se inventan fuentes de probabilidad a partir de datos actuales.
 Los borradores parciales se etiquetan; los fijos 1 provisionales deben revisarse.
 El precio histórico fijo de esa app se conserva a 75 céntimos y se identifica
 como referencia del software anterior, sin afirmar vigencia oficial.
+
+## Estructura canónica desde 0.1.2
+
+El código se ha trasladado a `src/quiniela_ai_studio`: `domain/models.py`,
+`domain/selection.py`, `domain/engine.py`, `domain/filters.py`,
+`application/services.py`, adaptadores en `infrastructure` y `ui/window.py`.
+`src/quiniela_studio` solo mantiene aliases para importaciones anteriores.
+La CLI y lanzadores utilizan el paquete canónico. Python mínimo 3.11;
+platformdirs mantiene los directorios estándar existentes.
+
+La exportación directa usa dos bucles anidados perezosos, sin dar un producto
+cartesiano generado como entrada a otro `itertools.product` (que lo agotaría).
+TXT/JSON se escribe en un archivo temporal del mismo directorio y se publica
+por reemplazo solo al terminar; el origen y sus versiones no cambian.
+Los sistemas con apuestas activas exportan exclusivamente las apuestas exactas.
+La importación se mantiene acotada a 20 MiB; no se anuncia importación masiva.
+Las selecciones parciales del Pleno se guardan en parámetros validados del sistema.

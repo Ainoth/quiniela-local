@@ -2,15 +2,14 @@ import argparse
 import os
 from pathlib import Path
 import sys
-from . import __version__
-from .storage import Repository
-from .demo import demo_round
+from quiniela_ai_studio import __version__
+from quiniela_ai_studio.infrastructure.storage import Repository
+from quiniela_ai_studio.infrastructure.demo import demo_round
 
 
 def default_data_dir():
-    if sys.platform == 'win32':
-        return Path(os.environ.get('LOCALAPPDATA', Path.home() / 'AppData' / 'Local')) / 'QuinielaAIStudio'
-    return Path(os.environ.get('XDG_DATA_HOME', Path.home() / '.local' / 'share')) / 'quiniela-ai-studio'
+    from platformdirs import user_data_path
+    return user_data_path('QuinielaAIStudio' if sys.platform == 'win32' else 'quiniela-ai-studio', appauthor=False)
 
 
 def main():
@@ -24,7 +23,7 @@ def main():
     if not repository.rounds():
         repository.save_round(demo_round())
     if args.self_check:
-        from .engine import generate, coverage_template, size, evaluate
+        from quiniela_ai_studio.domain.engine import generate, coverage_template, size, evaluate
         bets=generate(('1X','1','1X2')+('1',)*11,'M1')
         assert len(bets)==6
         assert size(coverage_template(('1',)*14,(False,)*14,10))==3456
@@ -44,14 +43,14 @@ def main():
                 environment['LD_LIBRARY_PATH'] = str(candidates[0].parent) + ':' + environment.get('LD_LIBRARY_PATH', '')
                 environment['QUINIELA_QT_RUNTIME'] = '1'
                 repository.close()
-                os.execve(sys.executable, [sys.executable, '-m', 'quiniela_studio', *sys.argv[1:]], environment)
+                os.execve(sys.executable, [sys.executable, '-m', 'quiniela_ai_studio', *sys.argv[1:]], environment)
             repository.close()
             print('Falta libxcb-cursor0 para Qt/X11. Ejecuta ./run_studio.sh o instala libxcb-cursor0 con el gestor de paquetes.', file=sys.stderr)
             return 1
     try:
         from PySide6.QtCore import QTimer
         from PySide6.QtWidgets import QApplication
-        from .ui import MainWindow, STYLE
+        from quiniela_ai_studio.ui.window import MainWindow, STYLE
     except ImportError:
         repository.close()
         print('Instala la interfaz: python -m pip install -e .', file=sys.stderr)

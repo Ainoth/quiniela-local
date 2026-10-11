@@ -1,6 +1,7 @@
 # Índice del proyecto de escritorio
 
-Documentación de la implementación local; complementar con la especificación original incluida abajo.
+Guía actual: [Entrega ejecutable v0.1](STUDIO_V01_ENTREGA.md), revisión 0.1.2.
+Los registros v0.1.0/v0.1.1 siguientes describen entregas anteriores.
 
 - [Especificación de PC](ESPECIFICACION_PC.md): objetivo completo, arquitectura,
   módulos, contratos matemáticos, fases y pruebas T01–T17.
