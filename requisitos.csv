@@ -11,7 +11,7 @@ RF-QUI-001,v0.1/v0.8,PARCIAL,"Editor de 14 casillas con subconjuntos no vacíos 
 RF-QUI-002,v0.1/v0.8,PARCIAL,"Selector de Pleno al 15 con marcadores `{0,1,2,M}` por equipo; permitir múltiples resultados o uno fijo."
 RF-QUI-003,v0.1/v0.8,PARCIAL,"Contador de fijos, dobles, triples y columnas, multiplicando por selecciones del Pleno al 15."
 RF-QUI-004,v0.1/v0.8,PARCIAL,"Precio configurable/versionado, presupuesto y coste total en céntimos."
-RF-QUI-005,v0.1/v0.8,PENDIENTE,"Bloquear signos, deshacer/rehacer, duplicar sistema, plantillas, iniciar, vaciar y completar."
+RF-QUI-005,v0.1/v0.8,PARCIAL,"Bloquear signos, deshacer/rehacer, duplicar sistema, plantillas, iniciar, vaciar y completar."
 RF-QUI-006,v0.1/v0.8,PENDIENTE,"Elegir jornadas, asociar sistemas a jornada y registrar objetivo/estrategia."
 RF-QUI-007,v0.1/v0.8,PENDIENTE,"Sistemas mixtos: combinar columnas concretas, bloques múltiples y reducciones sin duplicación involuntaria."
 RF-QUI-008,v0.1/v0.8,PENDIENTE,Construcción manual desde fichero existente y edición segura de combinaciones importadas.

@@ -1,4 +1,4 @@
-# Entrega ejecutable v0.1 — revisión 0.1.4
+# Entrega ejecutable v0.1 — revisión 0.1.5
 
 11/10/2026. Esta revisión corrige la interfaz conforme a la preferencia del
 usuario: conservar la experiencia de Quiniela Local y su descarga de datos.
@@ -138,3 +138,11 @@ condiciones; Análisis separa datos deportivos y elecciones de jugadores;
 Escrutinio habla de resultados y premios; Mis Sistemas describe cómo se creó
 cada quiniela; Configuración habla de precio, archivos y copias de seguridad.
 Identificadores y detalles del historial están en ayuda, no en el flujo habitual.
+
+## Barra progresiva en Optimizar — 0.1.5
+
+La barra 0–10 vuelve a estar visible en Optimizar y sigue disponible en Crear
+Quiniela. Las dos muestran el mismo nivel. Moverla propone dobles/triples y
+muestra apuestas y coste sin modificar la quiniela. Pulsa «Usar este nivel en
+el boleto» para aplicarlo, y después «Generar» para crear las nuevas apuestas.
+Respeta bloqueos y el precio guardado. No es una reducción con garantía.

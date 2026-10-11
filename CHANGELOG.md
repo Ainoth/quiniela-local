@@ -50,3 +50,10 @@
   de separación entre X pasan a ayuda contextual, sin jerga AND en el panel.
 - RF-AUD-004: revisión del lenguaje de las siete secciones, archivos descritos
   por su contenido, precio visible y detalles técnicos del historial plegados.
+
+## 0.1.5 — 11/10/2026 · barra progresiva en Optimizar
+
+- RF-QUI-005 / requisito PC T03: barra 0–10 también en Optimizar, sincronizada
+  con Crear, con propuesta de dobles/triples, apuestas y coste antes de aplicar.
+- Se reutiliza el motor de plantillas comprobado; mover la barra no altera
+  apuestas ni crea versiones. Aplicar exige generar de nuevo.

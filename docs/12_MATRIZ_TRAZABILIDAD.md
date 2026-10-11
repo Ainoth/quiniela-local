@@ -16,7 +16,7 @@ Esta tabla está generada inicialmente a partir de `01_ESPECIFICACION_FUNCIONAL.
 | `RF-QUI-002` | v0.1/v0.8 | PARCIAL | Selector de Pleno al 15 con marcadores `{0,1,2,M}` por equipo; permitir múltiples resultados o uno fijo. |
 | `RF-QUI-003` | v0.1/v0.8 | PARCIAL | Contador de fijos, dobles, triples y columnas, multiplicando por selecciones del Pleno al 15. |
 | `RF-QUI-004` | v0.1/v0.8 | PARCIAL | Precio configurable/versionado, presupuesto y coste total en céntimos. |
-| `RF-QUI-005` | v0.1/v0.8 | PENDIENTE | Bloquear signos, deshacer/rehacer, duplicar sistema, plantillas, iniciar, vaciar y completar. |
+| `RF-QUI-005` | v0.1/v0.8 | PARCIAL | Bloquear signos, deshacer/rehacer, duplicar sistema, plantillas, iniciar, vaciar y completar. |
 | `RF-QUI-006` | v0.1/v0.8 | PENDIENTE | Elegir jornadas, asociar sistemas a jornada y registrar objetivo/estrategia. |
 | `RF-QUI-007` | v0.1/v0.8 | PENDIENTE | Sistemas mixtos: combinar columnas concretas, bloques múltiples y reducciones sin duplicación involuntaria. |
 | `RF-QUI-008` | v0.1/v0.8 | PENDIENTE | Construcción manual desde fichero existente y edición segura de combinaciones importadas. |
@@ -189,3 +189,10 @@ condiciones sin cambiar apuestas; editar signos elimina el progreso obsoleto.
 RF-AUD-004: revisión transversal de textos y acciones en las siete secciones;
 proveniencia técnica accesible mediante ayuda y detalles del historial. No se
 modifican modelos, precios, formatos ni cálculos por simplificar el lenguaje.
+
+## Recuperación de la barra 0.1.5
+
+RF-QUI-005 / T03 de ESPECIFICACION_PC: barra progresiva visible en Optimizar y
+sincronizada con Crear. Prueba GUI: previsualización sin mutar el sistema,
+aplicación nivel 10 con 3.456 combinaciones y conservación del partido bloqueado.
+El requisito general sigue parcial; no se añaden algoritmos de reducción.

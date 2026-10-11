@@ -133,3 +133,9 @@ Los avisos de reductores e IA pendientes no representan su implementación.
 
 85 pruebas Studio correctas, incluidas validación no modal, desmarcado por clic
 en el indicador, reset de filtros y progreso tras invalidar el desarrollo.
+
+## Barra progresiva 0.1.5
+
+86 pruebas Studio correctas. GUI: barra visible en Optimizar, sincronización
+bidireccional, previsualización sin modificar apuestas, 3.456 combinaciones en
+nivel 10 y bloqueo conservado. Se usa el algoritmo existente; no hay nuevo reductor.

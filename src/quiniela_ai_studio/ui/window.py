@@ -54,6 +54,8 @@ QCheckBox::indicator {width:18px; height:18px; border:2px solid #86bfe8; border-
 QCheckBox::indicator:checked {background:#18864b; border-color:#35d27f;}
 QCheckBox::indicator:disabled {background:#24405b; border-color:#62768b;}
 QLineEdit:disabled, QSpinBox:disabled {background:#173451; color:#8ba5be; border-color:#35536e;}
+QSlider::groove:horizontal {height:7px; background:#123b65; border:1px solid #53a8d2; border-radius:3px;}
+QSlider::handle:horizontal {background:#ffc83d; width:18px; margin:-6px 0; border-radius:5px;}
 QProgressBar {border:1px solid #2a6698; text-align:center;}
 QProgressBar::chunk {background:#159881;}
 QWidget#ballot QLabel {color:#082b70; background:#f6f7fb;}
@@ -284,6 +286,8 @@ class MainWindow(QMainWindow):
         self.progress.setFormat('%p%' if generating or (self.system and self.system.bets) else 'Sin desarrollo generado')
         self.filter_group.setEnabled(round_.editable and not busy)
         self.update_filter_controls()
+        self.optimization_coverage.setEnabled(bool(self.system and round_.editable and not busy))
+        self.update_coverage_proposal()
         system = self.system
         for i, match in enumerate(view_round.matches[:14]):
             kickoff=match.kickoff[:10]+' '+match.kickoff[10:] if len(match.kickoff)==15 else match.kickoff
@@ -483,6 +487,21 @@ class MainWindow(QMainWindow):
         outer=self.page_layout(2)
         scroll=QScrollArea();scroll.setWidgetResizable(True)
         content=QWidget();layout=QVBoxLayout(content);scroll.setWidget(content);outer.addWidget(scroll)
+        progressive=QGroupBox('Barra progresiva · añadir dobles y triples')
+        progressive_layout=QVBoxLayout(progressive)
+        self.optimization_coverage=QSlider(Qt.Orientation.Horizontal);self.optimization_coverage.setRange(0,10)
+        self.optimization_coverage.setTickPosition(QSlider.TickPosition.TicksBelow);self.optimization_coverage.setTickInterval(1)
+        self.optimization_coverage.setAccessibleName('Nivel de la barra progresiva, de cero a diez')
+        progressive_layout.addWidget(self.optimization_coverage)
+        ends=QHBoxLayout();ends.addWidget(QLabel('0 · menos apuestas'));ends.addStretch();ends.addWidget(QLabel('10 · más apuestas'));progressive_layout.addLayout(ends)
+        self.coverage_proposal=QLabel();self.coverage_proposal.setWordWrap(True);progressive_layout.addWidget(self.coverage_proposal)
+        self.coverage_apply=self.button('Usar este nivel en el boleto',self.apply_template,progressive_layout,editable=True)
+        note=QLabel('Mover la barra solo muestra una propuesta. Para cambiar el boleto pulsa Usar este nivel y después Generar. Los partidos bloqueados se respetan.');note.setWordWrap(True);progressive_layout.addWidget(note)
+        layout.addWidget(progressive)
+        self.optimization_coverage.valueChanged.connect(self.coverage.setValue)
+        self.coverage.valueChanged.connect(self.optimization_coverage.setValue)
+        self.coverage.valueChanged.connect(self.update_coverage_proposal)
+        self.ranking_source.currentIndexChanged.connect(self.update_coverage_proposal)
         self.optimize_info=QLabel();self.optimize_info.setWordWrap(True);layout.addWidget(self.optimize_info)
         row=QHBoxLayout();row.addWidget(QLabel('Presupuesto máximo (€)'))
         self.budget=QDoubleSpinBox();self.budget.setRange(0,100000);self.budget.setDecimals(2);self.budget.setValue(10);row.addWidget(self.budget)
@@ -520,6 +539,19 @@ class MainWindow(QMainWindow):
         outer.addWidget(self.filter_feedback)
         actions=QHBoxLayout();actions.addWidget(self.filter_reset);actions.addWidget(self.filter_apply);outer.addLayout(actions)
         self.update_filter_controls()
+
+    def update_coverage_proposal(self):
+        """Preview the existing template without changing saved bets or expanding it."""
+        level=self.coverage.value()
+        if not self.system:
+            self.coverage_proposal.setText(f'Nivel {level}/10 · crea o abre una quiniela para ver la propuesta.')
+            return
+        round_=self.frozen_round()
+        snapshot=round_.snapshot(self.ranking_source.currentData())
+        base=engine.coverage_template(self.system.base,self.system.locks,level,snapshot)
+        count=engine.size(base)
+        doubles=sum(len(signs)==2 for signs in base);triples=sum(len(signs)==3 for signs in base)
+        self.coverage_proposal.setText(f'Nivel {level}/10 · {doubles} dobles y {triples} triples\nPropuesta: {count:,} apuestas · coste {money(count*round_.price_cents)}')
 
     def update_filter_controls(self):
         """Make activation explicit; inactive limits remain editable only after selection."""

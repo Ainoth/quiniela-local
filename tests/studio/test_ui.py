@@ -294,3 +294,25 @@ def test_edit_clears_stale_progress_and_explains_missing_development(window):
     window.filter_checks['x_count'].setChecked(True)
     assert not window.filter_apply.isEnabled()
     assert 'Pulsa Generar' in window.filter_feedback.text()
+
+
+def test_progressive_slider_in_optimize_previews_and_syncs_without_editing(window):
+    from quiniela_studio import engine
+    window.example_system();wait_for_generation(window)
+    original=window.system
+    window.navigation.setCurrentRow(2);QTest.qWait(10)
+    assert window.optimization_coverage.isVisible()
+    window.optimization_coverage.setValue(10)
+    assert window.coverage.value()==10
+    assert window.system==original
+    assert '3,456 apuestas' in window.coverage_proposal.text()
+    window.coverage_apply.click()
+    assert engine.size(window.system.base)==3456
+    assert not window.system.bets
+    assert window.progress.value()==0
+    window.coverage.setValue(3)
+    assert window.optimization_coverage.value()==3
+    window.lock_buttons[0].click()
+    locked=window.system.base[0]
+    window.optimization_coverage.setValue(0);window.coverage_apply.click()
+    assert window.system.base[0]==locked and window.system.locks[0]
