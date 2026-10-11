@@ -53,3 +53,16 @@ def test_invalid_level(level):
 def test_invalid_new_condition(parameters):
     with pytest.raises(ValueError):
         BasicFilters(**parameters)
+
+
+def test_cancel_mid_filter_does_not_return_partial_selection():
+    from quiniela_ai_studio.domain.engine import Cancelled
+    bets = tuple(Bet(''.join(signs) + '1X21X21X', 'M1')
+                 for signs in itertools.product('1X2', repeat=6))
+    calls = 0
+    def cancelled():
+        nonlocal calls
+        calls += 1
+        return calls == 2
+    with pytest.raises(Cancelled):
+        quick_conditions(0).apply(bets, cancelled)

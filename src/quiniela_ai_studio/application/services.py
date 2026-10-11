@@ -73,7 +73,9 @@ class SystemService:
         base = tuple(system.base[i] if system.locks[i] else union[i] for i in range(14))
         return self.version(system, bets=bets, base=base, origin='selección del desarrollo de origen',
                             parameters=json.dumps(dict(input_hash=system.hash, input_revision=system.revision,
-                                                       budget_cents=budget_cents, ranking=kind if snapshot else 'lexicográfico')))
+                                                       budget_cents=budget_cents, ranking=kind if snapshot else 'lexicográfico',
+                                                       filter_spec=json.loads(system.parameters).get('filter_spec',{}),
+                                                       quick_level=json.loads(system.parameters).get('quick_level'))))
 
     def refresh_sources(self, system):
         """Adopta fuentes actualizadas mediante versión explícita sin cambiar apuestas/precio."""
@@ -90,7 +92,15 @@ class SystemService:
         if not system.bets: raise ValueError('Genera o importa apuestas antes de aplicar filtros.')
         candidates = self.origin_bets(system)[1] if from_origin else system.bets
         bets = spec.apply(candidates)
-        if not bets: raise ValueError('Los filtros eliminarían todas las apuestas. El sistema anterior se conserva.')
+        return self.save_filtered(system, spec, bets, candidates, from_origin=from_origin, quick_level=quick_level)
+
+    def save_filtered(self, system, spec, bets, candidates, *, from_origin=True, quick_level=None, allow_empty=False):
+        """Save a computed result on the UI thread, rejecting an obsolete revision."""
+        self._editable(system)
+        if self.repository.load(system.system_id).revision != system.revision:
+            raise ValueError('La quiniela cambió durante el cálculo.')
+        if not bets and not allow_empty:
+            raise ValueError('Los filtros eliminarían todas las apuestas. El sistema anterior se conserva.')
         union = union_base(bets, system.base)
         base = tuple(system.base[i] if system.locks[i] else union[i] for i in range(14))
         return self.version(system, bets=bets, base=base, origin='filtros básicos de Quiniela Local', action='filter',

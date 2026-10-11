@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import asdict, dataclass
 
 from quiniela_ai_studio.domain.models import validate_column
 from quiniela_engine import FilterConfig
+
+from .engine import Cancelled
 
 
 @dataclass(frozen=True)
@@ -44,7 +47,7 @@ class BasicFilters:
         if self.reference:
             validate_column(self.reference)
 
-    def apply(self, bets):
+    def apply(self, bets, cancelled: Callable[[], bool] = lambda: False):
         """Subconjunto de apuestas exactas; conserva Plenos y cantidades sin expansión."""
         config = FilterConfig(
             variants=self.variants,
@@ -56,7 +59,15 @@ class BasicFilters:
             reference=tuple(self.reference) if self.reference else None,
             repetition_range=self.coincidences if self.reference else None,
         )
-        return tuple(bet for bet in bets if config.accepts(tuple(bet.column)))
+        result = []
+        for index, bet in enumerate(bets):
+            if index % 256 == 0 and cancelled():
+                raise Cancelled("Cálculo de condiciones cancelado.")
+            if config.accepts(tuple(bet.column)):
+                result.append(bet)
+        if cancelled():
+            raise Cancelled("Cálculo de condiciones cancelado.")
+        return tuple(result)
 
     def parameters(self):
         return dict(id="basic-local-v2", version=2, **asdict(self))

@@ -69,3 +69,15 @@
 - Aplicación desde las apuestas originales, para recuperar más al ampliar el nivel.
 - 94 pruebas Studio: oráculo independiente, niveles anidados, apuestas/Plenos/
   cantidades intactos, parámetros inválidos y recuperación completa en nivel 10.
+
+## 0.1.7 — 11/10/2026 · Optimizar reactivo
+
+- RF-FIL-001/009: barra y condiciones recalculan apuestas/coste automáticamente,
+  sin botones de confirmar nivel ni aplicar filtros. Barra propia e independiente.
+- Trabajador cancelable, agrupación de cambios y descarte de resultados obsoletos;
+  cierre seguro y recuperación de ajustes al abrir de nuevo.
+- RF-RED-001/002: presupuesto al final, aplicado únicamente al resultado filtrado.
+- Textos reducidos; cero coincidencias muestra 0 apuestas / 0 €, recuperable;
+  exportación directa impide sustituir una selección vacía por su base.
+- 100 pruebas Studio: reacción, última petición, vacío/recuperación, cancelación,
+  cierre, presupuesto final, persistencia de condiciones y exportación segura.

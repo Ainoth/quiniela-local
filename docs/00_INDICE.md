@@ -1,6 +1,6 @@
 # Índice del proyecto de escritorio
 
-Guía actual: [Entrega ejecutable v0.1](STUDIO_V01_ENTREGA.md), revisión 0.1.6.
+Guía actual: [Entrega ejecutable v0.1](STUDIO_V01_ENTREGA.md), revisión 0.1.7.
 Los registros v0.1.0/v0.1.1 siguientes describen entregas anteriores.
 
 - [Especificación de PC](ESPECIFICACION_PC.md): objetivo completo, arquitectura,

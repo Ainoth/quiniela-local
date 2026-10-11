@@ -1,4 +1,4 @@
-# Entrega ejecutable v0.1 — revisión 0.1.6
+# Entrega ejecutable v0.1 — revisión 0.1.7
 
 11/10/2026. Esta revisión corrige la interfaz conforme a la preferencia del
 usuario: conservar la experiencia de Quiniela Local y su descarga de datos.
@@ -139,28 +139,24 @@ Escrutinio habla de resultados y premios; Mis Sistemas describe cómo se creó
 cada quiniela; Configuración habla de precio, archivos y copias de seguridad.
 Identificadores y detalles del historial están en ayuda, no en el flujo habitual.
 
-## Ajustes rápidos en Optimizar — 0.1.6
+## Optimizar — recorrido automático 0.1.7
 
-La barra correcta modifica automáticamente las condiciones: Total X y 2,
-número de empates, victorias visitantes, cambios entre signos y máximo de
-signos 1/X/2 seguidos. **0 propone menos apuestas; 10 admite todas las apuestas
-originales**. No modifica los signos del boleto mientras la mueves. Después
-pulsa Aplicar para guardar el resultado. Los límites se pueden revisar y editar.
+1. Mueve la **barra propia de Optimizar**: 0 pone más condiciones y 10 conserva
+   el máximo de apuestas originales. Las condiciones, apuestas y coste se
+   actualizan automáticamente. La barra de Crear es independiente.
+2. Si quieres, ajusta una condición a mano: el resultado también se recalcula.
+   «Quitar todas las condiciones» recupera las apuestas originales.
+3. **Al final**, introduce el presupuesto y pulsa **Aplicar presupuesto**.
+   Se seleccionan únicamente apuestas del resultado ya filtrado hasta ese importe.
 
-La barra de dobles y triples pertenece a Crear Quiniela: se retiró de Optimizar,
-donde se había añadido por una interpretación equivocada en 0.1.5.
+Se eliminan «Usar los ajustes de este nivel» y el botón de aplicar condiciones.
+La pantalla muestra nivel, resultado, condiciones y presupuesto sin repetir
+explicaciones. No es un reductor con garantías ni una predicción de IA.
 
-Se recuperan las fórmulas de condiciones de Quiniela Local invirtiendo el sentido
-para respetar la petición del usuario. Nivel 10 es neutro; no se aplica el tope
-histórico de 200/50 columnas. No es un reductor con garantía ni IA. Si las
-condiciones no dejan apuestas, se informa sin cambiar el sistema. Al pasar de
-un nivel estricto a uno más amplio, se toman las apuestas de origen, por lo que
-pueden recuperarse sin generar ni inventar columnas. Plenos y copias se conservan.
-
-Los ajustes rápidos no activan automáticamente comparación con otra quiniela ni
-separación entre X: estas condiciones se configuran por separado. «Cambios entre
-signos» y «separación entre X» son condiciones distintas.
-
-La barra ajusta condiciones; no limita el coste por sí sola. Para fijar un máximo
-de gasto, usa después «Elegir según mi presupuesto». El coste real de las
-apuestas preparadas se muestra en el pie antes de guardar cualquier archivo.
+El cálculo usa un trabajador cancelable y una pausa corta para agrupar cambios;
+solo se acepta la última petición de la quiniela vigente. Las versiones se guardan
+al terminar. Plenos, copias y precio congelado se conservan. Si ninguna apuesta
+cumple las condiciones, se muestra 0 apuestas / 0 €; puedes ampliar el nivel
+para recuperarlas. Un resultado vacío no se exporta como si fuera la base.
+El presupuesto permanece deshabilitado mientras se recalcula o si no quedan
+apuestas. Las condiciones guardadas se recuperan al abrir de nuevo la app.

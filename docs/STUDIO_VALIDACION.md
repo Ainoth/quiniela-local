@@ -145,3 +145,14 @@ nivel 10 y bloqueo conservado. Se usa el algoritmo existente; no hay nuevo reduc
 94 pruebas Studio: parámetros históricos de condiciones, niveles anidados con
 oráculo independiente, límites nuevos inválidos y recuperación de 729 apuestas
 con Plenos/cantidades al ampliar el nivel. No se evalúa ningún modelo predictivo.
+
+## Optimizar reactivo 0.1.7
+
+100 pruebas Studio correctas: actualización automática, cambios rápidos,
+cancelación/cierre, presupuesto final, restauración de condiciones y resultado
+vacío sin exportar columnas nuevas. Filtros y nuevas pruebas con Ruff completo;
+conjunto src/tests con Ruff F. Sin cambios de esquema SQLite ni reglas de juego.
+
+Regresión histórica: 32 pruebas con GUI correctas. Captura de Optimizar
+reactivo Qt/X11 a 1200×820 revisada; paquete 0.1.7 aislado y arranque real
+correctos. Windows sigue pendiente de ejecución nativa.

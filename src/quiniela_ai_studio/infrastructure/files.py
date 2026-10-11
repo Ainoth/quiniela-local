@@ -89,6 +89,8 @@ def write_development(path, system, round_, *, format='txt', cancelled=lambda:Fa
     from quiniela_ai_studio.domain.selection import Selection
     if format not in ('txt','json'):raise ValueError('Formato TXT o JSON requerido.')
     if system.round_key!=round_.key:raise ValueError('Jornada y sistema diferentes.')
+    if not system.bets and json.loads(system.parameters).get('filter_spec'):
+        raise ValueError('No hay apuestas que guardar. Cambia las condiciones de Optimizar.')
     if system.bets:
         bets=iter(system.bets);total=system.quantity;exported=system
     else:

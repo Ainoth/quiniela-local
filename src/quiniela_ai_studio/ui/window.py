@@ -56,6 +56,7 @@ QCheckBox::indicator:disabled {background:#24405b; border-color:#62768b;}
 QLineEdit:disabled, QSpinBox:disabled {background:#173451; color:#8ba5be; border-color:#35536e;}
 QSlider::groove:horizontal {height:7px; background:#123b65; border:1px solid #53a8d2; border-radius:3px;}
 QSlider::handle:horizontal {background:#ffc83d; width:18px; margin:-6px 0; border-radius:5px;}
+QSlider#optimizationSlider::handle:horizontal {background:#35d27f;}
 QProgressBar {border:1px solid #2a6698; text-align:center;}
 QProgressBar::chunk {background:#159881;}
 QWidget#ballot QLabel {color:#082b70; background:#f6f7fb;}
@@ -252,6 +253,7 @@ class MainWindow(QMainWindow):
         self.repository.set_setting('selected_round', self.round_picker.currentData())
         systems = self.repository.systems(self.round.key)
         self.system = systems[-1] if systems else None
+        self.restore_filter_controls()
         self.result_input.setText('-'*14)
         self.result_pleno.clear()
         self.final_check.setChecked(False)
@@ -277,16 +279,16 @@ class MainWindow(QMainWindow):
         self.home_info.setText(f'{round_.key}\n15 partidos · {len(self.repository.systems(round_.key))} quinielas guardadas\nPrecio por apuesta: {money(round_.price_cents)} por apuesta. Guardar un archivo no envía ni paga la apuesta.')
         self.data_info.setText('Datos guardados: ' + (self.repository.setting('data_directory') or 'todavía no has añadido datos') + '\nWIN1X2 aporta partidos y premios. Quinielista aporta elecciones de otros jugadores y marcadores.')
         self.rule_price.setValue(round_.price_cents)
-        busy = bool((self.worker and self.worker.isRunning()) or (self.data_worker and self.data_worker.isRunning()))
+        busy = bool((self.filter_job and self.filter_job.isRunning()) or (self.worker and self.worker.isRunning()) or (self.data_worker and self.data_worker.isRunning()))
         for button in self.edit_buttons:
             button.setEnabled(round_.editable and not busy)
         generating=bool(self.worker and self.worker.isRunning())
         if not generating:
             self.progress.setValue(100 if self.system and self.system.bets else 0)
         self.progress.setFormat('%p%' if generating or (self.system and self.system.bets) else 'Sin desarrollo generado')
-        self.filter_group.setEnabled(round_.editable and not busy)
+        self.filter_group.setEnabled(round_.editable and not ((self.worker and self.worker.isRunning()) or (self.data_worker and self.data_worker.isRunning())))
         self.update_filter_controls()
-        self.quick_conditions_slider.setEnabled(round_.editable and not busy)
+        self.quick_conditions_slider.setEnabled(round_.editable and not ((self.worker and self.worker.isRunning()) or (self.data_worker and self.data_worker.isRunning())))
         system = self.system
         for i, match in enumerate(view_round.matches[:14]):
             kickoff=match.kickoff[:10]+' '+match.kickoff[10:] if len(match.kickoff)==15 else match.kickoff
@@ -324,7 +326,7 @@ class MainWindow(QMainWindow):
             return ' / '.join(f'{100*v:.1f}' for v in snap.values[index]) if snap else 'Sin datos'
         self.analysis_model.update_rows([(f'{i+1}. {m.home} – {m.away}',percentages('sport',i),percentages('public',i)) for i,m in enumerate(view_round.matches[:14])])
         self.optimize_info.setToolTip(f'Identificador de contenido: {system.hash}' if system else '')
-        self.optimize_info.setText(f'Quiniela: {system.name} · guardado {system.revision}\n{system.quantity:,} apuestas guardadas. Las anteriores se conservan para poder recuperarlas.' if system else 'Crea una quiniela o abre una de Mis Sistemas.')
+        self.optimize_info.setText(f'{system.quantity:,} apuestas · coste {money(system.cost(round_))}' if system else 'Abre una quiniela en Mis Sistemas.')
         self.update_data_buttons()
 
     def build_home(self):
@@ -441,7 +443,10 @@ class MainWindow(QMainWindow):
         self.safe(lambda:self.set_system(self.service.edit(self.system,self.system.base,self.system.locks,pleno,pleno_choices=choices)))
 
     def set_system(self,system):
-        self.system=system;self.refresh()
+        changed=not self.system or self.system.system_id!=system.system_id
+        self.system=system
+        if changed:self.restore_filter_controls()
+        self.refresh()
 
     def undo(self):
         if self.system:self.set_system(self.service.undo(self.system))
@@ -485,36 +490,31 @@ class MainWindow(QMainWindow):
     def build_optimize(self):
         outer=self.page_layout(2)
         scroll=QScrollArea();scroll.setWidgetResizable(True)
-        content=QWidget();layout=QVBoxLayout(content);scroll.setWidget(content);outer.addWidget(scroll)
-        self.quick_level=None
-        progressive=QGroupBox('Ajustes rápidos · elegir condiciones automáticamente')
+        content=QWidget();layout=QVBoxLayout(content);scroll.setWidget(content)
+        self.quick_level=None;self.configuring_filters=False
+        self.filter_job=None;self.filter_epoch=0;self.filter_pending=False
+        self.filter_timer=QTimer(self);self.filter_timer.setSingleShot(True);self.filter_timer.setInterval(150);self.filter_timer.timeout.connect(self.start_live_filter)
+        progressive=QGroupBox('1. Ajusta cuántas apuestas conservar')
         progressive_layout=QVBoxLayout(progressive)
-        self.quick_conditions_slider=QSlider(Qt.Orientation.Horizontal);self.quick_conditions_slider.setRange(0,10);self.quick_conditions_slider.setValue(10)
+        self.quick_conditions_slider=QSlider(Qt.Orientation.Horizontal);self.quick_conditions_slider.setObjectName('optimizationSlider');self.quick_conditions_slider.setRange(0,10);self.quick_conditions_slider.setValue(10)
         self.quick_conditions_slider.setTickPosition(QSlider.TickPosition.TicksBelow);self.quick_conditions_slider.setTickInterval(1)
         self.quick_conditions_slider.setAccessibleName('Ajustes de optimización: cero menos apuestas, diez máximo de apuestas')
         progressive_layout.addWidget(self.quick_conditions_slider)
         ends=QHBoxLayout();ends.addWidget(QLabel('0 · menos apuestas'));ends.addStretch();ends.addWidget(QLabel('10 · máximo de apuestas'));progressive_layout.addLayout(ends)
-        self.quick_description=QLabel('Mueve la barra para ajustar las condiciones de abajo. No cambia los signos del boleto.');self.quick_description.setWordWrap(True);progressive_layout.addWidget(self.quick_description)
-        self.button('Usar los ajustes de este nivel',lambda:self.configure_quick_conditions(self.quick_conditions_slider.value()),progressive_layout,editable=True)
-        note=QLabel('0 pone condiciones más estrictas; 10 admite todas las apuestas originales. Después pulsa Aplicar. Puedes recuperar más apuestas al subir de nivel. Para limitar el gasto, usa también Elegir según mi presupuesto.');note.setWordWrap(True);progressive_layout.addWidget(note)
-        layout.addWidget(progressive)
-        self.optimize_info=QLabel();self.optimize_info.setWordWrap(True);layout.addWidget(self.optimize_info)
-        row=QHBoxLayout();row.addWidget(QLabel('Presupuesto máximo (€)'))
-        self.budget=QDoubleSpinBox();self.budget.setRange(0,100000);self.budget.setDecimals(2);self.budget.setValue(10);row.addWidget(self.budget)
-        self.button('Elegir según mi presupuesto',self.optimize,row,primary=True,editable=True);layout.addLayout(row)
-        self.button('Recuperar apuestas anteriores',self.restore_origin,layout,editable=True)
-        label=QLabel('Con datos deportivos, se eligen primero las apuestas con mayor probabilidad calculada. Sin esos datos, se usa un orden fijo de signos.\nSe respeta tu presupuesto. Esta selección no garantiza aciertos ni beneficios.')
-        label.setWordWrap(True);layout.addWidget(label)
-        self.methods_status=QLabel('Puedes elegir apuestas según tu presupuesto o quitar las que no cumplen tus condiciones. Otros métodos de reducción están pendientes.')
-        self.methods_status.setWordWrap(True);layout.addWidget(self.methods_status)
-        self.filter_group=QGroupBox('2. Elige qué apuestas quieres conservar')
+        self.quick_description=QLabel('Nivel 10 / 10');self.quick_description.setWordWrap(True);progressive_layout.addWidget(self.quick_description)
+        outer.addWidget(progressive)
+        self.optimize_info=QLabel();self.optimize_info.setWordWrap(True);outer.addWidget(self.optimize_info)
+        outer.addWidget(scroll,1)
+        self.methods_status=QLabel('Sin garantía de aciertos. Otros reductores están pendientes.')
+        self.methods_status.setWordWrap(True)
+        self.filter_group=QGroupBox('Condiciones · puedes ajustarlas a mano')
         grid=QGridLayout(self.filter_group);self.filter_ranges={};self.filter_checks={}
         self.filter_tips={'variants':'Cuenta cuántos partidos llevan X o 2 en cada apuesta.', 'x_count':'Cuenta los empates (signo X) en cada apuesta.', 'changes':'Cuenta las veces que cambia el signo de un partido al siguiente. Por ejemplo, 1X2 tiene dos cambios.', 'max_one_run':'Máximo de victorias locales consecutivas que permites.', 'two_count':'Cuenta las victorias del visitante (signo 2) en cada apuesta.', 'x_distance':'Cuenta las posiciones entre dos X consecutivas: dos X juntas tienen distancia 1. Con cero o una X, esta condición no descarta la apuesta.', 'coincidences':'Cuenta cuántos signos coinciden con la otra quiniela que escribas abajo.', 'max_x_run':'Máximo de signos X consecutivos que permites.', 'max_two_run':'Máximo de signos 2 consecutivos que permites.'}
         self.filter_defaults={'variants':(0,14),'x_count':(0,14),'two_count':(0,14),'changes':(0,13),'x_distance':(1,13),'coincidences':(0,14)}
         for i,(key,label_text) in enumerate((('variants','Total de X y 2'),('x_count','Número de empates (X)'),('two_count','Victorias visitantes (2)'),('changes','Cambios entre signos'),('x_distance','Separación entre X'),('coincidences','Parecido a otra quiniela'))):
             lower,upper=self.filter_defaults[key]
             check=QCheckBox(label_text);check.setProperty('filterLabel',label_text);check.setToolTip(self.filter_tips[key]);self.filter_checks[key]=check
-            check.toggled.connect(self.update_filter_controls);grid.addWidget(check,i,0)
+            check.toggled.connect(self.filters_changed);grid.addWidget(check,i,0)
             minimum=QSpinBox();minimum.setRange(lower,upper);minimum.setValue(lower);minimum.setMaximumWidth(70)
             maximum=QSpinBox();maximum.setRange(lower,upper);maximum.setValue(upper);maximum.setMaximumWidth(70)
             self.filter_ranges[key]=(minimum,maximum)
@@ -524,24 +524,56 @@ class MainWindow(QMainWindow):
         self.filter_max_two=QSpinBox();self.filter_max_two.setRange(1,14);self.filter_max_two.setValue(14)
         for row,key,label_text,control in ((6,'max_one_run','Locales seguidos (1)',self.filter_max_one),(7,'max_x_run','Empates seguidos (X)',self.filter_max_x),(8,'max_two_run','Visitantes seguidos (2)',self.filter_max_two)):
             check=QCheckBox(label_text);check.setProperty('filterLabel',label_text);check.setToolTip(self.filter_tips[key]);self.filter_checks[key]=check
-            check.toggled.connect(self.update_filter_controls);grid.addWidget(check,row,0);grid.addWidget(QLabel('Máximo'),row,1);grid.addWidget(control,row,2)
+            check.toggled.connect(self.filters_changed);grid.addWidget(check,row,0);grid.addWidget(QLabel('Máximo'),row,1);grid.addWidget(control,row,2)
         self.filter_reference=QLineEdit();self.filter_reference.setMaxLength(14);self.filter_reference.setPlaceholderText('Ejemplo: 11111111111111 (14 signos)')
         self.filter_reference.setToolTip('Solo se usa con «Parecido a otra quiniela». Cuenta cuántos signos coinciden con esta columna.')
         grid.addWidget(QLabel('La otra quiniela'),9,0);grid.addWidget(self.filter_reference,9,1,1,4)
-        filter_note=QLabel('Marca solo las condiciones que quieras usar. Si marcas varias, cada apuesta debe cumplirlas todas. «Desde» y «Hasta» indican el mínimo y el máximo que admites.');filter_note.setWordWrap(True);grid.addWidget(filter_note,10,0,1,5)
-        self.filter_reset=QPushButton('Desactivar todos');self.filter_reset.clicked.connect(self.reset_filters)
+        self.filter_reset=QPushButton('Quitar todas las condiciones');self.filter_reset.clicked.connect(self.reset_filters)
         self.filter_feedback=QLabel();self.filter_feedback.setWordWrap(True)
-        self.filter_apply=QPushButton('Marca al menos un filtro');self.filter_apply.clicked.connect(lambda:self.safe(self.apply_filters_ui))
         layout.addWidget(self.filter_group);layout.addStretch()
-        outer.addWidget(self.filter_feedback)
-        actions=QHBoxLayout();actions.addWidget(self.filter_reset);actions.addWidget(self.filter_apply);outer.addLayout(actions)
+        outer.addWidget(self.filter_feedback);outer.addWidget(self.filter_reset)
+        self.budget_group=QGroupBox('2. Ajusta el resultado a tu presupuesto')
+        budget_layout=QHBoxLayout(self.budget_group);budget_layout.addWidget(QLabel('Máximo (€)'))
+        self.budget=QDoubleSpinBox();self.budget.setRange(0,100000);self.budget.setDecimals(2);self.budget.setValue(10);budget_layout.addWidget(self.budget)
+        self.budget_apply=self.button('Aplicar presupuesto',self.optimize,budget_layout,primary=True,editable=True)
+        outer.addWidget(self.budget_group)
+        self.budget_apply.setToolTip('Se eligen apuestas de la selección actual hasta este importe. No se generan nuevas apuestas.')
+        outer.addWidget(self.methods_status)
+        for minimum,maximum in self.filter_ranges.values():
+            minimum.valueChanged.connect(self.manual_filters_changed);maximum.valueChanged.connect(self.manual_filters_changed)
+        for control in (self.filter_max_one,self.filter_max_x,self.filter_max_two):control.valueChanged.connect(self.manual_filters_changed)
+        self.filter_reference.textChanged.connect(self.manual_filters_changed)
         self.quick_conditions_slider.valueChanged.connect(self.configure_quick_conditions)
         self.update_filter_controls()
+
+    def restore_filter_controls(self):
+        """Restore saved optimization settings without recalculating on load."""
+        self.filter_timer.stop();self.filter_epoch+=1
+        if self.filter_job:self.filter_job.cancel_event.set()
+        self.configuring_filters=True
+        params=json.loads(self.system.parameters) if self.system else {}
+        saved=params.get('filter_spec',{})
+        level=params.get('quick_level')
+        self.quick_level=level if type(level) is int and 0<=level<=10 else None
+        self.quick_conditions_slider.blockSignals(True);self.quick_conditions_slider.setValue(self.quick_level if self.quick_level is not None else 10);self.quick_conditions_slider.blockSignals(False)
+        automatic={'variants','x_count','two_count','changes','max_one_run','max_x_run','max_two_run'}
+        for key,(minimum,maximum) in self.filter_ranges.items():
+            limits=tuple(saved.get(key,self.filter_defaults[key]))
+            minimum.setValue(limits[0]);maximum.setValue(limits[1])
+            self.filter_checks[key].setChecked((self.quick_level is not None and key in automatic) or limits!=self.filter_defaults[key])
+        for key,control in (('max_one_run',self.filter_max_one),('max_x_run',self.filter_max_x),('max_two_run',self.filter_max_two)):
+            control.setValue(saved.get(key,14));self.filter_checks[key].setChecked((self.quick_level is not None) or control.value()!=14)
+        self.filter_reference.setText(saved.get('reference',''))
+        self.filter_checks['coincidences'].setChecked(bool(saved.get('reference')))
+        self.quick_description.setText(f'Nivel {self.quick_level} / 10' if self.quick_level is not None else 'Condiciones personalizadas' if saved else 'Nivel 10 / 10')
+        self.filter_feedback.setText('Primero pulsa Generar debajo del boleto.' if not self.system or (not self.system.bets and not saved) else '')
+        self.configuring_filters=False;self.update_filter_controls()
 
     def configure_quick_conditions(self, level):
         """Populate filter controls; moving the slider never edits a saved system."""
         from quiniela_ai_studio.domain.filters import quick_conditions
         spec=quick_conditions(level)
+        self.configuring_filters=True
         self.quick_level=level
         active={'variants','x_count','two_count','changes','max_one_run','max_x_run','max_two_run'}
         for key,check in self.filter_checks.items():check.setChecked(key in active)
@@ -550,8 +582,18 @@ class MainWindow(QMainWindow):
             minimum.setValue(limits[0]);maximum.setValue(limits[1])
         self.filter_max_one.setValue(spec.max_one_run)
         self.filter_max_x.setValue(spec.max_x_run);self.filter_max_two.setValue(spec.max_two_run)
-        self.quick_description.setText(f'Nivel {level}/10 · Total X y 2: {spec.variants[0]}–{spec.variants[1]} · Empates: {spec.x_count[0]}–{spec.x_count[1]} · Visitantes: {spec.two_count[0]}–{spec.two_count[1]}\nLas condiciones ya están ajustadas. Pulsa Aplicar para elegir las apuestas.')
-        self.update_filter_controls()
+        self.quick_description.setText(f'Nivel {level} / 10')
+        self.configuring_filters=False
+        self.update_filter_controls();self.schedule_live_filter()
+
+    def filters_changed(self):
+        self.update_filter_controls();self.manual_filters_changed()
+
+    def manual_filters_changed(self):
+        if self.configuring_filters:return
+        self.quick_level=None
+        self.quick_description.setText('Condiciones personalizadas')
+        self.schedule_live_filter()
 
     def update_filter_controls(self):
         """Make activation explicit; inactive limits remain editable only after selection."""
@@ -563,17 +605,18 @@ class MainWindow(QMainWindow):
         self.filter_max_x.setEnabled(self.filter_checks['max_x_run'].isChecked())
         self.filter_max_two.setEnabled(self.filter_checks['max_two_run'].isChecked())
         self.filter_reference.setEnabled(self.filter_checks['coincidences'].isChecked())
-        count=sum(check.isChecked() for check in self.filter_checks.values())
-        self.filter_apply.setText(f'3. Aplicar {count} condiciones a mis apuestas' if count else 'Marca al menos una condición')
         ready=bool(self.system and self.system.bets)
-        self.filter_apply.setEnabled(bool(count) and ready)
-        self.filter_feedback.setText('1. Pulsa Generar debajo del boleto. Todavía no hay apuestas guardadas. Si cambias el boleto después, vuelve a generarlas.' if not ready else 'Tus apuestas están listas. Elige una condición, ajusta sus límites y pulsa Aplicar. Puedes desmarcarla cuando quieras.')
+        if self.round_picker.currentData():
+            self.budget_apply.setEnabled(ready and self.round.editable and not self.filter_timer.isActive() and self.filter_job is None)
 
     def reset_filters(self):
+        self.configuring_filters=True
         self.quick_level=None
-        self.quick_description.setText('Mueve la barra para ajustar las condiciones de abajo. No cambia los signos del boleto.')
+        self.quick_description.setText('Sin condiciones')
+        self.quick_conditions_slider.blockSignals(True);self.quick_conditions_slider.setValue(10);self.quick_conditions_slider.blockSignals(False)
         for check in self.filter_checks.values():check.setChecked(False)
-        self.update_filter_controls()
+        self.configuring_filters=False
+        self.update_filter_controls();self.schedule_live_filter()
 
     def apply_filters_ui(self):
         try:
@@ -581,22 +624,78 @@ class MainWindow(QMainWindow):
         except ValueError as exc:
             self.filter_feedback.setText(f'{exc} Puedes corregir los datos o desmarcar el filtro; no se han cambiado tus apuestas.')
 
-    def apply_filters(self):
-        if not any(check.isChecked() for check in self.filter_checks.values()):
-            raise ValueError('Marca al menos un filtro antes de aplicarlo.')
-        if not self.system:raise ValueError('Abre primero un sistema.')
-        if not self.system.bets:raise ValueError('Pulsa Generar antes de aplicar filtros.')
+    def filter_spec(self):
         if self.filter_checks['coincidences'].isChecked() and not self.filter_reference.text().strip():
             raise ValueError('Para comparar, escribe la otra quiniela con 14 signos (por ejemplo, 11111111111111), o desmarca «Parecido a otra quiniela».')
         from quiniela_ai_studio.domain.filters import BasicFilters
-        spec=BasicFilters(**{key:(a.value(),b.value()) if self.filter_checks[key].isChecked() else self.filter_defaults[key] for key,(a,b) in self.filter_ranges.items()},
+        return BasicFilters(**{key:(a.value(),b.value()) if self.filter_checks[key].isChecked() else self.filter_defaults[key] for key,(a,b) in self.filter_ranges.items()},
                           max_one_run=self.filter_max_one.value() if self.filter_checks['max_one_run'].isChecked() else 14,
                           max_x_run=self.filter_max_x.value() if self.filter_checks['max_x_run'].isChecked() else 14,
                           max_two_run=self.filter_max_two.value() if self.filter_checks['max_two_run'].isChecked() else 14,
                           reference=self.filter_reference.text().upper() if self.filter_checks['coincidences'].isChecked() else '')
-        before=sum(b.quantity for b in self.service.origin_bets(self.system)[1]) if self.quick_level is not None else self.system.quantity
-        self.set_system(self.service.filtered(self.system,spec,from_origin=self.quick_level is not None,quick_level=self.quick_level))
+
+    def apply_filters(self):
+        if not self.system:raise ValueError('Abre primero una quiniela.')
+        self.filter_timer.stop();self.filter_epoch+=1
+        if self.filter_job:self.filter_job.cancel_event.set()
+        spec=self.filter_spec()
+        candidates=self.service.origin_bets(self.system)[1]
+        before=sum(b.quantity for b in candidates)
+        bets=spec.apply(candidates)
+        if bets!=self.system.bets:
+            self.set_system(self.service.save_filtered(self.system,spec,bets,candidates,quick_level=self.quick_level))
         self.statusBar().showMessage(f'Has conservado {self.system.quantity} de {before} apuestas. Puedes recuperar las anteriores con Recuperar apuestas anteriores.',15000)
+
+    def schedule_live_filter(self):
+        if self.configuring_filters or not self.system or self.close_pending or not self.round.editable:return
+        if not self.system.bets and not json.loads(self.system.parameters).get('filter_spec'):
+            self.filter_feedback.setText('Primero pulsa Generar debajo del boleto.');return
+        self.filter_epoch+=1
+        if self.filter_job:self.filter_job.cancel_event.set()
+        self.filter_timer.start()
+        self.filter_feedback.setText('Actualizando apuestas y coste…')
+        self.budget_apply.setEnabled(False)
+
+    def start_live_filter(self):
+        if self.close_pending or not self.system:return
+        if self.filter_job is not None:
+            self.filter_pending=True;return
+        try:
+            spec=self.filter_spec()
+            candidates=self.service.origin_bets(self.system)[1]
+        except ValueError as exc:
+            self.filter_feedback.setText(str(exc));return
+        self.filter_timer.stop();self.filter_pending=False
+        context=(self.filter_epoch,self.system,spec,candidates,self.quick_level)
+        job=DataTask(lambda cancel,status:spec.apply(candidates,cancel),self)
+        self.filter_job=job
+        job.completed.connect(lambda bets:self.live_filter_done(context,bets))
+        job.failed.connect(lambda message:self.live_filter_failed(context,message))
+        job.finished.connect(lambda:self.live_filter_finished(job))
+        job.start();self.refresh()
+
+    def live_filter_done(self,context,bets):
+        epoch,system,spec,candidates,level=context
+        if self.close_pending or epoch!=self.filter_epoch or self.system!=system:return
+        try:
+            parameters=json.loads(system.parameters)
+            if bets!=system.bets or parameters.get('filter_spec')!=json.loads(json.dumps(spec.parameters())) or parameters.get('quick_level')!=level:
+                self.set_system(self.service.save_filtered(system,spec,bets,candidates,quick_level=level,allow_empty=True))
+            self.filter_feedback.setText('No quedan apuestas. Sube el nivel o cambia las condiciones.' if not bets else '')
+        except ValueError as exc:
+            self.filter_feedback.setText(str(exc))
+
+    def live_filter_failed(self,context,message):
+        if not self.close_pending and context[0]==self.filter_epoch:
+            self.filter_feedback.setText(message)
+
+    def live_filter_finished(self,job):
+        if self.filter_job is job:self.filter_job=None
+        if job:job.deleteLater()
+        if self.close_pending:self.close();return
+        self.refresh()
+        if self.filter_pending:
+            self.filter_pending=False;self.start_live_filter()
 
     def restore_origin(self):
         if not self.system:raise ValueError('Abre primero un sistema.')
@@ -956,6 +1055,9 @@ class MainWindow(QMainWindow):
         dialog.setDetailedText('\n'.join(f'{date} · {action} · {detail}' for date,action,revision,detail in rows));dialog.exec()
 
     def closeEvent(self,event):
+        self.filter_timer.stop();self.filter_epoch+=1
+        if self.filter_job and self.filter_job.isRunning():
+            self.close_pending=True;self.filter_job.cancel_event.set();event.ignore();return
         if self.data_worker and self.data_worker.isRunning():
             self.close_pending=True
             self.cancel_data()

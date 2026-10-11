@@ -204,3 +204,12 @@ creación. Límites locales versionados v2; cambios entre signos y racha de 1.
 Pruebas: extremos de referencia, oráculo sobre 729 apuestas, monotonía de
 niveles, GUI sin edición del boleto y recuperación desde origen al volver a 10.
 La barra de dobles/triples en Optimizar de 0.1.5 se retira; Crear la conserva.
+
+## Optimizar reactivo 0.1.7
+
+RF-FIL-001/009 y RF-RED-001/002: cálculo automático desde origen, barra
+independiente, trabajo cancelable con descarte de peticiones obsoletas y
+presupuesto aplicado al final sobre la selección. Tests GUI cubren cambios
+rápidos, cierre durante cálculo, recuperación de cero resultados, condiciones
+guardadas y coste exacto tras presupuesto. El requisito de reducción completa
+sigue pendiente: no hay garantía ni nuevos reductores.
