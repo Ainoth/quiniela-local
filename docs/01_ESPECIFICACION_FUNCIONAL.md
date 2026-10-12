@@ -157,6 +157,7 @@ El usuario debe poder pasar de «quiero gastar como máximo X euros» a un conju
 - **RF-ARC-006** Intercambiar signos/posiciones, generar sistemas aleatorios y por distancias.
 - **RF-ARC-007** Inferir **aproximadamente** restricciones de una combinación importada, indicando error.
 - **RF-ARC-008** Adaptadores AD243, ASD(JSON), ASCII heredado y `.NUM` solo después de reunir especificaciones y fixtures legales.
+- **RF-ARC-009** Guardado visible de apuestas exactas desde la cabecera y de la fila elegida en Mis Sistemas, con ruta, cantidad, coste congelado y pasos para cargar manualmente el TXT. Abrir la web exige pulsar su botón; no se transmite el archivo ni se paga. Demo y jornadas de consulta mantienen ese botón desactivado.
 
 ### M13 — Boletos, PDF, QR y sellado
 

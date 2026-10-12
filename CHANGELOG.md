@@ -1,5 +1,20 @@
 # Cambios
 
+## 0.1.9 — 12/10/2026 · Guardar apuestas y preparar su carga manual
+
+- RF-ARC-009: Guardar apuestas (TXT) visible desde cualquier pestaña; conserva
+  exactamente las apuestas optimizadas/reducidas, copias y Plenos presentes.
+- Mis Sistemas exporta la fila elegida, aunque esté abierta otra quiniela.
+  Corregidos tanto TXT como JSON; botones de selección claramente separados.
+- Confirmación con ruta, cantidad, coste congelado y pasos para cargar el TXT.
+  Botones de abrir carpeta y web únicamente por clic. Sin subida ni pago
+  automático; demo y jornadas de consulta desactivan el acceso a la web.
+- Nombre con jornada/revisión, carpeta recordada y auditoría del TXT guardado.
+- Guardado bloqueado mientras se actualizan condiciones, para evitar sacar
+  apuestas anteriores. La tabla indica cuándo ya están listas para guardar.
+- 137 pruebas Studio y 32 históricas con GUI correctas; Ruff, arranque nativo,
+  self-check e importación de la wheel aislada correctos.
+
 ## 0.1.1 — 10/10/2026
 
 - AI Studio integra descarga, carpeta y ZIP WIN1X2, revisión y caché offline.

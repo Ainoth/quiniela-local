@@ -180,6 +180,7 @@ class MainWindow(QMainWindow):
         logo = QLabel('QUINIELA  AI STUDIO'); logo.setObjectName('brand'); bar.addWidget(logo)
         bar.addStretch()
         self.data_button('↻ Descargar datos', self.download_data, bar, primary=True)
+        self.export_button = self.button('Guardar apuestas (TXT)', self.export_txt, bar, primary=True)
         self.button('Mis sistemas', lambda: self.navigation.setCurrentRow(5), bar)
         root.addWidget(hero)
         self.tabs = QTabBar(); self.tabs.setExpanding(False)
@@ -285,7 +286,7 @@ class MainWindow(QMainWindow):
     def refresh(self):
         round_ = self.round
         view_round = round_from_dict(json.loads(self.system.round_snapshot)) if self.system and self.system.round_snapshot else round_
-        self.system_label.setText(f'{self.system.name} · v{self.system.revision}' if self.system else 'Ninguna quiniela abierta')
+        self.system_label.setText(f'Abierta: {self.system.name} · v{self.system.revision}' if self.system else 'Ninguna quiniela abierta')
         modes = dict(simulation='DEMO FICTICIA · datos de ejemplo', current='EN CURSO · puedes editar', past='ANTERIOR · solo consulta', future='FUTURA · consulta')
         mode_label = modes[round_.mode] if round_.mode != 'current' or round_.editable else 'SOLO CONSULTA · jornada pasada'
         self.metadata.setText(f'{mode_label} · {view_round.source}\nDatos usados: {datetime.fromisoformat(view_round.captured_at).astimezone():%d/%m/%Y %H:%M} · Precio por apuesta: {money(view_round.price_cents)} (referencia local)')
@@ -333,11 +334,12 @@ class MainWindow(QMainWindow):
                 button.setEnabled(bool(system and round_.editable and not busy))
         self.pleno_selection_info.setText(f'{len(system.plenos)} resultados del Pleno · puedes marcar varios goles por equipo' if system else 'Marca goles del local y visitante. M = 3 o más.')
         self.preview_model.update_rows([(b.column,b.pleno or '—',b.quantity) for b in system.bets[:100]] if system else [])
-        self.preview_info.setText(f'{quantity:,} apuestas guardadas. Selecciona signos en el boleto y pulsa Generar.' if system else 'Pulsa Nuevo para empezar una quiniela.')
+        self.preview_info.setText(f'{quantity:,} apuestas listas. Pulsa Guardar apuestas (TXT) para sacar el archivo.' if quantity else 'Elige los signos y los goles del Pleno y pulsa Generar debajo del boleto.' if system else 'Pulsa Nuevo para empezar una quiniela.')
         self.name_input.blockSignals(True); self.name_input.setText(system.name if system else ''); self.name_input.blockSignals(False)
         self.name_input.setEnabled(bool(system and round_.editable and not busy))
         self.builder_info.setText(f'Apuestas posibles: {engine.size(system.base)*len(system.plenos):,} · {sum(len(p)==1 for p in system.base)} fijos / {sum(len(p)==2 for p in system.base)} dobles / {sum(len(p)==3 for p in system.base)} triples\nCoste si juegas todas: {money(engine.size(system.base)*len(system.plenos)*view_round.price_cents)} · apuestas guardadas: {system.quantity:,}' if system else 'Pulsa Nuevo y elige los signos de cada partido.')
         self.update_system_list()
+        self.update_export_controls()
         self.analysis_info.setText(self.analysis_text())
         def percentages(kind,index):
             snap=view_round.snapshot(kind)
@@ -436,7 +438,7 @@ class MainWindow(QMainWindow):
         self.preview_view,self.preview_model=self.table(('Columna','Pleno','Cantidad'),preview)
         note=QLabel('El boleto permanece visible a la izquierda. La vista muestra hasta 100 filas; el archivo exportado conserva todas las apuestas.');note.setWordWrap(True);preview.addWidget(note)
         row=QHBoxLayout();self.button('Guardar apuestas (TXT)',self.export_txt,row);self.button('Guardar quiniela (JSON)',self.export_json,row);preview.addLayout(row)
-        self.data_button('Guardar todas las combinaciones…',self.export_development,preview)
+        self.full_export_button=self.data_button('Guardar todas las combinaciones…',self.export_development,preview)
 
     def rename(self):
         if self.system and self.name_input.text().strip()!=self.system.name:
@@ -683,6 +685,8 @@ class MainWindow(QMainWindow):
         self.filter_timer.start()
         self.filter_feedback.setText('Actualizando apuestas y coste…')
         self.budget_apply.setEnabled(False)
+        self.update_export_controls()
+        self.update_data_buttons()
 
     def start_live_filter(self):
         if self.close_pending or not self.system:return
@@ -692,7 +696,7 @@ class MainWindow(QMainWindow):
             spec=self.filter_spec()
             candidates=self.service.origin_bets(self.system)[1]
         except ValueError as exc:
-            self.filter_feedback.setText(str(exc));return
+            self.filter_feedback.setText(str(exc));self.update_export_controls();return
         self.filter_timer.stop();self.filter_pending=False
         context=(self.filter_epoch,self.system,spec,candidates,self.quick_level)
         job=DataTask(lambda cancel,status:spec.apply(candidates,cancel),self)
@@ -865,13 +869,35 @@ class MainWindow(QMainWindow):
         self.manual_eval_timer.stop();self.evaluate(scrutiny['prizes'])
 
     def build_systems(self):
-        layout=self.page_layout(5);self.system_view,self.system_model=self.table(('Nombre','Jornada','Guardado','Apuestas','Cómo se creó'),layout)
+        layout=self.page_layout(5)
+        note=QLabel('Tus quinielas se guardan automáticamente aquí. Selecciona una fila para abrirla o guardar sus apuestas en un archivo.');note.setWordWrap(True);layout.addWidget(note)
+        self.system_view,self.system_model=self.table(('Nombre','Jornada','Guardado','Apuestas','Cómo se creó'),layout)
         row=QHBoxLayout()
         self.button('Abrir',self.open_selected,row);self.button('Duplicar',self.duplicate,row)
         self.button('Abrir apuestas (TXT)',self.import_txt,row);self.button('Abrir quiniela (JSON)',self.import_json,row)
-        self.button('Guardar apuestas (TXT)',self.export_txt,row);self.button('Guardar quiniela (JSON)',self.export_json,row);layout.addLayout(row)
+        layout.addLayout(row)
+        row=QHBoxLayout()
+        self.selected_txt_button=self.button('Guardar apuestas de la fila (TXT)',self.export_selected_txt,row)
+        self.selected_json_button=self.button('Guardar copia de la fila (JSON)',self.export_selected_json,row)
+        layout.addLayout(row)
         self.import_quantity=QCheckBox('Si una apuesta aparece varias veces en el archivo, contar todas las copias');self.import_quantity.setChecked(True);layout.addWidget(self.import_quantity)
         self.system_view.doubleClicked.connect(lambda _:self.safe(self.open_selected))
+        self.system_view.selectionModel().currentChanged.connect(lambda *_:self.update_export_controls())
+
+    def export_busy(self):
+        """Avoid saving an older selection while a new calculation is pending."""
+        return bool(self.filter_timer.isActive() or self.filter_pending or
+                    any(job and job.isRunning() for job in (self.worker,self.data_worker,self.filter_job)))
+
+    def update_export_controls(self):
+        busy=self.export_busy()
+        ready=bool(self.system and self.system.bets and not busy)
+        self.export_button.setEnabled(ready)
+        self.export_button.setToolTip('Guarda las apuestas exactas de la quiniela abierta, con sus Plenos.' if ready else 'Espera a que termine el cálculo.' if busy else 'Abre una quiniela con apuestas o pulsa Generar debajo del boleto.')
+        index=self.system_view.currentIndex()
+        selected=self.listed_systems[index.row()] if index.isValid() and index.row()<len(getattr(self,'listed_systems',())) else None
+        self.selected_txt_button.setEnabled(bool(selected and selected.bets and not busy))
+        self.selected_json_button.setEnabled(bool(selected and not busy))
 
     def update_system_list(self):
         self.listed_systems=self.repository.systems(self.round.key)
@@ -906,15 +932,47 @@ class MainWindow(QMainWindow):
                                       pleno=system.pleno,origin='JSON importado',parameters=system.parameters,round_snapshot=system.round_snapshot or json.dumps(__import__('dataclasses').asdict(round_)))
         self.load_rounds(round_.key);self.set_system(imported)
 
-    def export_txt(self):
-        if not self.system:raise ValueError('No hay sistema activo.')
-        path,_=QFileDialog.getSaveFileName(self,'Exportar apuestas; no valida ni paga',self.system.name+'.txt','Apuestas (*.txt)')
-        if path:files.write_txt(path,self.system.bets)
+    def export_selected_txt(self):self.export_txt(self.selected_system())
 
-    def export_json(self):
-        if not self.system:raise ValueError('No hay sistema activo.')
-        path,_=QFileDialog.getSaveFileName(self,'Exportar sistema completo',self.system.name+'.json','Sistema (*.json)')
-        if path:files.write_system(path,self.system,self.round)
+    def export_selected_json(self):self.export_json(self.selected_system())
+
+    def export_filename(self,system,suffix):
+        """Suggest a portable name that distinguishes round and saved revision."""
+        import re
+        name=re.sub(r'[<>:"/\\|?*\x00-\x1f]', '-', f'{system.name}-{system.round_key}-v{system.revision}').strip(' .') or 'quiniela'
+        directory=self.repository.setting('export_directory')
+        return str(Path(directory)/f'{name}.{suffix}') if directory else f'{name}.{suffix}'
+
+    def show_export_result(self,path,system,round_,quantity):
+        from quiniela_ai_studio.ui.export_dialog import build_export_dialog
+        build_export_dialog(self,Path(path),system,round_,quantity).exec()
+
+    def export_txt(self,system=None):
+        system=system or self.system
+        if not system:raise ValueError('Abre primero una quiniela en Mis Sistemas.')
+        if self.export_busy():raise ValueError('Espera a que termine el cálculo antes de guardar las apuestas.')
+        if not system.bets:raise ValueError('Esta quiniela no tiene apuestas preparadas. Ábrela y pulsa Generar, o cambia las condiciones si has eliminado todas las apuestas.')
+        round_=self.repository.round(system.round_key)
+        if system.round_snapshot:round_=replace(round_,price_cents=round_from_dict(json.loads(system.round_snapshot)).price_cents)
+        path,_=QFileDialog.getSaveFileName(self,f'Guardar apuestas de {system.name}',self.export_filename(system,'txt'),'Apuestas (*.txt)')
+        if not path:return
+        if not Path(path).suffix:path+='.txt'
+        files.write_txt(path,system.bets)
+        self.repository.set_setting('export_directory',str(Path(path).resolve().parent))
+        self.repository.record_event('export_txt',dict(system_id=system.system_id,revision=system.revision,quantity=system.quantity,file=str(Path(path).resolve())))
+        self.statusBar().showMessage(f'{system.quantity:,} apuestas guardadas en {path}',15000)
+        self.show_export_result(path,system,round_,system.quantity)
+
+    def export_json(self,system=None):
+        system=system or self.system
+        if not system:raise ValueError('Abre primero una quiniela en Mis Sistemas.')
+        if self.export_busy():raise ValueError('Espera a que termine el cálculo antes de guardar la quiniela.')
+        path,_=QFileDialog.getSaveFileName(self,f'Guardar copia de {system.name}',self.export_filename(system,'json'),'Sistema (*.json)')
+        if path:
+            if not Path(path).suffix:path+='.json'
+            files.write_system(path,system,self.repository.round(system.round_key))
+            self.repository.set_setting('export_directory',str(Path(path).resolve().parent))
+            self.statusBar().showMessage(f'Copia de {system.name} guardada en {path}',15000)
 
     def build_settings(self):
         outer=self.page_layout(6)
@@ -951,7 +1009,7 @@ class MainWindow(QMainWindow):
 
     def update_data_buttons(self):
         busy=bool((self.data_worker and self.data_worker.isRunning()) or (self.worker and self.worker.isRunning()))
-        for button in self.data_buttons:button.setEnabled(not busy)
+        for button in self.data_buttons:button.setEnabled(not busy and (button is not self.full_export_button or not self.export_busy()))
         self.data_cancel.setEnabled(bool(self.data_worker and self.data_worker.isRunning()))
 
     def move_round(self,delta):
@@ -1030,6 +1088,9 @@ class MainWindow(QMainWindow):
         if self.data_kind=='export':
             self.repository.record_event('export_development',{**self.data_context, 'file':result['file'],'quantity':result['quantity']})
             self.background_status(f'{result["quantity"]:,} apuestas exportadas a {result["file"]}. El sistema de origen se conserva.')
+            if result['format']=='txt':
+                self.repository.set_setting('export_directory',str(Path(result['file']).resolve().parent))
+                self.show_export_result(result['file'],result['system'],result['round'],result['quantity'])
             return
         if self.close_pending or self.data_worker.cancel_event.is_set():
             if hasattr(result,'directory'):shutil.rmtree(result.directory)
@@ -1200,15 +1261,17 @@ class MainWindow(QMainWindow):
 
     def export_development(self):
         if not self.system:raise ValueError('Crea o abre primero un sistema.')
+        if self.export_busy():raise ValueError('Espera a que termine el cálculo antes de guardar las apuestas.')
         if not self.system.bets and not self.system.plenos:raise ValueError('Completa el Pleno antes de exportar.')
-        path,selected=QFileDialog.getSaveFileName(self,'Exportar desarrollo completo sin validar ni pagar',self.system.name+'.txt','TXT (*.txt);;JSON (*.json)')
+        path,selected=QFileDialog.getSaveFileName(self,'Guardar todas las combinaciones',self.export_filename(self.system,'txt'),'TXT (*.txt);;JSON (*.json)')
         if not path:return
         system=self.system;round_=self.round
+        if system.round_snapshot:round_=replace(round_,price_cents=round_from_dict(json.loads(system.round_snapshot)).price_cents)
         format='json' if Path(path).suffix.lower()=='.json' or selected.startswith('JSON') else 'txt'
         def operation(cancel,status):
             quantity=files.write_development(path,system,round_,format=format,cancelled=cancel,
                                             progress=lambda done,total:status(f'Exportación: {done:,} / {total:,} apuestas'))
-            return dict(file=path,quantity=quantity,published=True)
+            return dict(file=path,quantity=quantity,published=True,format=format,system=system,round=round_)
         self.start_background('export',dict(system_id=system.system_id,revision=system.revision,input_hash=system.hash,format=format),operation)
 
     def backup(self):
@@ -1278,7 +1341,7 @@ class MainWindow(QMainWindow):
 
     def show_audit(self):
         rows=self.repository.audit()
-        names={'edit':'Boleto modificado','create':'Quiniela creada','generate':'Apuestas generadas','filter':'Condiciones aplicadas','optimize':'Apuestas elegidas','import':'Archivo abierto','export_development':'Archivo guardado','change_rules':'Precio cambiado','restore_origin':'Apuestas recuperadas','undo':'Último cambio deshecho','refresh_sources':'Datos actualizados'}
+        names={'edit':'Boleto modificado','create':'Quiniela creada','generate':'Apuestas generadas','filter':'Condiciones aplicadas','optimize':'Apuestas elegidas','import':'Archivo abierto','export_txt':'Apuestas guardadas en TXT','export_development':'Archivo guardado','change_rules':'Precio cambiado','restore_origin':'Apuestas recuperadas','undo':'Último cambio deshecho','refresh_sources':'Datos actualizados'}
         dialog=QMessageBox(self);dialog.setWindowTitle('Qué has hecho');dialog.setText('\n'.join(f'{date} · {names.get(action, "Quiniela o datos guardados")} · guardado {revision}' for date,action,revision,detail in rows) or 'Todavía no hay operaciones.')
         dialog.setDetailedText('\n'.join(f'{date} · {action} · {detail}' for date,action,revision,detail in rows));dialog.exec()
 

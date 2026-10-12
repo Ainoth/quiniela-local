@@ -173,3 +173,23 @@ correctos. Windows sigue pendiente de ejecución nativa.
 - Catálogo fechado del artículo SELAE: BOE 2009 no vigente; diferencias con PDF
   posterior registradas. Mínimos de matrices verificados, sin afirmar sellado
   autorizado ni equivalencia completa con normativa/formatos actuales.
+
+## Guardado guiado 0.1.9 — 12/10/2026
+
+- 137 pruebas Studio correctas; 32 pruebas históricas con GUI correctas.
+- Exportación de fila distinta de la quiniela abierta, TXT/JSON exactos,
+  reducción con Plenos múltiples, cantidades repetidas, coste congelado,
+  cancelación y bloqueo durante condiciones pendientes.
+- El diálogo no abre carpeta ni web al construirse/mostrarse. Los clics de sus
+  botones se comprueban con mocks; demo/pasada/futura no habilitan la web.
+- Solo se anuncian Plenos realmente presentes en las apuestas exportadas.
+  Streaming comunica su cantidad real sin modificar el borrador original.
+- Ruff completo en diálogo y pruebas nuevas; Ruff F en src/tests y diff limpio.
+- Arranque Qt/X11 con perfil temporal y self-check correctos. Wheel y sdist
+  0.1.9 construidos; importación de la wheel aislada incluye el nuevo diálogo.
+- Capturas Qt/X11 revisadas: Mis Sistemas a 1200×820 y confirmación a 660×420,
+  sin recortes de controles. Ejemplo ficticio de 162 apuestas reducido a 18,
+  dos Plenos, TXT de 18 líneas y coste de referencia de 13,50 €.
+- Página y muestra del proveedor contrastadas sin cargar archivos ni efectuar
+  compras. Abrir la web no constituye validación, envío ni pago desde Studio.
+- Windows sigue preparado y sin prueba nativa; no cambia el esquema SQLite.

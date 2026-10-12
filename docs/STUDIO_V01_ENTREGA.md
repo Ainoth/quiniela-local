@@ -1,4 +1,4 @@
-# Entrega ejecutable v0.1 — revisión 0.1.8
+# Entrega ejecutable v0.1 — revisión 0.1.9
 
 11/10/2026. Esta revisión corrige la interfaz conforme a la preferencia del
 usuario: conservar la experiencia de Quiniela Local y su descarga de datos.
@@ -46,8 +46,8 @@ py -3 -m venv .venv-studio
    0/1/2/M; al elegir un solo lado, la selección parcial persiste.
 4. Crear Quiniela muestra las primeras 100 filas. TXT/JSON conserva todas las
    apuestas exactas y las cantidades; no reconstruye una reducción desde la base.
-5. En Escrutinio introduce 14 signos; usa `-` para pendientes. Marca definitivos
-   solo con resultados completos. El Pleno requiere también 14 para su categoría.
+5. En Aciertos, el marcador se actualiza automáticamente. Para probar la demo,
+   activa resultados manuales; el Pleno requiere 14 aciertos y goles definitivos.
 6. Cierra y abre: jornada, sistema, base, selecciones y versiones siguen en SQLite.
 7. Configuración → precio por apuesta cambia el precio de sistemas nuevos;
    los ya guardados conservan su coste. Elige8 se reserva como modalidad separada
@@ -58,6 +58,45 @@ py -3 -m venv .venv-studio
 El fixture `fixtures/seleccion_demo_v1.json` se importa como JSON de proyecto
 sintético: conserva draw_id, reglas y dos parejas de Pleno. Da **12 apuestas / 900
 céntimos**. `resultados_demo_v1.json` verifica 14 + Pleno sin premio económico.
+
+## Dónde se generan y cómo guardar las apuestas — 0.1.9
+
+1. **Quiniela normal:** elige los signos y los goles del Pleno en el boleto y
+   pulsa **Generar**, abajo a la izquierda. Las apuestas se guardan en la app.
+2. **Optimizada:** después de generar, cambia las condiciones en Optimizar y,
+   si quieres, aplica el presupuesto. Las apuestas finales se guardan solas.
+3. **Reducida:** **Crear copia reducida** ya genera y guarda las apuestas de
+   esa copia. Conserva la original en Mis Sistemas.
+
+Cuando las apuestas estén listas, pulsa **Guardar apuestas (TXT)** en la
+cabecera desde cualquier pestaña. Elige la carpeta y el nombre del archivo.
+El nombre sugerido incluye la jornada y la revisión. Una reducida u optimizada
+se guarda con sus apuestas exactas: no pulses Generar para guardarla, porque
+Generar desarrolla de nuevo todos los signos del boleto.
+
+Para otra quiniela, entra en **Mis Sistemas**, selecciona su fila y pulsa
+**Guardar apuestas de la fila (TXT)**. No necesitas abrirla; el botón de la
+cabecera siempre usa la quiniela que aparece como «Abierta».
+
+Al guardar se muestran nombre, temporada, jornada, cantidad de apuestas,
+Plenos presentes en el archivo, coste de referencia y ruta. Puedes abrir la
+carpeta o pulsar **Abrir web para cargar el TXT**. La web se abre únicamente
+por ese clic y el archivo no se sube automáticamente.
+
+La [página de archivos de Quinielista](https://www.eduardolosilla.es/quiniela/archivos)
+admite TXT y pide seleccionar archivo e indicar número de apuestas. Comprueba
+que su temporada/jornada coincida con tu quiniela, elige el TXT e indica la
+cantidad mostrada al guardar. Revisa importe y Pleno antes de confirmar en
+la web. Su [muestra pública](https://www.eduardolosilla.es/assets/archivos/1x2.txt)
+contiene 14 signos y dos goles por línea, como el contenido exportado por Studio.
+Fuentes consultadas el 12/10/2026; no se ha realizado una carga o compra real.
+Demo y jornadas de consulta permiten guardar archivos, pero desactivan el botón
+de la web. El archivo TXT no incluye la jornada: debes comprobarla en la web.
+
+**Guardar quiniela (JSON)** sirve para conservar el proyecto completo y volver
+a abrirlo en Studio. TXT y JSON contienen todas las apuestas guardadas, aunque
+la tabla solo muestre las primeras 100 filas. Cada pareja del Pleno y cada copia
+cuentan como una línea del TXT; no vuelvas a multiplicar la cantidad mostrada.
 
 ## Desarrollo grande
 

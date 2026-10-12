@@ -1,6 +1,6 @@
 # Índice del proyecto de escritorio
 
-Guía actual: [Entrega ejecutable v0.1](STUDIO_V01_ENTREGA.md), revisión 0.1.8. Incluye Aciertos automático, Pleno múltiple y Reducidas opcional.
+Guía actual: [Entrega ejecutable v0.1](STUDIO_V01_ENTREGA.md), revisión 0.1.9. Incluye Aciertos automático, Pleno múltiple, Reducidas opcional y guardado guiado de apuestas.
 Los registros v0.1.0/v0.1.1 siguientes describen entregas anteriores.
 
 - [Especificación de PC](ESPECIFICACION_PC.md): objetivo completo, arquitectura,

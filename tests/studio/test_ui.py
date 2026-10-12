@@ -43,6 +43,7 @@ def test_T15_six_columns_real_gui_flow(window,tmp_path,monkeypatch):
     window.result_input.setText('1'*14);window.evaluate()
     assert window.eval_model.rowCount()==2
     monkeypatch.setattr(QFileDialog,'getSaveFileName',lambda *a:(str(tmp_path/'bets.txt'),''))
+    monkeypatch.setattr(window,'show_export_result',lambda *a:None)
     window.export_txt();assert len((tmp_path/'bets.txt').read_text().splitlines())==2
     # Tablas virtualizadas: un refresco idéntico mantiene índice y selección.
     window.system_view.selectRow(0);index=window.system_view.currentIndex()

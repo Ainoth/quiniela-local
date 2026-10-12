@@ -103,6 +103,7 @@ Esta tabla está generada inicialmente a partir de `01_ESPECIFICACION_FUNCIONAL.
 | `RF-ARC-006` | v0.1/v0.8 | PENDIENTE | Intercambiar signos/posiciones, generar sistemas aleatorios y por distancias. |
 | `RF-ARC-007` | v0.1/v0.8 | PENDIENTE | Inferir **aproximadamente** restricciones de una combinación importada, indicando error. |
 | `RF-ARC-008` | v0.1/v0.8 | PENDIENTE | Adaptadores AD243, ASD(JSON), ASCII heredado y `.NUM` solo después de reunir especificaciones y fixtures legales. |
+| `RF-ARC-009` | v0.1 | IMPLEMENTADO | Guardado visible de apuestas exactas, exportación de fila seleccionada y ayuda para cargar el TXT manualmente; sin envío automático. |
 | `RF-BOL-001` | v0.5/v0.9 | PENDIENTE | Mostrar apuestas y preparar PDF legible, con coste, jornada, plenos y total. |
 | `RF-BOL-002` | v0.5/v0.9 | PENDIENTE | Diagramación de varias apuestas por página y salida de prueba. |
 | `RF-BOL-003` | v0.5/v0.9 | PENDIENTE | QR de uso interno (para recuperar proyectos) separado de QR oficial de validación. |
@@ -224,3 +225,12 @@ RF-RED-001/003/009: tablas del artículo fechadas BOE 2009, mapeo de partidos y
 dobles, extras al directo, P15 múltiple y copia opcional. Cada mínimo se verifica
 exhaustivamente, sin asumir 13 para todas. Tests en test_pleno_reductions.py y
 test_ui.py. No se declaran fases completas ni formatos autorizados actuales.
+
+## Guardado guiado 0.1.9
+
+RF-ARC-009: botón global, selección independiente en Mis Sistemas, TXT exacto,
+nombre con jornada/revisión, carpeta recordada, cantidad/coste congelados y
+ayuda tras guardar. Pruebas de exportar una fila distinta de la abierta,
+reducción con Plenos múltiples, cancelación, filtros pendientes y navegación
+externa solo por clic. RF-ARC-001 y RF-AUD-001 siguen parciales; RF-BOL-005
+continúa pendiente: abrir la web no implementa envío, pago ni recibo.
