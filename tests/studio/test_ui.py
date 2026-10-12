@@ -131,7 +131,7 @@ def test_live_partial_and_cached_result_respects_quantities(window,monkeypatch):
     window.display_live(matches,'2026-10-10T12:00:00+00:00',cached=False)
     window.evaluate_live()
     row=window.eval_model.rows[0]
-    assert row[2:]==(3,1,0,13)
+    assert row[2:]==(3,1,1,12,13,'Pendiente')
     assert 'sin premios' in window.eval_summary.text()
     window.load_rounds('DEMO/J01')
     assert window.live_matches is None and window.live_model.rowCount()==0
@@ -430,3 +430,131 @@ def test_empty_filtered_result_cannot_export_the_unfiltered_base(window,tmp_path
     with pytest.raises(ValueError,match='No hay apuestas'):
         write_development(path,window.system,window.round)
     assert path.read_text()=='anterior'
+
+
+def wait_for_live(window):
+    for _ in range(300):
+        QTest.qWait(10)
+        if window.live_worker is None:return
+    raise AssertionError('El marcador no terminó.')
+
+
+def test_multiple_pleno_buttons_and_optional_reduction_copy(window):
+    from quiniela_studio import engine
+    window.new_system()
+    window.set_system(window.service.edit(window.system,('1X2',)*4+('1',)*10,(False,)*14,''))
+    for side,goals in ((0,'01'),(1,'2M')):
+        for goal in goals:QTest.mouseClick(window.goal_buttons[side][goal],Qt.MouseButton.LeftButton)
+    assert window.system.plenos==('02','0M','12','1M')
+    window.start_generation();wait_for_generation(window)
+    original=window.system
+    assert original.quantity==324 and original.cost(window.round)==24300
+    window.navigation.setCurrentRow(7)
+    assert not window.reduction_apply.isEnabled()
+    window.reduction_enabled.setChecked(True)
+    assert window.reduction_apply.isEnabled()
+    window.reduction_apply.click();wait_for_data(window)
+    assert window.system.system_id!=original.system_id
+    assert window.system.quantity==36 and window.system.cost(window.round)==2700
+    assert window.repository.load(original.system_id).bets==original.bets
+    assert set(window.system.plenos)==set(original.plenos)
+    assert engine.size(window.system.base)==81
+
+
+def test_automatic_marker_refresh_updates_hits_misses_and_pleno(window,monkeypatch):
+    from live_results import LiveMatch
+    from quiniela_studio.domain import Bet
+    from quiniela_studio import ui
+    round_=replace(window.round,season='26-27',number=12)
+    window.repository.save_round(round_);window.load_rounds(round_.key)
+    system=window.service.imported(round_,'Seguimiento',(Bet('1'*14,'01'),Bet('1'*13+'X','01')));window.set_system(system)
+    counter=0
+    def provider(context):
+        nonlocal counter
+        counter+=1
+        matches=[LiveMatch(m.number,m.home,m.away,'1 - 0','1','10','Finalizado',True,0) for m in context.matches]
+        matches[14]=replace(matches[14],score='0 - 1',sign='2',pleno='01',final=counter>=2,status='Finalizado' if counter>=2 else 'En juego')
+        return tuple(matches)
+    monkeypatch.setattr(ui,'live_for_round',provider)
+    window.navigation.setCurrentRow(4);wait_for_live(window)
+    assert counter==1
+    assert window.live_model.rowCount()==15
+    assert window.eval_model.rows[0][3:7]==(14,0,0,14)
+    assert window.eval_model.rows[0][7]=='Goles coinciden (en juego)'
+    window.live_timer.setInterval(30)
+    for _ in range(100):
+        QTest.qWait(10)
+        if counter>=2 and window.live_worker is None:break
+    window.live_timer.stop()
+    assert counter>=2
+    assert window.eval_model.rows[0][7]=='Pleno acertado'
+    assert window.eval_model.rows[1][7]=='Goles sí; faltan 14'
+    assert window.repository.setting('live:'+round_.key)['matches'][14]['pleno']=='01'
+    cached=window.repository.setting('live:'+round_.key)
+    monkeypatch.setattr(ui,'live_for_round',lambda context:(_ for _ in ()).throw(OSError('Sin red')))
+    window.fetch_live();wait_for_live(window)
+    assert window.repository.setting('live:'+round_.key)==cached
+    assert window.eval_model.rows[0][7]=='Pleno acertado'
+    assert 'No se pudo actualizar' in window.live_status.text()
+    assert QApplication.activeModalWidget() is None
+    window.navigation.setCurrentRow(0)
+    assert not window.live_timer.isActive()
+
+
+def test_manual_results_selector_updates_without_check_button(window):
+    window.example_system();wait_for_generation(window)
+    window.navigation.setCurrentRow(4);window.manual_mode.setChecked(True)
+    for combo in window.manual_signs:combo.setCurrentText('1')
+    window.manual_goals[0].setCurrentText('M');window.manual_goals[1].setCurrentText('1')
+    window.final_check.setChecked(True)
+    QTest.qWait(180)
+    assert window.eval_model.rowCount()==6
+    assert any(row[3]==14 and row[7]=='Pleno acertado' for row in window.eval_model.rows)
+    assert not window.live_timer.isActive()
+
+
+def test_live_bad_identity_and_close_do_not_corrupt_cache(window,monkeypatch,application):
+    import threading
+    from live_results import LiveMatch
+    from quiniela_studio import ui
+    round_=replace(window.round,season='26-27',number=12)
+    window.repository.save_round(round_);window.load_rounds(round_.key)
+    def matches(context):
+        return tuple(LiveMatch(m.number,m.home,m.away,'—','','','Pendiente',False,0) for m in context.matches)
+    monkeypatch.setattr(ui,'live_for_round',lambda context:tuple(replace(m,home='Equipo incorrecto') for m in matches(context)))
+    window.navigation.setCurrentRow(4);wait_for_live(window)
+    assert window.repository.setting('live:'+round_.key) is None
+    assert QApplication.activeModalWidget() is None
+    started=threading.Event();release=threading.Event()
+    def slow_provider(context):
+        started.set();release.wait(2);return matches(context)
+    monkeypatch.setattr(ui,'live_for_round',slow_provider)
+    window.fetch_live()
+    for _ in range(100):
+        QTest.qWait(10)
+        if started.is_set():break
+    assert started.is_set()
+    path=window.repository.path;window.close();release.set()
+    for _ in range(100):
+        QTest.qWait(10)
+        if not window.isVisible():break
+    assert not window.isVisible() and not window.live_timer.isActive()
+    repo=Repository(path);assert repo.setting('live:'+round_.key) is None;repo.close()
+    application.processEvents()
+
+
+def test_live_refresh_keeps_selected_bet_and_shows_pleno_in_header(window):
+    from live_results import LiveMatch
+    from quiniela_studio.domain import Bet
+    window.set_system(window.service.imported(window.round,'Comparación',(Bet('1'*14,'01'),Bet('X'*14,'02'))))
+    matches=[LiveMatch(m.number,m.home,m.away,'1 - 0','1','10','Finalizado',True,0) for m in window.round.matches]
+    matches[14]=replace(matches[14],score='0 - 2',sign='2',pleno='02')
+    window.display_live(matches,'2026-10-12T10:00:00+00:00',False)
+    window.eval_view.setCurrentIndex(window.eval_model.index(1,0))
+    assert window.live_model.rows[0][3]=='X'
+    matches=[replace(m,score='0 - 0',sign='X') if m.number<15 else m for m in matches]
+    window.display_live(matches,'2026-10-12T10:01:00+00:00',False)
+    selected=window.eval_view.currentIndex().row()
+    assert window.eval_model.rows[selected][:2]==('X'*14,'02')
+    assert window.live_model.rows[0][4]=='Acierto'
+    assert '0 - 2' in window.live_pleno_summary.text()

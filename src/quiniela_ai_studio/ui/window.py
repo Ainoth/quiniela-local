@@ -10,7 +10,7 @@ import shutil
 import sqlite3
 
 from PySide6.QtCore import Qt, QAbstractTableModel, QModelIndex, QThread, Signal, QTimer
-from PySide6.QtGui import QShortcut, QKeySequence
+from PySide6.QtGui import QShortcut, QKeySequence, QColor
 from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QGridLayout, QLabel, QPushButton, QListWidget, QStackedWidget, QComboBox,
     QTableView, QHeaderView, QLineEdit, QSpinBox, QDoubleSpinBox, QSlider,
@@ -86,8 +86,17 @@ class RowsModel(QAbstractTableModel):
     def data(self, index, role=Qt.ItemDataRole.DisplayRole):
         if not index.isValid():
             return None
+        if role==Qt.ItemDataRole.BackgroundRole and self.headers[index.column()] in ('Acierto / fallo','Pleno ahora'):
+            value=str(self.rows[index.row()][index.column()])
+            if value.startswith(('Acierto','Pleno acertado')):return QColor('#165c3b')
+            if value.startswith(('Fallo','Goles fallados')):return QColor('#7f2338')
         if role in (Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.ToolTipRole):
-            return str(self.rows[index.row()][index.column()])
+            value=str(self.rows[index.row()][index.column()])
+            header=self.headers[index.column()]
+            if role==Qt.ItemDataRole.DisplayRole:
+                if header=='Apuesta':return f'#{index.row()+1}'
+                if header in ('Pleno','Tu signo','Resultado') and len(value)==2 and not set(value)-set('012M'):return value[0]+'–'+value[1]
+            return value
 
     def headerData(self, section, orientation, role=Qt.ItemDataRole.DisplayRole):
         if role == Qt.ItemDataRole.DisplayRole:
@@ -120,7 +129,7 @@ class GenerationTask(QThread):
 
     def run(self):
         try:
-            result = engine.generate(self.version.base, self.version.pleno,
+            result = engine.generate(self.version.base, self.version.plenos,
                                      self.cancel_event.is_set, self.progress.emit)
             self.completed.emit(result)
         except Exception as exc:
@@ -149,7 +158,7 @@ class DataTask(QThread):
 
 
 class MainWindow(QMainWindow):
-    SECTIONS = ('Inicio', 'Crear Quiniela', 'Optimizar', 'Análisis', 'Escrutinio', 'Mis Sistemas', 'Configuración')
+    SECTIONS = ('Inicio', 'Crear Quiniela', 'Optimizar', 'Análisis', 'Aciertos', 'Mis Sistemas', 'Configuración', 'Reducidas')
 
     def __init__(self, repository):
         super().__init__()
@@ -198,8 +207,9 @@ class MainWindow(QMainWindow):
             self.pages.addWidget(page)
         self.footer = QLabel();self.footer.setObjectName('footer');self.footer.setWordWrap(True);root.addWidget(self.footer)
         self.build_home(); self.build_builder(); self.build_optimize(); self.build_analysis()
-        self.build_evaluation(); self.build_systems(); self.build_settings()
+        self.build_evaluation(); self.build_systems(); self.build_settings();self.build_reductions()
         self.navigation.currentRowChanged.connect(self.pages.setCurrentIndex)
+        self.navigation.currentRowChanged.connect(self.ensure_live_updates)
         self.round_picker.currentIndexChanged.connect(self.select_round)
         self.navigation.setCurrentRow(0)
         self.load_rounds()
@@ -253,6 +263,7 @@ class MainWindow(QMainWindow):
         self.repository.set_setting('selected_round', self.round_picker.currentData())
         systems = self.repository.systems(self.round.key)
         self.system = systems[-1] if systems else None
+        self.choose_reduction_positions()
         self.restore_filter_controls()
         self.result_input.setText('-'*14)
         self.result_pleno.clear()
@@ -260,9 +271,15 @@ class MainWindow(QMainWindow):
         self.eval_model.update_rows([])
         self.eval_summary.setText('Selecciona resultados para esta jornada.')
         self.live_matches = None
+        self.live_pleno_summary.setText('Pleno actual: pendiente')
         self.live_model.update_rows([])
         cached = self.repository.setting('live:' + self.round.key)
-        self.live_status.setText(f'Última consulta guardada: {cached["captured_at"]} · pulsa «Ver último marcador».' if cached else 'Sin marcador guardado para esta jornada.')
+        self.live_status.setText('Sin marcador guardado para esta jornada.')
+        if cached:
+            try:self.restore_live()
+            except ValueError as exc:self.live_status.setText(str(exc))
+        self.reset_manual_inputs()
+        self.ensure_live_updates()
         self.refresh()
 
     def refresh(self):
@@ -305,20 +322,21 @@ class MainWindow(QMainWindow):
             lock.setChecked(bool(system and system.locks[i])); lock.setText('Fijo' if lock.isChecked() else 'Libre')
             lock.setEnabled(bool(system and round_.editable and not busy)); lock.blockSignals(False)
         for i, combo in enumerate(self.pleno_combos):
-            pending=json.loads(system.parameters).get('pleno_choices',['','']) if system else ['','']
-            combo.blockSignals(True); combo.setCurrentText(system.pleno[i] if system and len(system.pleno)==2 else pending[i] or '—')
+            pending=system.goal_masks if system else ('','')
+            combo.blockSignals(True); combo.setCurrentText(pending[i][0] if pending[i] else '—')
             combo.setEnabled(bool(system and round_.editable and not busy)); combo.blockSignals(False)
         pleno_match=view_round.matches[14]
         self.pleno_match_label.setText(f'Pleno al 15 · {pleno_match.home} – {pleno_match.away}')
         for side,buttons in enumerate(self.goal_buttons):
             for goal,button in buttons.items():
-                button.setChecked(self.pleno_combos[side].currentText()==goal)
+                button.setChecked(bool(system and goal in system.goal_masks[side]))
                 button.setEnabled(bool(system and round_.editable and not busy))
+        self.pleno_selection_info.setText(f'{len(system.plenos)} resultados del Pleno · puedes marcar varios goles por equipo' if system else 'Marca goles del local y visitante. M = 3 o más.')
         self.preview_model.update_rows([(b.column,b.pleno or '—',b.quantity) for b in system.bets[:100]] if system else [])
         self.preview_info.setText(f'{quantity:,} apuestas guardadas. Selecciona signos en el boleto y pulsa Generar.' if system else 'Pulsa Nuevo para empezar una quiniela.')
         self.name_input.blockSignals(True); self.name_input.setText(system.name if system else ''); self.name_input.blockSignals(False)
         self.name_input.setEnabled(bool(system and round_.editable and not busy))
-        self.builder_info.setText(f'Apuestas posibles: {engine.size(system.base):,} · {sum(len(p)==1 for p in system.base)} fijos / {sum(len(p)==2 for p in system.base)} dobles / {sum(len(p)==3 for p in system.base)} triples\nCoste si juegas todas: {money(engine.size(system.base)*view_round.price_cents)} · apuestas guardadas: {system.quantity:,}' if system else 'Pulsa Nuevo y elige los signos de cada partido.')
+        self.builder_info.setText(f'Apuestas posibles: {engine.size(system.base)*len(system.plenos):,} · {sum(len(p)==1 for p in system.base)} fijos / {sum(len(p)==2 for p in system.base)} dobles / {sum(len(p)==3 for p in system.base)} triples\nCoste si juegas todas: {money(engine.size(system.base)*len(system.plenos)*view_round.price_cents)} · apuestas guardadas: {system.quantity:,}' if system else 'Pulsa Nuevo y elige los signos de cada partido.')
         self.update_system_list()
         self.analysis_info.setText(self.analysis_text())
         def percentages(kind,index):
@@ -327,6 +345,7 @@ class MainWindow(QMainWindow):
         self.analysis_model.update_rows([(f'{i+1}. {m.home} – {m.away}',percentages('sport',i),percentages('public',i)) for i,m in enumerate(view_round.matches[:14])])
         self.optimize_info.setToolTip(f'Identificador de contenido: {system.hash}' if system else '')
         self.optimize_info.setText(f'{system.quantity:,} apuestas · coste {money(system.cost(round_))}' if system else 'Abre una quiniela en Mis Sistemas.')
+        self.refresh_reduction()
         self.update_data_buttons()
 
     def build_home(self):
@@ -394,9 +413,10 @@ class MainWindow(QMainWindow):
             row=QHBoxLayout();row.addWidget(QLabel(label_text));buttons={}
             for goal in '012M':
                 button=QPushButton(goal);button.setCheckable(True);button.setFixedSize(35,25)
-                button.clicked.connect(lambda checked=False,i=side,g=goal:self.pleno_combos[i].setCurrentText(g))
+                button.clicked.connect(lambda checked=False,i=side,g=goal:self.toggle_goal(i,g))
                 row.addWidget(button);buttons[goal]=button
             row.addStretch();layout.addLayout(row);self.goal_buttons.append(buttons)
+        self.pleno_selection_info=QLabel();self.pleno_selection_info.setWordWrap(True);layout.addWidget(self.pleno_selection_info)
         left_layout=layout;layout=self.page_layout(1)
         row=QHBoxLayout();row.addWidget(QLabel('Añadir dobles y triples (0–10)'))
         self.coverage=QSlider(Qt.Orientation.Horizontal);self.coverage.setRange(0,10);row.addWidget(self.coverage,1)
@@ -435,6 +455,14 @@ class MainWindow(QMainWindow):
         def action():self.set_system(self.service.edit(self.system,self.system.base,locks,self.system.pleno))
         self.safe(action);self.refresh()
 
+    def toggle_goal(self,side,goal):
+        if not self.system:return
+        masks=list(self.system.goal_masks)
+        masks[side]=''.join(g for g in '012M' if (g in masks[side]) != (g==goal))
+        pairs=tuple(a+b for a in masks[0] for b in masks[1])
+        self.safe(lambda:self.set_system(self.service.edit(self.system,self.system.base,self.system.locks,
+                                                          pairs[0] if len(pairs)==1 else '',pleno_choices=masks)))
+
     def change_pleno(self,*_):
         if not self.system:return
         pleno=''.join(c.currentText() for c in self.pleno_combos)
@@ -445,7 +473,7 @@ class MainWindow(QMainWindow):
     def set_system(self,system):
         changed=not self.system or self.system.system_id!=system.system_id
         self.system=system
-        if changed:self.restore_filter_controls()
+        if changed:self.restore_filter_controls();self.choose_reduction_positions()
         self.refresh()
 
     def undo(self):
@@ -465,8 +493,8 @@ class MainWindow(QMainWindow):
         if not self.system:raise ValueError('Pulsa Nuevo para crear una quiniela.')
         if self.worker and self.worker.isRunning():return
         if self.data_worker and self.data_worker.isRunning():raise ValueError('Espera a que termine la actualización de datos.')
-        if not self.system.pleno:raise ValueError('En el Pleno, elige los goles del local y del visitante: 0, 1, 2 o M (3 o más). Después pulsa Generar.')
-        if engine.size(self.system.base)>engine.MAX_GENERATED:raise ValueError('Has elegido más de 100.000 apuestas. Quita algunos dobles o triples, o usa Guardar todas las combinaciones para escribirlas en un archivo.')
+        if not self.system.plenos:raise ValueError('En el Pleno, elige los goles del local y del visitante: 0, 1, 2 o M (3 o más). Después pulsa Generar.')
+        if engine.size(self.system.base)*len(self.system.plenos)>engine.MAX_GENERATED:raise ValueError('Has elegido más de 100.000 apuestas. Quita algunos dobles o triples, o usa Guardar todas las combinaciones para escribirlas en un archivo.')
         version=self.system
         self.worker=GenerationTask(version)
         self.worker.completed.connect(lambda bets:self.safe(lambda:self.generation_done(version,bets)))
@@ -728,30 +756,102 @@ class MainWindow(QMainWindow):
 
     def build_evaluation(self):
         layout=self.page_layout(4)
-        row=QHBoxLayout();self.result_input=QLineEdit('-'*14);self.result_input.setMaxLength(14);row.addWidget(QLabel('Resultados: 1/X/2; - si falta'));row.addWidget(self.result_input)
-        self.result_pleno=QLineEdit();self.result_pleno.setMaxLength(2);self.result_pleno.setMaximumWidth(70);row.addWidget(QLabel('Pleno'));row.addWidget(self.result_pleno);layout.addLayout(row)
-        row=QHBoxLayout();self.final_check=QCheckBox('Resultados definitivos');row.addWidget(self.final_check)
-        self.button('Comprobar',self.evaluate,row,primary=True);self.button('Cargar resultados de un archivo',self.read_scrutiny,row);self.button('Premios guardados',self.read_cached_scrutiny,row);layout.addLayout(row)
-        self.eval_summary=QLabel();self.eval_summary.setWordWrap(True);layout.addWidget(self.eval_summary)
-        self.eval_view,self.eval_model=self.table(('Apuesta','Pleno','Copias','Ahora','Finales','Máximo'),layout)
-        row=QHBoxLayout()
-        self.data_button('Actualizar marcador',self.fetch_live,row)
-        self.button('Ver último marcador',self.restore_live,row)
-        self.button('Comparar con el marcador',self.evaluate_live,row);layout.addLayout(row)
-        self.live_status=QLabel();self.live_status.setWordWrap(True);layout.addWidget(self.live_status)
-        self.live_view,self.live_model=self.table(('Nº','Partido','Marcador','Estado'),layout)
-        note=QLabel('Los marcadores en directo pueden cambiar. Los premios solo se muestran si están publicados en los datos guardados.')
-        note.setWordWrap(True);layout.addWidget(note)
+        self.live_worker=None;self.live_context=None
+        self.live_timer=QTimer(self);self.live_timer.setInterval(60000);self.live_timer.timeout.connect(self.fetch_live_automatically)
+        row=QHBoxLayout();self.auto_live=QCheckBox('Marcador automático');self.auto_live.setChecked(self.repository.setting('automatic_live',True));row.addWidget(self.auto_live)
+        self.live_interval=QComboBox()
+        for seconds in (30,60,120):self.live_interval.addItem(f'Cada {seconds} segundos',seconds)
+        saved_interval=self.live_interval.findData(self.repository.setting('live_interval_seconds',60))
+        self.live_interval.setCurrentIndex(saved_interval if saved_interval>=0 else 1);row.addWidget(self.live_interval)
+        self.manual_mode=QCheckBox('Introducir resultados a mano');row.addWidget(self.manual_mode);layout.addLayout(row)
+        self.live_status=QLabel('El marcador se actualizará al abrir esta sección.');self.live_status.setWordWrap(True);layout.addWidget(self.live_status)
+        self.live_pleno_summary=QLabel('Pleno actual: pendiente');self.live_pleno_summary.setWordWrap(True);layout.addWidget(self.live_pleno_summary)
+        self.live_view,self.live_model=self.table(('Partido','Marcador','Resultado','Tu signo','Acierto / fallo','Estado'),layout)
+        self.live_view.verticalHeader().hide();self.live_view.verticalHeader().setDefaultSectionSize(23)
+        for column in range(1,6):self.live_view.horizontalHeader().setSectionResizeMode(column,QHeaderView.ResizeMode.ResizeToContents)
+        self.manual_container=QScrollArea();self.manual_container.setWidgetResizable(True);manual=QWidget();manual_layout=QGridLayout(manual);self.manual_container.setWidget(manual);self.manual_container.setMaximumHeight(270)
+        self.manual_labels=[];self.manual_signs=[]
+        for i in range(14):
+            label=QLabel();self.manual_labels.append(label);manual_layout.addWidget(label,i,0)
+            combo=QComboBox();combo.addItems(['-','1','X','2']);combo.currentIndexChanged.connect(self.manual_results_changed);self.manual_signs.append(combo);manual_layout.addWidget(combo,i,1)
+        manual_layout.addWidget(QLabel('Pleno · goles local / visitante'),14,0)
+        goal_row=QHBoxLayout();self.manual_goals=[]
+        for _ in range(2):
+            combo=QComboBox();combo.addItems(['—','0','1','2','M']);combo.currentIndexChanged.connect(self.manual_results_changed);self.manual_goals.append(combo);goal_row.addWidget(combo)
+        manual_layout.addLayout(goal_row,14,1)
+        self.result_input=QLineEdit('-'*14);self.result_input.setMaxLength(14);self.result_input.hide()
+        self.result_pleno=QLineEdit();self.result_pleno.setMaxLength(2);self.result_pleno.hide()
+        self.final_check=QCheckBox('Estos resultados son definitivos');manual_layout.addWidget(self.final_check,15,0,1,2)
+        self.button('Cargar resultados guardados',self.read_cached_scrutiny,manual_layout)
+        layout.addWidget(self.manual_container);self.manual_container.hide()
+        self.eval_summary=QLabel('Abre una quiniela con apuestas para ver tus aciertos.');self.eval_summary.setWordWrap(True);self.eval_summary.setMinimumHeight(48);layout.addWidget(self.eval_summary)
+        self.eval_view,self.eval_model=self.table(('Apuesta','Pleno','Copias','Aciertos','Fallos','Pendientes','Máximo','Pleno ahora'),layout)
+        self.eval_view.verticalHeader().hide()
+        for column in range(1,8):self.eval_view.horizontalHeader().setSectionResizeMode(column,QHeaderView.ResizeMode.ResizeToContents)
+        self.eval_view.selectionModel().currentRowChanged.connect(self.display_match_comparison)
+        self.eval_view.setToolTip('Aciertos y fallos actuales pueden cambiar en partidos en juego. Máximo usa solo fallos definitivos. El Pleno exige 14 aciertos más los goles del partido 15.')
+        self.manual_eval_timer=QTimer(self);self.manual_eval_timer.setSingleShot(True);self.manual_eval_timer.setInterval(150);self.manual_eval_timer.timeout.connect(self.refresh_manual_evaluation)
+        self.result_input.textChanged.connect(self.schedule_manual_evaluation);self.result_pleno.textChanged.connect(self.schedule_manual_evaluation);self.final_check.toggled.connect(self.schedule_manual_evaluation)
+        self.auto_live.toggled.connect(self.ensure_live_updates);self.manual_mode.toggled.connect(self.switch_scrutiny_mode);self.live_interval.currentIndexChanged.connect(self.ensure_live_updates)
+
+    def reset_manual_inputs(self):
+        for i,combo in enumerate(self.manual_signs):
+            combo.blockSignals(True);combo.setCurrentIndex(0);combo.blockSignals(False)
+            match=self.round.matches[i];self.manual_labels[i].setText(f'{i+1:02} · {match.home} – {match.away}')
+        for combo in self.manual_goals:combo.blockSignals(True);combo.setCurrentIndex(0);combo.blockSignals(False)
+
+    def set_manual_results(self,result,pleno):
+        for i,combo in enumerate(self.manual_signs):
+            combo.blockSignals(True);combo.setCurrentText(result[i]);combo.blockSignals(False)
+        for i,combo in enumerate(self.manual_goals):
+            combo.blockSignals(True);combo.setCurrentText(pleno[i] if len(pleno)==2 else '—');combo.blockSignals(False)
+        self.result_input.setText(result);self.result_pleno.setText(pleno)
+
+    def manual_results_changed(self):
+        self.result_input.setText(''.join(combo.currentText() for combo in self.manual_signs))
+        goals=''.join(combo.currentText() for combo in self.manual_goals)
+        self.result_pleno.setText('' if '—' in goals else goals)
+
+    def schedule_manual_evaluation(self):
+        if self.manual_mode.isChecked():self.manual_eval_timer.start()
+
+    def refresh_manual_evaluation(self):
+        if self.close_pending or not self.manual_mode.isChecked():return
+        try:self.evaluate()
+        except ValueError as exc:self.eval_summary.setText(str(exc))
+
+    def switch_scrutiny_mode(self):
+        manual=self.manual_mode.isChecked();self.manual_container.setVisible(manual);self.live_view.setVisible(not manual)
+        self.ensure_live_updates()
+        if manual:self.schedule_manual_evaluation()
+        elif self.live_matches:self.evaluate_live()
+
+    def render_scrutiny(self,outcome,actual_pleno,pleno_final):
+        selected=self.eval_view.currentIndex().row()
+        old_key=self.eval_model.rows[selected][:2] if 0<=selected<len(self.eval_model.rows) else None
+        if self.manual_mode.isChecked():self.live_pleno_summary.setText('Pleno manual: '+(actual_pleno[0]+'–'+actual_pleno[1] if actual_pleno else 'pendiente'))
+        rows=[]
+        for r in outcome['rows']:
+            if not r['pleno']:p15='Sin selección'
+            elif not actual_pleno:p15='Pendiente'
+            elif r['full15_hit']:p15='Pleno acertado'
+            elif r['pleno_hit']:p15='Goles sí; faltan 14' if outcome['definitive'] and r['hits']<14 else 'Goles coinciden' + ('' if pleno_final else ' (en juego)')
+            else:p15='Goles fallados' + ('' if pleno_final else ' (en juego)')
+            rows.append((r['column'],r['pleno'] or '—',r['quantity'],r['hits'],r['misses'],r['pending'],r['maximum'],p15))
+        self.eval_model.update_rows(rows)
+        if old_key:
+            selected=next((i for i,row in enumerate(rows) if row[:2]==old_key),0)
+            self.eval_view.setCurrentIndex(self.eval_model.index(selected,0))
+        self.display_match_comparison()
+        best=max((r['hits'] for r in outcome['rows']),default=0)
+        self.eval_summary.setText(f'{outcome["known"]} de 14 resultados disponibles · mejor apuesta: {best} aciertos · {outcome["counts"][15]} Plenos confirmados. Marcadores en juego pueden cambiar; sin premios calculados.' if outcome['prize_cents'] is None else f'{outcome["known"]} de 14 resultados disponibles · premio publicado: {money(outcome["prize_cents"])}')
 
     def evaluate(self,prizes=None):
-        if not self.system or not self.system.bets:raise ValueError('Genera o importa apuestas para comprobarlas.')
+        if not self.system or not self.system.bets:raise ValueError('Abre una quiniela con apuestas preparadas.')
         result=self.result_input.text().upper();pleno=self.result_pleno.text().upper()
         outcome=engine.evaluate(self.system.bets,result,pleno,finalized=(self.final_check.isChecked(),)*14,
                                 prizes=prizes,official=prizes is not None)
-        self.eval_model.update_rows([(r['column'],r['pleno'] or '—',r['quantity'],r['hits'],r['confirmed'],r['maximum']) for r in outcome['rows']])
-        prize=f' · premio bruto {money(outcome["prize_cents"])}' if outcome['prize_cents'] is not None else ' · premios no disponibles'
-        categories=' · '.join(f'{c}: {n}' for c,n in outcome['counts'].items() if n)
-        self.eval_summary.setText(f'{outcome["known"]}/14 resultados conocidos · {"definitivos" if outcome["definitive"] else "provisionales"}{prize}\nApuestas premiadas por categoría: {categories or "sin categorías definitivas"}')
+        self.render_scrutiny(outcome,pleno,self.final_check.isChecked())
 
     def read_scrutiny(self):
         path,_=QFileDialog.getOpenFileName(self,'Seleccionar PRE de esta temporada',filter='WIN1X2 (PRE*.txt Pre*.txt)')
@@ -760,8 +860,9 @@ class MainWindow(QMainWindow):
         line=next((s for s in text(path).splitlines() if s[:2].strip().isdigit() and int(s[:2])==self.round.number),'')
         scrutiny=scrutiny_record(line)
         if not scrutiny:raise ValueError('No hay escrutinio definitivo para esta jornada.')
-        self.result_input.setText(scrutiny['result']);self.result_pleno.setText(scrutiny['pleno']);self.final_check.setChecked(True)
-        self.evaluate(scrutiny['prizes'])
+        self.manual_mode.setChecked(True)
+        self.set_manual_results(scrutiny['result'],scrutiny['pleno']);self.final_check.setChecked(True)
+        self.manual_eval_timer.stop();self.evaluate(scrutiny['prizes'])
 
     def build_systems(self):
         layout=self.page_layout(5);self.system_view,self.system_model=self.table(('Nombre','Jornada','Guardado','Apuestas','Cómo se creó'),layout)
@@ -921,6 +1022,11 @@ class MainWindow(QMainWindow):
         if self.close_pending:
             if hasattr(result,'directory'):shutil.rmtree(result.directory)
             return
+        if self.data_kind=='reduction':
+            source,plan=self.data_context
+            if self.system!=source:
+                self.background_status('La quiniela cambió; la reducción no se ha aplicado.');return
+            self.set_system(self.service.reduced_copy(source,plan,result));self.background_status('Copia reducida creada. La quiniela anterior sigue en Mis Sistemas.');return
         if self.data_kind=='export':
             self.repository.record_event('export_development',{**self.data_context, 'file':result['file'],'quantity':result['quantity']})
             self.background_status(f'{result["quantity"]:,} apuestas exportadas a {result["file"]}. El sistema de origen se conserva.')
@@ -975,19 +1081,86 @@ class MainWindow(QMainWindow):
         if not directory:raise ValueError('Importa o descarga primero los datos de WIN1X2.')
         scrutiny=scrutiny_from_cache(Path(directory),self.frozen_round())
         if not scrutiny:raise ValueError('Todavía no hay escrutinio definitivo guardado para esta jornada.')
-        self.result_input.setText(scrutiny['result']);self.result_pleno.setText(scrutiny['pleno']);self.final_check.setChecked(True)
-        self.evaluate(scrutiny['prizes'])
+        self.manual_mode.setChecked(True)
+        self.set_manual_results(scrutiny['result'],scrutiny['pleno']);self.final_check.setChecked(True)
+        self.manual_eval_timer.stop();self.evaluate(scrutiny['prizes'])
+
+    def ensure_live_updates(self,*_):
+        if self.close_pending:return
+        active=self.auto_live.isChecked() and not self.manual_mode.isChecked() and self.navigation.currentRow()==4 and self.round_picker.currentData() and self.round.season!='DEMO'
+        self.repository.set_setting('automatic_live',self.auto_live.isChecked())
+        self.repository.set_setting('live_interval_seconds',self.live_interval.currentData())
+        self.live_timer.stop()
+        if active:
+            self.live_timer.setInterval(self.live_interval.currentData()*1000);self.live_timer.start();self.fetch_live_automatically()
+        else:
+            if self.live_worker:self.live_worker.cancel_event.set()
+            if self.manual_mode.isChecked():self.live_status.setText('Resultados introducidos a mano.')
+            elif not self.auto_live.isChecked():self.live_status.setText('Actualización automática desactivada.')
+            if self.round_picker.currentData() and self.round.season=='DEMO':self.live_status.setText('Demo ficticia: activa Introducir resultados a mano para probar los aciertos.')
+
+    def fetch_live_automatically(self):
+        if self.close_pending or not self.auto_live.isChecked() or self.manual_mode.isChecked() or self.navigation.currentRow()!=4:return
+        self.fetch_live()
 
     def fetch_live(self):
-        context=self.frozen_round()
-        self.start_background('live',context,lambda cancel,status:live_for_round(context))
+        if self.live_worker is not None or self.round.season=='DEMO':return
+        context=self.frozen_round();self.live_context=context
+        job=DataTask(lambda cancel,status:live_for_round(context),self);self.live_worker=job
+        self.live_status.setText('Actualizando marcador…')
+        job.completed.connect(lambda matches:self.live_received(context,matches))
+        job.failed.connect(lambda message:self.live_error(context,message))
+        job.finished.connect(lambda:self.live_finished(job))
+        job.start()
+
+    def live_received(self,context,matches):
+        if self.close_pending or (self.live_worker and self.live_worker.cancel_event.is_set()):return
+        from quiniela_ai_studio.infrastructure.integration import validate_teams
+        try:validate_teams(context,[(m.home,m.away) for m in matches])
+        except ValueError as exc:
+            self.live_error(context,str(exc));return
+        captured=utcnow()
+        self.repository.set_setting('live:'+context.key,dict(captured_at=captured,matches=[asdict(m) for m in matches]))
+        if self.round.key==context.key and not self.manual_mode.isChecked():
+            try:self.display_live(matches,captured,cached=False)
+            except ValueError as exc:self.live_status.setText(str(exc))
+
+    def live_error(self,context,message):
+        if self.live_worker and self.live_worker.cancel_event.is_set():return
+        if not self.close_pending and self.round.key==context.key:
+            self.live_status.setText(f'No se pudo actualizar: {message}. Se mantiene el último marcador; se volverá a intentar automáticamente.')
+
+    def live_finished(self,job):
+        if self.live_worker is job:self.live_worker=None
+        job.deleteLater()
+        if self.close_pending:self.close();return
+        if self.live_context and self.round.key!=self.live_context.key:self.ensure_live_updates()
+        elif job.cancel_event.is_set():QTimer.singleShot(0,self.fetch_live_automatically)
 
     def display_live(self,matches,captured_at,cached):
         from quiniela_ai_studio.infrastructure.integration import validate_teams
         validate_teams(self.frozen_round(),[(m.home,m.away) for m in matches])
         self.live_matches=tuple(matches)
-        self.live_model.update_rows([(m.number,f'{m.home} – {m.away}',m.score,m.status) for m in matches])
-        self.live_status.setText(f'Quinielista / Dataradar · {"consulta guardada" if cached else "última consulta"}: {captured_at}\nMarcador todavía provisional; sin premios calculados.')
+        last=self.live_matches[14]
+        self.live_pleno_summary.setText(f'Pleno actual: {last.score} · {last.status} · M = 3 o más goles')
+        self.display_match_comparison()
+        queried=datetime.fromisoformat(captured_at).astimezone().strftime('%d/%m %H:%M:%S')
+        self.live_status.setText(f'{"Marcador guardado" if cached else "Última consulta"}: {queried} · Quinielista / Dataradar')
+        self.evaluate_live()
+
+    def display_match_comparison(self,*_):
+        if not self.live_matches:return
+        index=self.eval_view.currentIndex().row()
+        chosen=self.eval_model.rows[index if 0<=index<len(self.eval_model.rows) else 0] if self.eval_model.rows else None
+        rows=[]
+        for m in self.live_matches:
+            actual=(m.pleno or '—') if m.number==15 else m.sign or '—'
+            predicted=(chosen[1] if m.number==15 else chosen[0][m.number-1]) if chosen else '—'
+            state='Pendiente'
+            if chosen and actual!='—':
+                state=('Goles coinciden' if predicted==actual else 'Goles fallados') if m.number==15 else ('Acierto' if predicted==actual else 'Fallo')
+            rows.append((f'{m.number:02} · {m.home} – {m.away}',m.score,actual,predicted,state,m.status))
+        self.live_model.update_rows(rows)
 
     def restore_live(self):
         cached=self.repository.setting('live:'+self.round.key)
@@ -999,15 +1172,15 @@ class MainWindow(QMainWindow):
 
     def evaluate_live(self):
         if not self.live_matches:raise ValueError('Actualiza o recupera primero el marcador de esta jornada.')
-        if not self.system or not self.system.bets:raise ValueError('Abre un sistema con apuestas para comprobarlo.')
+        if not self.system or not self.system.bets:
+            self.eval_model.update_rows([]);self.eval_summary.setText('Abre una quiniela con apuestas para compararla con los resultados.');return
         from quiniela_ai_studio.infrastructure.integration import validate_teams
         validate_teams(self.frozen_round(),[(m.home,m.away) for m in self.live_matches])
         result=''.join(m.sign or '-' for m in self.live_matches[:14])
         finalized=tuple(bool(m.final and m.sign) for m in self.live_matches[:14])
-        pleno=self.live_matches[14].pleno if self.live_matches[14].final else ''
-        outcome=engine.evaluate(self.system.bets,result,pleno,finalized=finalized)
-        self.eval_model.update_rows([(r['column'],r['pleno'] or '—',r['quantity'],r['hits'],r['confirmed'],r['maximum']) for r in outcome['rows']])
-        self.eval_summary.setText(f'Directo: {outcome["known"]}/14 conocidos. Confirmados y máximo posible por apuesta; sin premios económicos.\nPleno: {self.live_matches[14].pleno or "pendiente"} · {"final" if self.live_matches[14].final else "provisional"}.')
+        last=self.live_matches[14]
+        outcome=engine.evaluate(self.system.bets,result,last.pleno,finalized=finalized,pleno_final=last.final)
+        self.render_scrutiny(outcome,last.pleno,last.final)
 
     def import_pc_systems(self):
         path,_=QFileDialog.getOpenFileName(self,'Base de Quiniela Local (desktop_data/systems.sqlite3)',filter='SQLite (*.sqlite3 *.db)')
@@ -1027,7 +1200,7 @@ class MainWindow(QMainWindow):
 
     def export_development(self):
         if not self.system:raise ValueError('Crea o abre primero un sistema.')
-        if not self.system.bets and not self.system.pleno:raise ValueError('Completa el Pleno antes de exportar.')
+        if not self.system.bets and not self.system.plenos:raise ValueError('Completa el Pleno antes de exportar.')
         path,selected=QFileDialog.getSaveFileName(self,'Exportar desarrollo completo sin validar ni pagar',self.system.name+'.txt','TXT (*.txt);;JSON (*.json)')
         if not path:return
         system=self.system;round_=self.round
@@ -1048,6 +1221,61 @@ class MainWindow(QMainWindow):
         count,target=migrate_legacy(path,self.repository,self.service)
         self.refresh();QMessageBox.information(self,'Recuperación',f'{count} sistemas recuperados.\nCopia y columnas sin asignar:\n{target}\nLas apuestas sin jornada quedan en la copia para que puedas revisarlas.')
 
+    def build_reductions(self):
+        from quiniela_ai_studio.domain.reduction_tables import TABLES
+        outer=self.page_layout(7)
+        note=QLabel('Tablas del artículo de SELAE (BOE 2009). No es un envío oficial. Se crea una copia desde el boleto, sin aplicar los filtros de Optimizar. Los partidos sin marcar se juegan al directo.');note.setWordWrap(True);outer.addWidget(note)
+        self.reduction_enabled=QCheckBox('Quiero usar una quiniela reducida');self.reduction_enabled.toggled.connect(self.choose_reduction_positions);outer.addWidget(self.reduction_enabled)
+        self.reduction_picker=QComboBox()
+        for table in TABLES:
+            self.reduction_picker.addItem(f'Reducida {table.number}: {table.widths.count(2)} dobles + {table.widths.count(3)} triples → {len(table.patterns)} columnas',table.number)
+        self.reduction_picker.currentIndexChanged.connect(self.choose_reduction_positions);outer.addWidget(self.reduction_picker)
+        scroll=QScrollArea();scroll.setWidgetResizable(True);content=QWidget();layout=QVBoxLayout(content);scroll.setWidget(content);outer.addWidget(scroll,1)
+        self.reduction_checks=[]
+        for i in range(14):
+            check=QCheckBox();check.toggled.connect(self.refresh_reduction);layout.addWidget(check);self.reduction_checks.append(check)
+        self.reduction_info=QLabel();self.reduction_info.setWordWrap(True);outer.addWidget(self.reduction_info)
+        self.reduction_apply=self.button('Crear copia reducida',self.apply_reduction,outer,primary=True)
+        self.button('Cancelar cálculo',self.cancel_data,outer)
+        self.choose_reduction_positions()
+
+    def choose_reduction_positions(self):
+        from quiniela_ai_studio.domain.reduction_tables import TABLES
+        table=TABLES[self.reduction_picker.currentData()-1]
+        selected=set()
+        if self.system:
+            for width in (2,3):
+                selected.update([i for i,mask in enumerate(self.system.base) if len(mask)==width][:table.widths.count(width)])
+        for i,check in enumerate(self.reduction_checks):
+            check.blockSignals(True);check.setChecked(i in selected);check.blockSignals(False)
+        self.refresh_reduction()
+
+    def refresh_reduction(self):
+        if not hasattr(self,'reduction_apply') or not self.round_picker.currentData():return
+        from quiniela_ai_studio.domain.reductions import plan_reduction
+        enabled=self.reduction_enabled.isChecked()
+        self.reduction_picker.setEnabled(enabled)
+        for i,check in enumerate(self.reduction_checks):
+            check.setText(f'{i+1:02} · {self.round.matches[i].home} – {self.round.matches[i].away} · {self.system.base[i] if self.system else "sin boleto"}')
+            check.setEnabled(bool(enabled and self.system and len(self.system.base[i])>1))
+        self.reduction_apply.setEnabled(False)
+        if not self.system:
+            self.reduction_info.setText('Abre una quiniela o crea un boleto.');return
+        try:
+            plan=plan_reduction(self.system.base,self.system.plenos,self.reduction_picker.currentData(),[i for i,c in enumerate(self.reduction_checks) if c.isChecked()])
+            price=self.frozen_round().price_cents
+            self.reduction_info.setText(f'{plan.before:,} → {plan.after:,} apuestas · coste {money(plan.after*price)}\nSi aciertas todos los signos del boleto: al menos {plan.table.minimum_hits} aciertos en los 14. Esto no garantiza el Pleno ni un premio en cualquier resultado.')
+            busy=bool((self.data_worker and self.data_worker.isRunning()) or (self.worker and self.worker.isRunning()) or (self.filter_job and self.filter_job.isRunning()))
+            self.reduction_apply.setEnabled(enabled and self.round.editable and plan.after<=engine.MAX_GENERATED and not busy)
+        except ValueError as exc:self.reduction_info.setText(str(exc))
+
+    def apply_reduction(self):
+        if not self.reduction_enabled.isChecked():raise ValueError('Activa primero la opción de quiniela reducida.')
+        from quiniela_ai_studio.domain.reductions import plan_reduction,reduced_bets
+        system=self.system
+        plan=plan_reduction(system.base,system.plenos,self.reduction_picker.currentData(),[i for i,c in enumerate(self.reduction_checks) if c.isChecked()])
+        self.start_background('reduction',(system,plan),lambda cancel,status:reduced_bets(plan,cancel))
+
     def show_audit(self):
         rows=self.repository.audit()
         names={'edit':'Boleto modificado','create':'Quiniela creada','generate':'Apuestas generadas','filter':'Condiciones aplicadas','optimize':'Apuestas elegidas','import':'Archivo abierto','export_development':'Archivo guardado','change_rules':'Precio cambiado','restore_origin':'Apuestas recuperadas','undo':'Último cambio deshecho','refresh_sources':'Datos actualizados'}
@@ -1055,6 +1283,9 @@ class MainWindow(QMainWindow):
         dialog.setDetailedText('\n'.join(f'{date} · {action} · {detail}' for date,action,revision,detail in rows));dialog.exec()
 
     def closeEvent(self,event):
+        self.live_timer.stop();self.manual_eval_timer.stop()
+        if self.live_worker and self.live_worker.isRunning():
+            self.close_pending=True;self.live_worker.cancel_event.set();event.ignore();return
         self.filter_timer.stop();self.filter_epoch+=1
         if self.filter_job and self.filter_job.isRunning():
             self.close_pending=True;self.filter_job.cancel_event.set();event.ignore();return

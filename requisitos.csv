@@ -49,7 +49,7 @@ RF-FIL-012,v0.2/v0.7,PENDIENTE,"Guardar opcionalmente descartes por filtro, en m
 RF-FIL-013,v0.2/v0.7,PENDIENTE,Filtros de rentabilidad y probabilidad solo cuando existan datos válidos.
 RF-RED-001,v0.3/v0.7,PENDIENTE,Reducir sobre conjunto base ya filtrado con presupuesto o número objetivo de columnas.
 RF-RED-002,v0.3/v0.7,PENDIENTE,"Modos de optimización: cobertura, probabilidad o combinación ponderada; explicar los compromisos."
-RF-RED-003,v0.3/v0.7,PENDIENTE,Objetivos de 14 a 9 aciertos y objetivos de N premios si son matemáticamente interpretables.
+RF-RED-003,v0.3/v0.7,PARCIAL,Objetivos de 14 a 9 aciertos y objetivos de N premios si son matemáticamente interpretables.
 RF-RED-004,v0.3/v0.7,PENDIENTE,"Generadores propios: voraz (greedy), mejora local, búsqueda con semillas y optimizadores opcionales."
 RF-RED-005,v0.3/v0.7,PENDIENTE,Separar apuestas candidatas internas (del sistema base) de candidatas externas (si se autoriza dominio mayor).
 RF-RED-006,v0.3/v0.7,PENDIENTE,Ajustar número exacto de columnas solo si el objetivo es factible; indicar limitaciones.
@@ -71,8 +71,8 @@ RF-REN-006,v0.6,PENDIENTE,"Estimar posibles premios con 3 o menos encuentros pen
 RF-REN-007,v0.6,PENDIENTE,Calculadora de premios históricos y definitivos con datos oficiales validados.
 RF-REN-008,v0.6,PENDIENTE,"Comparativa real vs simulada: coste, premios, beneficio neto y retorno acumulado."
 RF-ESC-001,v0.1/v0.5,PARCIAL,Escrutinio parcial y final de sistemas locales y ficheros externos.
-RF-ESC-002,v0.1/v0.5,PENDIENTE,"Categorías de aciertos 14,13,12,11,10 y Pleno al 15 según reglas vigentes."
-RF-ESC-003,v0.1/v0.5,PENDIENTE,No conceder Pleno al 15 por acertar solo el marcador si faltan los 14.
+RF-ESC-002,v0.1/v0.5,PARCIAL,"Categorías de aciertos 14,13,12,11,10 y Pleno al 15 según reglas vigentes."
+RF-ESC-003,v0.1/v0.5,PARCIAL,No conceder Pleno al 15 por acertar solo el marcador si faltan los 14.
 RF-ESC-004,v0.1/v0.5,PARCIAL,Filtrar solo partidos finalizados; mostrar intervalo de aciertos potenciales en parciales.
 RF-ESC-005,v0.1/v0.5,PENDIENTE,"Procesar múltiples ficheros con progreso, cancelar y ranking."
 RF-ESC-006,v0.1/v0.5,PENDIENTE,"Columnas ganadoras aleatorias solo en simulación, claramente identificada."

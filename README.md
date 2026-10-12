@@ -6,7 +6,7 @@ Aplicación de Quiniela para escritorio y Android. La versión de escritorio
 puede leer los datos instalados por WIN1X2; ambas versiones descargan datos,
 porcentajes y marcadores directamente de sus proveedores públicos.
 
-## Quiniela AI Studio — v0.1 ejecutable (revisión 0.1.7)
+## Quiniela AI Studio — v0.1 ejecutable (revisión 0.1.8)
 
 Interfaz gráfica en español que conserva la experiencia visual de Quiniela Local:
 fondo azul, boleto compacto siempre visible a la izquierda, casillas 1/X/2 y
@@ -27,7 +27,9 @@ funciona sin conexión con la demo y los datos ya importados. Windows:
 2. Edita signos y Pleno en el boleto; las selecciones parciales se guardan.
 3. En Crear Quiniela, genera, revisa hasta 100 filas y exporta TXT/JSON.
 4. Para datos reales, **Descargar datos** o Configuración → importar carpeta/ZIP.
-5. En Escrutinio introduce resultados; `-` significa pendiente. No se inventan premios.
+5. En **Aciertos**, el marcador y tus aciertos/fallos se actualizan solos. La demo usa resultados manuales.
+6. Puedes marcar varios goles por equipo en el Pleno; cada pareja aumenta apuestas y coste.
+7. **Reducidas** crea, si lo eliges, una copia desde las tablas del artículo SELAE (BOE 2009).
 
 Los desarrollos grandes tienen **Guardar todas las combinaciones**,
 que escribe sin expandir todo el universo en RAM. Los sistemas reducidos

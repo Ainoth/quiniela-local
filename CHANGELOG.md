@@ -81,3 +81,19 @@
   exportación directa impide sustituir una selección vacía por su base.
 - 100 pruebas Studio: reacción, última petición, vacío/recuperación, cancelación,
   cierre, presupuesto final, persistencia de condiciones y exportación segura.
+
+## 0.1.8 — 12/10/2026 · Aciertos automáticos, Pleno múltiple y Reducidas
+
+- RF-ESC-001/002/003/004: Aciertos con marcador de 15 partidos, comparación por
+  apuesta, aciertos/fallos/pendientes y Pleno condicionado a 14 y goles finales.
+- RF-JOR-007: refresco automático cada 30/60/120 s en la sección, caché validada
+  por jornada/equipos y fallos de red no modales; modo manual reactivo para demo.
+- RF-QUI-002/003/004: varias selecciones de goles por equipo, multiplicación de
+  apuestas/coste y persistencia/import-export, sin perder parejas de Pleno exactas.
+- RF-RED-001/003/009: pestaña opcional con seis matrices del BOE 2009 enlazado por
+  el artículo SELAE, verificación exhaustiva y creación como copia independiente.
+- Tablas fechadas, sin declararlas formato oficial vigente: discrepancias de
+  transcripción con PDF posterior registradas; mínimo verificado tabla 6 = 9.
+- No se modifica Android, no se implementa sellado ni premios inventados.
+- 120 pruebas Studio y 32 de regresión histórica correctas; Qt/X11 y proveedor
+  real verificados; las apuestas seleccionadas se mantienen al cambiar el ranking.

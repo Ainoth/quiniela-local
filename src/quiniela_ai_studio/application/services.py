@@ -34,12 +34,21 @@ class SystemService:
         normalized = normalize_base(base)
         if any(system.locks[i] and normalized[i] != system.base[i] for i in range(14)):
             raise ValueError('Desbloquea el partido antes de cambiar sus signos.')
-        changes = {}
+        params=json.loads(system.parameters)
+        for key in ('filter_spec','input_revision','input_hash','input_quantity','output_quantity','from_origin','quick_level','budget_cents','ranking'):
+            params.pop(key,None)
         if pleno_choices is not None:
-            if len(pleno_choices)!=2 or any(p not in ('','0','1','2','M') for p in pleno_choices):
+            if len(pleno_choices)!=2 or any(not isinstance(p,str) or len(set(p))!=len(p) or set(p)-set('012M') for p in pleno_choices):
                 raise ValueError('Selección parcial de Pleno inválida.')
-            changes['parameters']=json.dumps({**json.loads(system.parameters),'pleno_choices':list(pleno_choices)})
-        return self.version(system, base=normalized, locks=tuple(locks), pleno=pleno, bets=(), origin='manual', **changes)
+            masks=[''.join(g for g in '012M' if g in p) for p in pleno_choices]
+            params.pop('pleno_choices',None);params.pop('pleno_masks',None)
+            params['pleno_masks' if any(len(p)>1 for p in masks) else 'pleno_choices']=masks
+            params.pop('plenos',None)
+        elif pleno!=system.pleno:
+            params.pop('pleno_choices',None);params.pop('pleno_masks',None);params.pop('plenos',None)
+        elif 'pleno_choices' not in params and 'pleno_masks' not in params:
+            params['plenos']=list(system.plenos)
+        return self.version(system, base=normalized, locks=tuple(locks), pleno=pleno, bets=(), origin='manual',parameters=json.dumps(params))
 
     def template(self, system, level, kind='sport'):
         round_ = self._editable(system)
@@ -47,7 +56,8 @@ class SystemService:
         snapshot = frozen.snapshot(kind)
         base = coverage_template(system.base, system.locks, level, snapshot)
         return self.version(system, base=base, bets=(), origin=f'plantilla nivel {level}',
-                            parameters=json.dumps(dict(level=level, source=snapshot.source if snapshot else 'orden 1/X/2 sin modelo', kind=kind)))
+                            parameters=json.dumps(dict(level=level, source=snapshot.source if snapshot else 'orden 1/X/2 sin modelo', kind=kind,
+                                                      pleno_masks=list(system.goal_masks),plenos=list(system.plenos))))
 
     def generated(self, system, bets):
         self._editable(system)
@@ -55,7 +65,7 @@ class SystemService:
         if self.repository.load(system.system_id).revision != system.revision:
             raise ValueError('El sistema cambió durante la generación. El resultado no se ha aplicado.')
         return self.version(system, bets=tuple(bets), origin='desarrollo cartesiano exacto',
-                            parameters=json.dumps(dict(base=system.base, pleno=system.pleno)))
+                            parameters=json.dumps(dict(base=system.base, pleno=system.pleno,plenos=list(system.plenos))))
 
     def optimized(self, system, budget_cents, kind='sport'):
         round_ = self._editable(system)
@@ -74,6 +84,7 @@ class SystemService:
         return self.version(system, bets=bets, base=base, origin='selección del desarrollo de origen',
                             parameters=json.dumps(dict(input_hash=system.hash, input_revision=system.revision,
                                                        budget_cents=budget_cents, ranking=kind if snapshot else 'lexicográfico',
+                                                       plenos=list(system.plenos),
                                                        filter_spec=json.loads(system.parameters).get('filter_spec',{}),
                                                        quick_level=json.loads(system.parameters).get('quick_level'))))
 
@@ -105,7 +116,7 @@ class SystemService:
         base = tuple(system.base[i] if system.locks[i] else union[i] for i in range(14))
         return self.version(system, bets=bets, base=base, origin='filtros básicos de Quiniela Local', action='filter',
                             parameters=json.dumps(dict(input_revision=system.revision, input_hash=system.hash,
-                                                       filter_spec=spec.parameters(), input_quantity=sum(b.quantity for b in candidates),
+                                                       plenos=list(system.plenos), filter_spec=spec.parameters(), input_quantity=sum(b.quantity for b in candidates),
                                                        from_origin=from_origin, quick_level=quick_level,
                                                        output_quantity=sum(b.quantity for b in bets))))
 
@@ -154,3 +165,20 @@ class SystemService:
                             name=system.name + ' · copia', created_at=utcnow(), origin=f'copia de {system.system_id} v{system.revision}')
         self.repository.save(duplicate, 'duplicate')
         return duplicate
+
+    def reduced_copy(self, system, plan, bets):
+        """Create an optional independent copy; do not overwrite a filtered system."""
+        self._editable(system)
+        if self.repository.load(system.system_id).revision != system.revision:
+            raise ValueError('El boleto cambió durante la reducción; vuelve a revisarlo.')
+        if len(bets)!=plan.after or any(b.quantity!=1 for b in bets):
+            raise ValueError('Desarrollo reducido incompleto.')
+        copy=replace(system,system_id=str(uuid.uuid4()),revision=1,
+                     name=f'{system.name} · Reducida {plan.table.number}',bets=tuple(bets),created_at=utcnow(),
+                     origin=f'Tabla de reducción {plan.table.number}',
+                     parameters=json.dumps(dict(reduction=plan.table.number,positions=list(plan.positions),
+                                                plenos=list(plan.selection.plenos),source_system_id=system.system_id,
+                                                source_revision=system.revision,conditional_minimum_hits=plan.table.minimum_hits,
+                                                table_source='Artículo SELAE: tablas BOE-A-2009-12204')))
+        self.repository.save(copy,'reduction_copy')
+        return copy

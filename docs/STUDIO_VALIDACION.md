@@ -156,3 +156,20 @@ conjunto src/tests con Ruff F. Sin cambios de esquema SQLite ni reglas de juego.
 Regresión histórica: 32 pruebas con GUI correctas. Captura de Optimizar
 reactivo Qt/X11 a 1200×820 revisada; paquete 0.1.7 aislado y arranque real
 correctos. Windows sigue pendiente de ejecución nativa.
+
+## Aciertos, Pleno múltiple y Reducidas 0.1.8 — 12/10/2026
+
+- 120 pruebas Studio: matrices/cobertura exhaustiva, mapeo de dobles, extras,
+  parejas múltiples/no cartesianas, coste, JSON/TXT/streaming y persistencia.
+- Refresco automático con proveedor simulado, aciertos/fallos/P15, errores no
+  modales, caché intacta con equipos incorrectos y cierre durante petición.
+- Comparación partido a partido y selección mantenida al cambiar el ranking.
+- 32 pruebas históricas con GUI correctas; Android permanece intacto.
+- Qt real/X11: capturas sintéticas de Aciertos y Reducidas revisadas a 1200×820;
+  Pleno visible en cabecera. Datos de ejemplo claramente señalizados.
+- Proveedor real: devuelve los 15 partidos de la jornada seleccionada; identidad
+  contrastada con el registro público de jornada mediante SQLite en modo ro.
+  No se leen apuestas personales para esta comprobación ni se incluyen en Git.
+- Catálogo fechado del artículo SELAE: BOE 2009 no vigente; diferencias con PDF
+  posterior registradas. Mínimos de matrices verificados, sin afirmar sellado
+  autorizado ni equivalencia completa con normativa/formatos actuales.

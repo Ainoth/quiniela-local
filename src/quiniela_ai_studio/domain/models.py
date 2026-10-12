@@ -161,12 +161,37 @@ class SystemVersion:
         validate_datetime(self.created_at)
         parameters = json.loads(self.parameters)
         if not isinstance(parameters, dict):raise ValueError('Los parámetros deben ser un objeto JSON.')
-        if 'pleno_choices' in parameters:
-            choices=parameters['pleno_choices']
-            if not isinstance(choices,list) or len(choices)!=2 or any(p not in ('','0','1','2','M') for p in choices):
-                raise ValueError('Selección parcial de Pleno inválida.')
+        for key in ('pleno_choices','pleno_masks'):
+            if key in parameters:
+                choices=parameters[key]
+                if not isinstance(choices,list) or len(choices)!=2 or any(not isinstance(p,str) or len(p)>4 or len(set(p))!=len(p) or set(p)-set('012M') for p in choices):
+                    raise ValueError('Selección parcial de Pleno inválida.')
+        if 'plenos' in parameters:
+            pairs=parameters['plenos']
+            if not isinstance(pairs,list) or len(pairs)>16 or any(not isinstance(p,str) or not re.fullmatch(r'[012M]{2}',p) for p in pairs) or len(set(pairs))!=len(pairs):
+                raise ValueError('Resultados del Pleno inválidos.')
         if self.round_snapshot and round_from_dict(json.loads(self.round_snapshot)).key != self.round_key:
             raise ValueError("Instantánea de otra jornada.")
+
+    @property
+    def plenos(self) -> tuple[str, ...]:
+        """Selected explicit pairs; Cartesian goals are expanded only when edited."""
+        from itertools import product
+        params=json.loads(self.parameters)
+        if 'plenos' in params:
+            return tuple(params['plenos'])
+        masks=params.get('pleno_masks',params.get('pleno_choices'))
+        if masks is not None:return tuple(a+b for a,b in product(*masks))
+        if self.pleno:
+            return (self.pleno,)
+        return tuple(dict.fromkeys(b.pleno for b in self.bets if b.pleno))
+
+    @property
+    def goal_masks(self) -> tuple[str, str]:
+        params=json.loads(self.parameters)
+        masks=params.get('pleno_masks',params.get('pleno_choices'))
+        if masks is not None:return tuple(masks)
+        return tuple(''.join(g for g in '012M' if any(p[i]==g for p in self.plenos)) for i in range(2))
 
     @property
     def hash(self):

@@ -51,16 +51,20 @@ def decode_column(value):
 
 def generate(base, pleno, cancelled=lambda: False, progress=lambda done, total: None):
     base = normalize_base(base)
-    total = size(base)
+    plenos=(pleno,) if isinstance(pleno,str) else tuple(pleno)
+    if not plenos or len(plenos)>16 or len(set(plenos))!=len(plenos):raise ValueError('Selecciona resultados distintos del Pleno.')
+    for pair in plenos:Bet('1'*14,pair)
+    total = size(base)*len(plenos)
     if total > MAX_GENERATED:
         raise ValueError(f"v0.1 admite hasta {MAX_GENERATED:,} columnas por generación; esta base tiene {total:,}.")
     output = []
-    for index, column in enumerate(itertools.product(*base)):
-        if index % 256 == 0:
-            if cancelled():
-                raise Cancelled("Generación cancelada; se conserva el sistema anterior.")
-            progress(index, total)
-        output.append(Bet("".join(column), pleno))
+    for column in itertools.product(*base):
+        for pair in plenos:
+            index=len(output)
+            if index % 256 == 0:
+                if cancelled():raise Cancelled("Generación cancelada; se conserva el sistema anterior.")
+                progress(index,total)
+            output.append(Bet("".join(column),pair))
     if cancelled():
         raise Cancelled("Generación cancelada; se conserva el sistema anterior.")
     progress(total, total)
@@ -121,7 +125,7 @@ def union_base(bets, fallback):
     return tuple("".join(s for s in SIGNS if any(b.column[i] == s for b in bets)) for i in range(14)) if bets else normalize_base(fallback)
 
 
-def evaluate(bets, result, pleno="", finalized=None, prizes=None, official=False):
+def evaluate(bets, result, pleno="", finalized=None, prizes=None, official=False, pleno_final=None):
     if len(result) != 14 or set(result) - set("1X2-"):
         raise ValueError("Introduce 14 signos 1/X/2; usa - para resultados pendientes.")
     if pleno and (len(pleno) != 2 or set(pleno) - set("012M")):
@@ -129,6 +133,8 @@ def evaluate(bets, result, pleno="", finalized=None, prizes=None, official=False
     finalized = tuple(finalized if finalized is not None else (False,) * 14)
     if len(finalized) != 14 or any(type(v) is not bool for v in finalized) or any(f and result[i] == '-' for i, f in enumerate(finalized)):
         raise ValueError("Los finalizados necesitan un resultado.")
+    if pleno_final is None:pleno_final=bool(pleno)
+    if type(pleno_final) is not bool:raise ValueError('Estado de Pleno inválido.')
     definitive = all(finalized) and '-' not in result
     if prizes is not None and (not official or not definitive):
         raise ValueError("Los importes requieren resultado definitivo y escrutinio publicado.")
@@ -143,10 +149,11 @@ def evaluate(bets, result, pleno="", finalized=None, prizes=None, official=False
         pleno_hit = bool(pleno and bet.pleno == pleno)
         if definitive and hits >= 10:
             counts[hits] += bet.quantity
-            if hits == 14 and pleno_hit:
+            if hits == 14 and pleno_hit and pleno_final:
                 counts[15] += bet.quantity
         rows.append(dict(column=bet.column, pleno=bet.pleno, quantity=bet.quantity, hits=hits,
-                         confirmed=fixed, maximum=maximum, pleno_hit=pleno_hit))
+                         confirmed=fixed, maximum=maximum, misses=sum(r!="-" for r in result)-hits, pending=result.count("-"),
+                         pleno_hit=pleno_hit,full15_hit=bool(definitive and hits==14 and pleno_hit and pleno_final)))
     return dict(rows=sorted(rows, key=lambda r: (-r['hits'], -r['maximum'], r['column'])), counts=counts,
                 known=sum(s != '-' for s in result), definitive=definitive,
                 prize_cents=sum(counts[k] * v for k, v in (prizes or {}).items()) if prizes is not None else None)

@@ -1,4 +1,4 @@
-# Entrega ejecutable v0.1 — revisión 0.1.7
+# Entrega ejecutable v0.1 — revisión 0.1.8
 
 11/10/2026. Esta revisión corrige la interfaz conforme a la preferencia del
 usuario: conservar la experiencia de Quiniela Local y su descarga de datos.
@@ -160,3 +160,57 @@ cumple las condiciones, se muestra 0 apuestas / 0 €; puedes ampliar el nivel
 para recuperarlas. Un resultado vacío no se exporta como si fuera la base.
 El presupuesto permanece deshabilitado mientras se recalcula o si no quedan
 apuestas. Las condiciones guardadas se recuperan al abrir de nuevo la app.
+
+## Aciertos, Pleno múltiple y Reducidas — 0.1.8
+
+- **Aciertos**: tabla de los 15 partidos con marcador, resultado, tu signo y
+  acierto/fallo. Selecciona una apuesta en la tabla inferior para compararla
+  partido a partido. Aciertos y fallos en partidos en juego pueden cambiar.
+- El marcador se consulta al abrir la sección y cada 60 s mientras está visible;
+  puedes elegir 30 o 120 s o desactivar la actualización. Una petición cada vez.
+  Los errores no abren ventanas: se conserva el último marcador y se reintenta.
+  Si cierras con una petición en curso, termina/cancela con el timeout de red.
+- La jornada y los equipos se validan. No se utiliza otra jornada como sustituta.
+  Un proveedor sin datos para esa jornada no permite anunciar resultados en vivo.
+- La demo usa **Introducir resultados a mano**: elige signos en los 14 partidos
+  y goles del Pleno; la comparación se actualiza sola. «Definitivos» requiere
+  todos los resultados. El Pleno solo se confirma con 14 aciertos y goles finales.
+- En el boleto puedes marcar varios 0/1/2/M por equipo. Se juegan todas las parejas:
+  local 0/1 y visitante 2/M produce 02, 0M, 12 y 1M. Una columna se convierte en
+  4 apuestas; con precio de referencia de 75 céntimos, cuesta 3 €. Cambiar el
+  Pleno requiere generar de nuevo. Se conserva la selección al cerrar.
+- Generación, TXT/JSON, exportación directa y límites cuentan también las parejas
+  del Pleno. Optimizar y las reducciones conservan Plenos y cantidades exactas.
+
+**Reducidas**, opcional: activa la casilla, elige una de las seis tablas y marca
+los partidos a reducir. Se propone una selección compatible y puedes cambiarla.
+La app muestra apuestas/coste antes de crear una copia; la original sigue en
+Mis Sistemas. Los otros dobles/triples se desarrollan al directo. Los filtros de
+Optimizar no se aplican a esta copia desde el boleto. Límite de 100.000 apuestas.
+
+### Procedencia y verificación de las tablas
+
+El [artículo SELAE solicitado](https://www.loteriasyapuestas.es/es/paginas-informativas/quinielas-reducidas-maximiza-tus-posibilidades)
+enlaza [BOE-A-2009-12204](https://www.boe.es/diario_boe/txt.php?id=BOE-A-2009-12204).
+Esta resolución ha dejado de estar vigente. Se usan sus matrices numéricas como
+catálogo fechado del artículo, no como certificación de formato actual ni sellado.
+Se observaron diferencias con el [PDF que actualmente enlaza normativa SELAE](https://www.loteriasyapuestas.es/f/loterias/documentos/normativa/Normativa%20de%20los%20juegos/Normas_de_la_Quiniela_y_Elige8_Octubre_2019.pdf);
+no se anuncia equivalencia exacta con todas sus matrices. Este PDF permite varias
+casillas de goles por equipo en el Pleno (18.2) y explica su multiplicación.
+
+| Tabla del artículo | Dobles / triples seleccionados | Columnas de tabla | Mínimo de aciertos verificado* |
+|---|---|---|---|
+| 1 | 0 / 4 | 9 | 13 |
+| 2 | 7 / 0 | 16 | 13 |
+| 3 | 3 / 3 | 24 | 13 |
+| 4 | 6 / 2 | 64 | 13 |
+| 5 | 0 / 8 | 81 | 12 |
+| 6 | 11 / 0 | 132 | 9 |
+
+*Comprobación exhaustiva local sobre resultados contenidos en todos los signos
+del boleto; fuera de esa base no se afirma garantía. No garantiza el Pleno ni
+un premio monetario. La tabla 6 transcrita del BOE enlazado ofrece mínimo 9 en
+esta verificación: no se le atribuye una garantía mayor. Los partidos adicionales
+al directo y los Plenos multiplican las columnas y el coste.
+
+La app prepara archivos locales: no valida, sella, envía ni paga apuestas.

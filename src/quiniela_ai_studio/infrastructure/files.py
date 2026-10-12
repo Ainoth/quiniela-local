@@ -94,7 +94,7 @@ def write_development(path, system, round_, *, format='txt', cancelled=lambda:Fa
     if system.bets:
         bets=iter(system.bets);total=system.quantity;exported=system
     else:
-        selection=Selection(system.base,(system.pleno,))
+        selection=Selection(system.base,system.plenos)
         bets=iter_bets(selection.base,selection.plenos,cancelled)
         total=selection.quantity
         exported=replace(system,origin='desarrollo directo exportado; borrador de origen conservado')

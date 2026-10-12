@@ -131,3 +131,21 @@ por reemplazo solo al terminar; el origen y sus versiones no cambian.
 Los sistemas con apuestas activas exportan exclusivamente las apuestas exactas.
 La importación se mantiene acotada a 20 MiB; no se anuncia importación masiva.
 Las selecciones parciales del Pleno se guardan en parámetros validados del sistema.
+
+## Incremento 0.1.8
+
+Pleno múltiple: nuevas máscaras en parameters.pleno_masks y parejas explícitas
+en parameters.plenos. Se conserva pleno escalar para una sola pareja y se
+aceptan selecciones parciales antiguas en pleno_choices. JSON v1 sigue siendo
+aditivo; SQLite sigue en esquema 2. Los Bet siempre contienen una pareja exacta.
+Las parejas importadas no cartesianas sobreviven a cambios de plantilla.
+
+Marcador: trabajador de lectura propio, timer de 30/60/120 s solo al mostrar
+Aciertos, sin bloquear controles ni compartir el trabajador de importación.
+Validación de identidad antes de guardar caché. Cierre espera/cancela petición
+en curso; resultados obsoletos no sustituyen la jornada seleccionada.
+
+domain/reduction_tables.py contiene datos numéricos publicados BOE enlazados
+por el artículo SELAE. domain/reductions.py aplica mapeo, posiciones, directos
+adicionales y parejas; application crea copia y infrastructure persiste. La
+procedencia histórica no se confunde con formatos de validación vigentes.

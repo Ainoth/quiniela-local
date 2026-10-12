@@ -54,7 +54,7 @@ Esta tabla está generada inicialmente a partir de `01_ESPECIFICACION_FUNCIONAL.
 | `RF-FIL-013` | v0.2/v0.7 | PENDIENTE | Filtros de rentabilidad y probabilidad solo cuando existan datos válidos. |
 | `RF-RED-001` | v0.3/v0.7 | PENDIENTE | Reducir sobre conjunto base ya filtrado con presupuesto o número objetivo de columnas. |
 | `RF-RED-002` | v0.3/v0.7 | PENDIENTE | Modos de optimización: cobertura, probabilidad o combinación ponderada; explicar los compromisos. |
-| `RF-RED-003` | v0.3/v0.7 | PENDIENTE | Objetivos de 14 a 9 aciertos y objetivos de N premios si son matemáticamente interpretables. |
+| `RF-RED-003` | v0.3/v0.7 | PARCIAL | Objetivos de 14 a 9 aciertos y objetivos de N premios si son matemáticamente interpretables. |
 | `RF-RED-004` | v0.3/v0.7 | PENDIENTE | Generadores propios: voraz (greedy), mejora local, búsqueda con semillas y optimizadores opcionales. |
 | `RF-RED-005` | v0.3/v0.7 | PENDIENTE | Separar apuestas candidatas internas (del sistema base) de candidatas externas (si se autoriza dominio mayor). |
 | `RF-RED-006` | v0.3/v0.7 | PENDIENTE | Ajustar número exacto de columnas solo si el objetivo es factible; indicar limitaciones. |
@@ -76,8 +76,8 @@ Esta tabla está generada inicialmente a partir de `01_ESPECIFICACION_FUNCIONAL.
 | `RF-REN-007` | v0.6 | PENDIENTE | Calculadora de premios históricos y definitivos con datos oficiales validados. |
 | `RF-REN-008` | v0.6 | PENDIENTE | Comparativa real vs simulada: coste, premios, beneficio neto y retorno acumulado. |
 | `RF-ESC-001` | v0.1/v0.5 | PARCIAL | Escrutinio parcial y final de sistemas locales y ficheros externos. |
-| `RF-ESC-002` | v0.1/v0.5 | PENDIENTE | Categorías de aciertos 14,13,12,11,10 y Pleno al 15 según reglas vigentes. |
-| `RF-ESC-003` | v0.1/v0.5 | PENDIENTE | No conceder Pleno al 15 por acertar solo el marcador si faltan los 14. |
+| `RF-ESC-002` | v0.1/v0.5 | PARCIAL | Categorías de aciertos 14,13,12,11,10 y Pleno al 15 según reglas vigentes. |
+| `RF-ESC-003` | v0.1/v0.5 | PARCIAL | No conceder Pleno al 15 por acertar solo el marcador si faltan los 14. |
 | `RF-ESC-004` | v0.1/v0.5 | PARCIAL | Filtrar solo partidos finalizados; mostrar intervalo de aciertos potenciales en parciales. |
 | `RF-ESC-005` | v0.1/v0.5 | PENDIENTE | Procesar múltiples ficheros con progreso, cancelar y ranking. |
 | `RF-ESC-006` | v0.1/v0.5 | PENDIENTE | Columnas ganadoras aleatorias solo en simulación, claramente identificada. |
@@ -213,3 +213,14 @@ presupuesto aplicado al final sobre la selección. Tests GUI cubren cambios
 rápidos, cierre durante cálculo, recuperación de cero resultados, condiciones
 guardadas y coste exacto tras presupuesto. El requisito de reducción completa
 sigue pendiente: no hay garantía ni nuevos reductores.
+
+## Incremento 0.1.8
+
+RF-QUI-002/003/004: máscaras de goles, producto de parejas, coste y límite global,
+round-trip y streaming. RF-ESC-001/002/003/004 y RF-JOR-007: refresco automático
+con proveedor simulado, actual/provisional/final, conservación de caché ante
+errores y rechazo de otros equipos; comparación del Pleno requiere 14 + final.
+RF-RED-001/003/009: tablas del artículo fechadas BOE 2009, mapeo de partidos y
+dobles, extras al directo, P15 múltiple y copia opcional. Cada mínimo se verifica
+exhaustivamente, sin asumir 13 para todas. Tests en test_pleno_reductions.py y
+test_ui.py. No se declaran fases completas ni formatos autorizados actuales.
