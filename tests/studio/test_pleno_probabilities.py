@@ -84,6 +84,7 @@ def test_ui_autoselection_multiple_price_and_exports(window, tmp_path):
     window.load_rounds(round_.key)
     window.new_system()
     window.coverage.setValue(4)
+    window.pleno_mode.setCurrentIndex(1)  # Automático solicitado explícitamente.
     window.apply_template()
     assert window.system.goal_masks == ('12', '0M')
     assert len(window.system.plenos) == 4
@@ -114,6 +115,7 @@ def test_missing_goals_preserves_manual_selection(window):
     window.toggle_goal(0, 'M')
     window.toggle_goal(1, '2')
     original = window.system.plenos
+    window.pleno_mode.setCurrentIndex(1)
     window.apply_template()
     assert window.system.plenos == original == ('M2',)
     assert 'no publica porcentajes del Pleno' in window.data_message.text()
@@ -128,6 +130,7 @@ def test_undo_restores_manual_pleno_after_template(window):
     window.toggle_goal(0, 'M')
     window.toggle_goal(1, '2')
     original = window.system
+    window.pleno_mode.setCurrentIndex(1)
     window.coverage.setValue(4)
     window.apply_template()
     assert window.system.plenos != original.plenos
@@ -142,6 +145,7 @@ def test_maximum_includes_full_fifteen(window):
     window.load_rounds(round_.key)
     window.new_system()
     window.coverage.setValue(10)
+    window.pleno_mode.setCurrentIndex(1)
     window.apply_template()
     assert size(window.system.base) * len(window.system.plenos) == 55296
     assert json.loads(window.system.parameters)['plenos'] == list(window.system.plenos)

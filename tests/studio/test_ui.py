@@ -21,11 +21,15 @@ def application():
 
 
 @pytest.fixture
-def window(application,tmp_path):
+def window(application,tmp_path,monkeypatch):
+    from PySide6.QtWidgets import QMessageBox
+    unexpected=[]
+    monkeypatch.setattr(QMessageBox,'warning',lambda parent,title,message:(unexpected.append(str(message)),QMessageBox.StandardButton.Ok)[1])
     repo=Repository(tmp_path/'studio.sqlite3');repo.save_round(demo_round())
     window=MainWindow(repo);window.resize(1024,768);window.show();application.processEvents()
     yield window
     window.close();application.processEvents()
+    assert not unexpected, 'Avisos inesperados: '+repr(unexpected)
 
 
 def wait_for_generation(window):
@@ -41,7 +45,9 @@ def test_T15_six_columns_real_gui_flow(window,tmp_path,monkeypatch):
     window.example_system();wait_for_generation(window)
     assert window.system.quantity==6
     assert window.system.cost(window.round)==450
-    window.budget.setValue(1.5);window.optimize()
+    window.budget.setValue(1.5);window.optimize();wait_for_data(window)
+    assert window.system.quantity==6  # Propuesta aún no aplicada.
+    window.optimization_dialog.apply_button.click()
     assert window.system.quantity==2 and window.system.revision==4
     window.result_input.setText('1'*14);window.evaluate()
     assert window.eval_model.rowCount()==2
@@ -85,7 +91,7 @@ def test_seven_pages_and_geometry(window):
 
 
 def wait_for_data(window):
-    for _ in range(400):
+    for _ in range(2000):
         QTest.qWait(10)
         if not window.data_worker.isRunning():
             QTest.qWait(30)
@@ -249,7 +255,7 @@ def test_filter_activation_is_independent_and_inactive_values_are_ignored(window
     assert window.system.bets==tuple(b for b in original if '2' not in b.column)
     assert window.system.quantity>0
     assert not window.filter_ranges['x_count'][0].isEnabled()
-    assert 'pendientes' in window.methods_status.text()
+    assert 'garantía combinatoria' in window.methods_status.text()
     assert 'pendiente' in window.ai_status.text()
 
 
@@ -363,6 +369,7 @@ def test_live_optimization_latest_request_empty_recovery_and_budget_last(window)
     wait_for_optimization(window)
     assert window.system.bets==original.bets
     window.budget.setValue(3);window.budget_apply.click()
+    wait_for_data(window);window.optimization_dialog.apply_button.click()
     assert window.system.quantity==4 and window.system.cost(window.round)==300
     assert all(bet in original.bets for bet in window.system.bets)
 

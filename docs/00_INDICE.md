@@ -1,6 +1,6 @@
 # Índice del proyecto de escritorio
 
-Guía actual: [Entrega ejecutable v0.1](STUDIO_V01_ENTREGA.md), revisión 0.1.13. Añade modos Normal/Reducidas independientes, barras reactivas y diferenciación opcional del público. [Plan y límites](planes/MODOS_REDUCIDAS_REACTIVOS.md).
+Guía actual: [Quiniela AI Studio v1.0.0](STUDIO_V1_0.md): carteras por presupuesto, cobertura independiente, propuestas/auditoría y preparación manual TuLotero. [Plan](planes/V1_OPTIMIZACION.md).
 Los registros v0.1.0/v0.1.1 siguientes describen entregas anteriores.
 
 - [Especificación de PC](ESPECIFICACION_PC.md): objetivo completo, arquitectura,

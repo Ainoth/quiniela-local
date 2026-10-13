@@ -72,6 +72,7 @@ def test_reduced_template_preserves_locks_and_rejects_incompatible():
 
 def test_live_normal_slider_and_stale_navigation(window):
     window.repository.save_round(with_goals());window.load_rounds('DEMO/J01');window.new_system()
+    window.pleno_mode.setCurrentIndex(1)
     before=window.system
     window.coverage.setValue(5);QTest.qWait(250)
     assert window.system.base!=before.base and window.system.revision==before.revision+1
@@ -85,10 +86,12 @@ def test_live_normal_slider_and_stale_navigation(window):
 
 def test_normal_and_reduced_independent_with_all_choices(window,tmp_path):
     window.repository.save_round(with_goals());window.load_rounds('DEMO/J01');window.new_system()
+    window.pleno_mode.setCurrentIndex(1)
     window.coverage.setValue(2);QTest.qWait(250)
     window.start_generation();wait_for_generation(window)
     normal=window.system
     window.navigation.setCurrentRow(7)
+    window.pleno_mode.setCurrentIndex(1);QTest.qWait(250)
     assert window.system.system_id!=normal.system_id
     assert window.system_mode(window.system)=='reduced'
     assert window.reduction_options_model.rowCount()==6
@@ -112,6 +115,7 @@ def test_normal_and_reduced_independent_with_all_choices(window,tmp_path):
 def test_reduced_pleno_multiplier_and_differentiation(window):
     window.repository.save_round(with_goals());window.load_rounds('DEMO/J01')
     window.navigation.setCurrentRow(7)
+    window.pleno_mode.setCurrentIndex(1);QTest.qWait(250)
     window.reduction_pleno_level.setValue(4);QTest.qWait(250)
     assert len(window.system.plenos)==4
     window.reduction_differentiation.setValue(5);QTest.qWait(250)

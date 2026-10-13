@@ -29,7 +29,7 @@ def main():
         assert size(coverage_template(('1',)*14,(False,)*14,10))==3456
         assert evaluate(bets,'-'*14)['known']==0
         assert repository.db.execute('PRAGMA integrity_check').fetchone()[0]=='ok'
-        print('v0.1 OK: SQLite íntegro · ejemplo 6 columnas · nivel 10 = 3456 · pendientes correctos')
+        print(f'v{__version__} OK: SQLite íntegro · ejemplo 6 columnas · nivel 10 = 3456 · pendientes correctos')
         repository.close();return 0
     if sys.platform.startswith('linux') and os.environ.get('QT_QPA_PLATFORM') != 'offscreen':
         import ctypes

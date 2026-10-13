@@ -3,7 +3,7 @@ import json
 import uuid
 from dataclasses import replace
 
-from quiniela_ai_studio.domain.engine import coverage_template, optimize, union_base
+from quiniela_ai_studio.domain.engine import coverage_template, union_base
 from quiniela_ai_studio.domain.models import (
     SystemVersion,
     normalize_base,
@@ -37,7 +37,7 @@ class SystemService:
         revision = self.repository.load(system.system_id).revision + 1
         if 'parameters' in changes:
             old, new = json.loads(system.parameters), json.loads(changes['parameters'])
-            for key in ('construction_mode', 'reduction_choice', 'differentiation_level', 'kind', 'level'):
+            for key in ('construction_mode', 'reduction_choice', 'differentiation_level', 'kind', 'level','pleno_mode'):
                 if key in old and key not in new:
                     new[key] = old[key]
             changes['parameters'] = json.dumps(new)
@@ -65,7 +65,7 @@ class SystemService:
             params['plenos']=list(system.plenos)
         return self.version(system, base=normalized, locks=tuple(locks), pleno=pleno, bets=(), origin='manual',parameters=json.dumps(params))
 
-    def template(self, system, level, kind='sport', *, include_pleno=False, differentiation=0):
+    def template(self, system, level, kind='sport', *, include_pleno=False, differentiation=0,pleno_mode=None):
         round_ = self._editable(system)
         frozen = round_from_dict(json.loads(system.round_snapshot)) if system.round_snapshot else round_
         snapshot = frozen.snapshot(kind)
@@ -82,10 +82,10 @@ class SystemService:
             pairs = tuple(a + b for a in masks[0] for b in masks[1])
             pleno = pairs[0] if len(pairs) == 1 else ''
         return self.version(system, base=base, pleno=pleno, bets=(), origin=f'plantilla nivel {level}',
-                            parameters=json.dumps(dict(level=level, source=snapshot.source if snapshot else 'orden 1/X/2 sin modelo', kind=kind, differentiation_level=differentiation,
+                            parameters=json.dumps(dict(level=level, source=snapshot.source if snapshot else 'orden 1/X/2 sin modelo', kind=kind, differentiation_level=differentiation,pleno_mode=pleno_mode or ('auto' if include_pleno else 'manual'),
                                                       pleno_masks=list(masks),plenos=list(pairs))))
 
-    def reduced_template(self, system, number, kind='sport', *, pleno_level=0, differentiation=0):
+    def reduced_template(self, system, number, kind='sport', *, pleno_level=0, differentiation=0,include_pleno=True,pleno_mode=None):
         self._editable(system)
         if json.loads(system.parameters).get('construction_mode') != 'reduced':
             raise ValueError('Crea una base independiente en Reducidas; no se usa la quiniela normal.')
@@ -96,14 +96,14 @@ class SystemService:
         weights = selection_weights(frozen, kind, differentiation)
         base, positions = reduction_template(system.base, system.locks, number, weights)
         masks, pairs, pleno = system.goal_masks, system.plenos, system.pleno
-        if weights.pleno_values:
+        if include_pleno and weights.pleno_values:
             masks = pleno_template(weights, pleno_level)
             pairs = tuple(a+b for a in masks[0] for b in masks[1])
             pleno = pairs[0] if len(pairs) == 1 else ''
         return self.version(system, base=base, pleno=pleno, bets=(), origin=f'Base independiente para reducida {number}',
                             parameters=json.dumps(dict(construction_mode='reduced',reduction_choice=number,
                                 positions=list(positions),kind=kind,differentiation_level=differentiation,level=pleno_level,
-                                source=weights.source,pleno_masks=list(masks),plenos=list(pairs))))
+                                source=weights.source,pleno_mode=pleno_mode or ('auto' if include_pleno else 'manual'),pleno_masks=list(masks),plenos=list(pairs))))
 
     def generated(self, system, bets):
         self._editable(system)
@@ -114,23 +114,42 @@ class SystemService:
                             parameters=json.dumps(dict(base=system.base, pleno=system.pleno,plenos=list(system.plenos))))
 
     def optimized(self, system, budget_cents, kind='sport'):
+        """Compatibilidad síncrona; la interfaz usa preparación/propuesta asíncrona."""
+        from quiniela_ai_studio.domain.portfolio import optimize_portfolio
+        bets,base,config,frozen,spec=self.optimization_input(system,budget_cents)
+        eligible=set(spec.apply(bets))
+        result=optimize_portfolio(bets,base,config,frozen.snapshot('sport'),public=frozen.snapshot('public'),eligible=lambda b:b in eligible)
+        return self.apply_portfolio(system,result)
+
+    def optimization_input(self,system,budget_cents,**options):
+        from quiniela_ai_studio.domain.filters import BasicFilters
+        from quiniela_ai_studio.domain.portfolio import OptimizationConfig
         round_ = self._editable(system)
         if not system.bets:
             raise ValueError('Genera o importa un desarrollo antes de optimizarlo.')
         frozen = round_from_dict(json.loads(system.round_snapshot)) if system.round_snapshot else round_
-        if kind not in ('sport', 'public'): raise ValueError('Tipo de fuente desconocido.')
-        snapshot = frozen.snapshot(kind)
-        if kind == 'public' and snapshot is None: raise ValueError('No hay porcentajes jugados congelados en este sistema.')
-        bets = optimize(system.bets, budget_cents, frozen.price_cents, snapshot)
-        if not bets:
-            raise ValueError('El presupuesto no permite conservar una apuesta.')
+        source,bets=self.origin_bets(system)
+        base=tuple(json.loads(source.parameters).get('base',source.base))
+        saved=dict(json.loads(system.parameters).get('filter_spec',{}))
+        identity=saved.pop('id',None);version=saved.pop('version',None)
+        if identity not in (None,'basic-local-v1','basic-local-v2') or version not in (None,1,2):
+            raise ValueError('Versión de condiciones no admitida; no se ignoran restricciones desconocidas.')
+        spec=BasicFilters(**saved)
+        return bets,base,OptimizationConfig(budget_cents,frozen.price_cents,**options),frozen,spec
+
+    def apply_portfolio(self,system,result):
+        self._editable(system)
+        if self.repository.load(system.system_id).revision!=system.revision:
+            raise ValueError('La quiniela cambió; repite la optimización antes de aplicar.')
+        bets=result.bets
+        if not bets:raise ValueError('La propuesta no contiene apuestas.')
         # Unión descriptiva: se conservan exactamente las apuestas seleccionadas.
         union = union_base(bets, system.base)
         base = tuple(system.base[i] if system.locks[i] else union[i] for i in range(14))
         return self.version(system, bets=bets, base=base, origin='selección del desarrollo de origen',
-                            parameters=json.dumps(dict(input_hash=system.hash, input_revision=system.revision,
-                                                       budget_cents=budget_cents, ranking=kind if snapshot else 'lexicográfico',
-                                                       plenos=list(system.plenos),
+                            action='optimization_apply',parameters=json.dumps(dict(input_hash=system.hash, input_revision=system.revision,
+                                                       budget_cents=result.report['config']['budget_cents'],optimization_report=result.report,
+                                                       plenos=list(dict.fromkeys(b.pleno for b in bets)),
                                                        filter_spec=json.loads(system.parameters).get('filter_spec',{}),
                                                        quick_level=json.loads(system.parameters).get('quick_level'))))
 
@@ -212,7 +231,7 @@ class SystemService:
         self.repository.save(duplicate, 'duplicate')
         return duplicate
 
-    def reduced_copy(self, system, plan, bets):
+    def reduced_copy(self, system, plan, bets, *, verification=None):
         """Create an optional independent copy; do not overwrite a filtered system."""
         self._editable(system)
         if self.repository.load(system.system_id).revision != system.revision:
@@ -222,7 +241,8 @@ class SystemService:
         copy=replace(system,system_id=str(uuid.uuid4()),revision=1,
                      name=f'{system.name} · Reducida {plan.table.number}',bets=tuple(bets),created_at=utcnow(),
                      origin=f'Tabla de reducción {plan.table.number}',
-                     parameters=json.dumps(dict(construction_mode='reduced',reduction_choice=plan.table.number,
+                     parameters=json.dumps(dict(construction_mode='reduced',reduction_choice=plan.table.number,reduction_verification=verification,
+                                                pleno_mode=json.loads(system.parameters).get('pleno_mode','manual'),
                                                 differentiation_level=json.loads(system.parameters).get('differentiation_level',0),
                                                 kind=json.loads(system.parameters).get('kind','sport'),level=json.loads(system.parameters).get('level',0),
                                                 reduction=plan.table.number,positions=list(plan.positions),

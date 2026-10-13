@@ -209,6 +209,7 @@ class MainWindow(QMainWindow):
         self.data_buttons = []
         self.template_timer=QTimer(self);self.template_timer.setSingleShot(True);self.template_timer.setInterval(150);self.template_timer.timeout.connect(self.apply_pending_template)
         self.template_context=None
+        self.optimization_result=None;self.optimization_source=None;self.optimization_dialog=None
         self.live_matches = None
         self.close_pending = False
         self.edit_buttons = []
@@ -222,6 +223,7 @@ class MainWindow(QMainWindow):
         bar.addStretch()
         self.data_button('↻ Descargar datos', self.download_data, bar, primary=True)
         self.export_button = self.button('Guardar apuestas (TXT)', self.export_txt, bar, primary=True)
+        self.button('TuLotero',self.open_tulotero,bar)
         self.button('Mis sistemas', lambda: self.navigation.setCurrentRow(5), bar)
         root.addWidget(hero)
         self.tabs = QTabBar(); self.tabs.setExpanding(False)
@@ -339,7 +341,10 @@ class MainWindow(QMainWindow):
         self.metadata.setToolTip(f'Versión de reglas: {view_round.rules_version}\nProveedor: {view_round.source}')
         quantity = self.system.quantity if self.system else 0
         pending = sum(b.quantity for b in self.system.bets if not b.pleno) if self.system else 0
-        self.footer.setText(f'{quantity:,} apuestas preparadas · coste {money(self.system.cost(round_) if self.system else 0)} · {pending} apuestas sin Pleno · Sin garantía de premio')
+        params=json.loads(self.system.parameters) if self.system else {}
+        verification=params.get('reduction_verification') or params.get('optimization_report',{}).get('after')
+        guarantee=f' · cobertura {verification["status"]}, mínimo {verification["minimum_hits"] if verification["minimum_hits"] is not None else "NO VERIFICADO"} dentro del universo' if verification else ' · cobertura aún no verificada'
+        self.footer.setText(f'{quantity:,} apuestas · {money(self.system.cost(round_) if self.system else 0)} · {pending} sin Pleno{guarantee} · Premio económico no garantizado')
         self.home_info.setText(f'{round_.key}\n15 partidos · {len(self.repository.systems(round_.key))} quinielas guardadas\nPrecio por apuesta: {money(round_.price_cents)} por apuesta. Guardar un archivo no envía ni paga la apuesta.')
         self.data_info.setText('Datos guardados: ' + (self.repository.setting('data_directory') or 'todavía no has añadido datos') + '\nWIN1X2 aporta partidos y premios. Quinielista aporta elecciones de otros jugadores y marcadores.')
         self.rule_price.setValue(round_.price_cents)
@@ -358,6 +363,8 @@ class MainWindow(QMainWindow):
         self.ballot_title.setText(f'BASE PARA REDUCIDA {number}' if self.construction_mode()=='reduced' else 'QUINIELA NORMAL')
         self.coverage.setEnabled(bool(system and self.construction_mode()=='normal' and round_.editable and not busy))
         self.differentiation.setEnabled(bool(system and round_.editable and not busy))
+        self.pleno_mode.setEnabled(bool(system and round_.editable and not busy))
+        self.update_budget_capacity()
         for i, match in enumerate(view_round.matches[:14]):
             kickoff=match.kickoff[:10]+' '+match.kickoff[10:] if len(match.kickoff)==15 else match.kickoff
             self.match_labels[i].setText(f'{i+1:02}  {match.home} – {match.away}')
@@ -464,6 +471,7 @@ class MainWindow(QMainWindow):
             combo=QComboBox();combo.addItems(['—','0','1','2','M']);combo.currentIndexChanged.connect(self.change_pleno)
             combo.hide();self.pleno_combos.append(combo)
         layout.addLayout(row)
+        row=QHBoxLayout();row.addWidget(QLabel('Modo del Pleno'));self.pleno_mode=QComboBox();self.pleno_mode.addItem('Manual','manual');self.pleno_mode.addItem('Automático según fuente','auto');self.pleno_mode.addItem('Diversificado: varias parejas manuales','diversified');self.pleno_mode.currentIndexChanged.connect(self.schedule_template);row.addWidget(self.pleno_mode,1);layout.addLayout(row)
         self.goal_buttons=[]
         self.goal_percentages=[]
         self.pleno_panel=QWidget();self.pleno_panel.setObjectName('plenoPanel')
@@ -485,7 +493,7 @@ class MainWindow(QMainWindow):
         self.coverage_label=QLabel('0');row.addWidget(self.coverage_label);self.coverage.valueChanged.connect(lambda v:self.coverage_label.setText(str(v)));self.coverage.valueChanged.connect(self.schedule_template)
         self.coverage.sliderPressed.connect(self.schedule_template)
         layout.addLayout(row)
-        note=QLabel('Un nivel mayor añade signos y goles del Pleno y aumenta el coste. Nivel 0: un resultado del Pleno; nivel 10: los 16 marcadores, hasta 55.296 apuestas con 3.456 columnas base. Los partidos bloqueados no cambian.')
+        note=QLabel('La barra amplía signos. Solo en Pleno Automático amplía también goles. Nivel 10: hasta 3.456 columnas × 16 Plenos; los bloqueos no cambian. En Manual/Diversificado marca los goles tú, sin reasignación automática.')
         note.setWordWrap(True);note.setObjectName('muted');layout.addWidget(note)
         row=QHBoxLayout();row.addWidget(QLabel('Elegir signos según'))
         self.ranking_source=QComboBox();self.ranking_source.addItem('Mercado: casas de apuestas','sport');self.ranking_source.addItem('Popularidad: Quinielista','public');row.addWidget(self.ranking_source,1)
@@ -579,6 +587,7 @@ class MainWindow(QMainWindow):
         self.reduction_diff_label.setText(str(self.reduction_differentiation.value()));self.reduction_level_label.setText(str(self.reduction_pleno_level.value()))
         for combo in (self.ranking_source,self.reduction_source):
             combo.blockSignals(True);combo.setCurrentIndex(max(0,combo.findData(params.get('kind','sport'))));combo.blockSignals(False)
+        self.pleno_mode.blockSignals(True);self.pleno_mode.setCurrentIndex(max(0,self.pleno_mode.findData(params.get('pleno_mode','manual'))));self.pleno_mode.blockSignals(False)
         self.reduction_picker.blockSignals(True);self.reduction_picker.setCurrentIndex(params.get('reduction_choice',params.get('reduction',1))-1);self.reduction_picker.blockSignals(False)
 
     def construction_page_changed(self,index):
@@ -626,13 +635,13 @@ class MainWindow(QMainWindow):
         if not self.system or self.construction_mode()!='reduced':return
         try:
             updated=self.service.reduced_template(self.system,self.reduction_picker.currentData(),self.ranking_source.currentData(),
-                pleno_level=self.reduction_pleno_level.value(),differentiation=self.differentiation.value())
+                pleno_level=self.reduction_pleno_level.value(),differentiation=self.differentiation.value(),include_pleno=self.pleno_mode.currentData()=='auto',pleno_mode=self.pleno_mode.currentData())
             self.set_system(updated);self.choose_reduction_positions()
         except ValueError as exc:
             self.background_status(str(exc));self.reduction_info.setText(str(exc))
 
     def undo(self):
-        if self.system:self.set_system(self.service.undo(self.system))
+        if self.system:self.set_system(self.service.undo(self.system));self.restore_builder_controls();self.refresh()
 
     def apply_template(self):
         self.template_timer.stop()
@@ -640,7 +649,7 @@ class MainWindow(QMainWindow):
         kind=self.ranking_source.currentData()
         if not self.frozen_round().snapshot(kind):raise ValueError('Esta fuente no tiene porcentajes para esta quiniela. Pulsa Descargar porcentajes. No se sustituirán por valores inventados.')
         has_pleno=bool(self.frozen_round().snapshot(kind).pleno_values)
-        self.set_system(self.service.template(self.system,self.coverage.value(),kind,include_pleno=True,differentiation=self.differentiation.value()))
+        self.set_system(self.service.template(self.system,self.coverage.value(),kind,include_pleno=self.pleno_mode.currentData()=='auto',differentiation=self.differentiation.value(),pleno_mode=self.pleno_mode.currentData()))
         if not has_pleno:self.background_status('Signos aplicados. Esta fuente no publica porcentajes del Pleno; se conserva tu selección de goles, sin inventar resultados.')
 
     def refresh_system_sources(self):
@@ -712,7 +721,7 @@ class MainWindow(QMainWindow):
         outer.addWidget(progressive)
         self.optimize_info=QLabel();self.optimize_info.setWordWrap(True);outer.addWidget(self.optimize_info)
         outer.addWidget(scroll,1)
-        self.methods_status=QLabel('Sin garantía de aciertos. Otros reductores están pendientes.')
+        self.methods_status=QLabel('La garantía combinatoria se verifica dentro de un universo concreto. No garantiza un premio económico.')
         self.methods_status.setWordWrap(True)
         self.filter_group=QGroupBox('Condiciones · puedes ajustarlas a mano')
         grid=QGridLayout(self.filter_group);self.filter_ranges={};self.filter_checks={}
@@ -740,11 +749,26 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.filter_group);layout.addStretch()
         outer.addWidget(self.filter_feedback);outer.addWidget(self.filter_reset)
         self.budget_group=QGroupBox('2. Ajusta el resultado a tu presupuesto')
-        budget_layout=QHBoxLayout(self.budget_group);budget_layout.addWidget(QLabel('Máximo (€)'))
+        budget_outer=QVBoxLayout(self.budget_group);budget_layout=QHBoxLayout();budget_outer.addLayout(budget_layout);budget_layout.addWidget(QLabel('1. Máximo (€)'))
         self.budget=QDoubleSpinBox();self.budget.setRange(0,100000);self.budget.setDecimals(2);self.budget.setValue(10);budget_layout.addWidget(self.budget)
-        self.budget_apply=self.button('Aplicar presupuesto',self.optimize,budget_layout,primary=True,editable=True)
+        self.budget_capacity=QLabel();budget_layout.addWidget(self.budget_capacity)
+        row=QHBoxLayout();row.addWidget(QLabel('2. Objetivo'));self.portfolio_objective=QComboBox()
+        for label,key in (('Automático recomendado','auto'),('Máxima probabilidad','probability'),('Máxima cobertura 13+/12+','coverage'),('Valor esperado: no disponible','expected')):self.portfolio_objective.addItem(label,key)
+        self.portfolio_objective.model().item(3).setEnabled(False);row.addWidget(self.portfolio_objective,1);budget_outer.addLayout(row)
+        self.budget_apply=self.button('3. Optimizar mis apuestas',self.optimize,row,primary=True,editable=True)
+        advanced_toggle=QCheckBox('Parámetros avanzados');budget_outer.addWidget(advanced_toggle)
+        advanced=QWidget();advanced_layout=QGridLayout(advanced);advanced.hide();budget_outer.addWidget(advanced);advanced_toggle.toggled.connect(advanced.setVisible)
+        self.portfolio_seed=QSpinBox();self.portfolio_seed.setRange(0,2_000_000_000)
+        self.portfolio_time=QSpinBox();self.portfolio_time.setRange(1,300);self.portfolio_time.setValue(10)
+        self.portfolio_scope=QComboBox();self.portfolio_scope.addItem('Base completa (incluye descartadas)','base');self.portfolio_scope.addItem('Solo candidatas tras condiciones','candidates')
+        self.portfolio_channel=QComboBox();self.portfolio_channel.addItem('Genérico: mínimo 1 por Pleno',1);self.portfolio_channel.addItem('TuLotero sencillas: mínimo 2 por Pleno',2)
+        self.portfolio_pleno_model=QCheckBox('Incluir Pleno en probabilidad: independencia explícita de goles')
+        for i,(label_text,control) in enumerate((('Semilla',self.portfolio_seed),('Tiempo de búsqueda (s)',self.portfolio_time),('Universo',self.portfolio_scope),('Canal',self.portfolio_channel))):advanced_layout.addWidget(QLabel(label_text),i,0);advanced_layout.addWidget(control,i,1)
+        advanced_layout.addWidget(self.portfolio_pleno_model,4,0,1,2)
+        self.portfolio_summary=QLabel('La propuesta se revisa antes de aplicar. Valor esperado desactivado: faltan recaudación y modelo de premios fiable.');self.portfolio_summary.setWordWrap(True);budget_outer.addWidget(self.portfolio_summary)
+        self.budget.valueChanged.connect(self.update_budget_capacity)
         outer.addWidget(self.budget_group)
-        self.budget_apply.setToolTip('Se eligen apuestas de la selección actual hasta este importe. No se generan nuevas apuestas.')
+        self.budget_apply.setToolTip('Optimiza el desarrollo de origen respetando las condiciones. Muestra una propuesta sin cambiar tus apuestas hasta que la apliques.')
         outer.addWidget(self.methods_status)
         for minimum,maximum in self.filter_ranges.values():
             minimum.valueChanged.connect(self.manual_filters_changed);maximum.valueChanged.connect(self.manual_filters_changed)
@@ -913,13 +937,61 @@ class MainWindow(QMainWindow):
     def optimize(self):
         if not self.system:raise ValueError('No hay un sistema activo.')
         cents=int(Decimal(self.budget.cleanText().replace(',','.'))*100)
-        self.set_system(self.service.optimized(self.system,cents,self.ranking_source.currentData()))
+        source=self.system
+        bets,base,config,frozen,spec=self.service.optimization_input(source,cents,
+            objective=self.portfolio_objective.currentData(),seed=self.portfolio_seed.value(),max_seconds=self.portfolio_time.value(),
+            universe_scope=self.portfolio_scope.currentData(),min_per_pleno=self.portfolio_channel.currentData(),
+            include_pleno_probability=self.portfolio_pleno_model.isChecked())
+        from quiniela_ai_studio.domain.portfolio import optimize_portfolio
+        def operation(cancel,status):
+            admitted=set(spec.apply(bets,cancel))
+            def progress(done,total):
+                if done==total or done%max(1,total//100)==0:status(f'Optimización: {done:,}/{total:,} · cálculo real; permite cancelar')
+            result=optimize_portfolio(bets,base,config,frozen.snapshot('sport'),public=frozen.snapshot('public'),eligible=lambda b:b in admitted,cancelled=cancel,progress=progress)
+            result.report.update(run_id=__import__('uuid').uuid4().hex,created_at=utcnow(),round_key=source.round_key,input_hash=source.hash,
+                input_revision=source.revision,base=list(base),filter_spec=spec.parameters(),sources=[asdict(s) for s in frozen.snapshots])
+            return result
+        self.start_background('portfolio',source,operation)
+
+    def update_budget_capacity(self,*_):
+        if not self.round_picker.currentData() or not hasattr(self,'budget_capacity'):return
+        price=self.frozen_round().price_cents
+        cents=int(Decimal(self.budget.cleanText().replace(',','.'))*100)
+        self.budget_capacity.setText(f'Hasta {cents//price} apuestas · {money(price)}/apuesta')
+
+    def open_tulotero(self,bets=None,round_=None):
+        if bets is None:
+            if self.export_busy() or self.template_timer.isActive():raise ValueError('Espera a que terminen los cálculos antes de preparar las apuestas actuales.')
+            if not self.system or not self.system.bets:raise ValueError('Genera o aplica una selección antes de preparar boletos.')
+            bets=self.system.bets
+        from quiniela_ai_studio.ui.portfolio_dialogs import tulotero_dialog
+        self.tulotero_window=tulotero_dialog(self,tuple(bets),round_ or self.frozen_round());self.tulotero_window.show()
+
+    def verify_current_coverage(self):
+        if not self.system or not self.system.bets:raise ValueError('Abre apuestas para verificar cobertura.')
+        source=self.system
+        origin,_=self.service.origin_bets(source)
+        base=tuple(json.loads(origin.parameters).get('base',origin.base))
+        from quiniela_ai_studio.domain.coverage import make_universe, verify_coverage
+        universe=make_universe(base,self.frozen_round().snapshot('sport'),limit=10000,seed=self.portfolio_seed.value())
+        self.start_background('verification',source,lambda cancel,status:verify_coverage(source.bets,universe,cancelled=cancel,
+            progress=lambda done,total:status(f'Verificando {done}/{total} escenarios')))
 
     def build_analysis(self):
         layout=self.page_layout(3);self.analysis_info=QLabel();self.analysis_info.setWordWrap(True);layout.addWidget(self.analysis_info)
         self.analysis_view,self.analysis_model=self.table(('Partido','Mercado / fuente deportiva (%)','Popularidad en Quinielista (%)'),layout)
         self.ai_status=QLabel('IA: pendiente. La app todavía no aprende de los resultados ni hace pronósticos propios. Aquí puedes consultar los datos que has descargado.');self.ai_status.setWordWrap(True);layout.addWidget(self.ai_status)
         note=QLabel('Cada grupo muestra 1 / X / 2. Los datos deportivos estiman resultados; las elecciones de otros jugadores muestran qué signos prefieren.');note.setWordWrap(True);layout.addWidget(note)
+        self.button('Verificar cobertura de mis apuestas',self.verify_current_coverage,layout)
+        self.button('Ver modelo explícito de las 16 parejas del Pleno',self.show_pleno_model,layout)
+
+    def show_pleno_model(self):
+        from quiniela_ai_studio.domain.coverage import pleno_joint
+        values=pleno_joint(self.frozen_round().snapshot('sport'))
+        dialog=QDialog(self);dialog.setWindowTitle('Modelo aproximado del Pleno · independencia de goles');dialog.resize(500,550)
+        layout=QVBoxLayout(dialog);label=QLabel('Probabilidades calculadas multiplicando marginales local y visitante. Hipótesis de independencia, no una distribución conjunta observada/calibrada. No modifica tus goles.');label.setWordWrap(True);layout.addWidget(label)
+        _,model=self.table(('Goles local','Goles visitante','Probabilidad aproximada'),layout)
+        model.update_rows([(pair[0],pair[1],f'{p:.2%}') for pair,p in values.items()]);self.pleno_model_window=dialog;dialog.show()
 
     def analysis_text(self):
         round_=self.round;system=self.system
@@ -1056,6 +1128,7 @@ class MainWindow(QMainWindow):
         self.button('Abrir',self.open_selected,row);self.button('Duplicar',self.duplicate,row)
         self.button('Abrir apuestas (TXT)',self.import_txt,row);self.button('Abrir quiniela (JSON)',self.import_json,row)
         layout.addLayout(row)
+        self.button('Abrir boletos agrupados (CSV/TXT propio)',self.import_ticket_file,layout)
         row=QHBoxLayout()
         self.selected_txt_button=self.button('Guardar apuestas de la fila (TXT)',self.export_selected_txt,row)
         self.selected_json_button=self.button('Guardar copia de la fila (JSON)',self.export_selected_json,row)
@@ -1096,6 +1169,16 @@ class MainWindow(QMainWindow):
         path,_=QFileDialog.getOpenFileName(self,f'Importar TXT para {self.round.key}',filter='Apuestas (*.txt)')
         if not path:return
         bets=files.read_txt(path,self.import_quantity.isChecked())
+        self.set_system(self.service.imported(self.round,Path(path).stem,bets))
+
+    def import_ticket_file(self):
+        from quiniela_ai_studio.domain.tickets import ChannelRules
+        from quiniela_ai_studio.infrastructure.ticket_files import read_ticket_file
+        path,_=QFileDialog.getOpenFileName(self,'Boletos agrupados de Studio; no formato oficial TuLotero',filter='Archivos propios (*.csv *.txt)')
+        if not path:return
+        saved=self.repository.setting('tulotero_channel_rules',dict(minimum=2,maximum=8))
+        bets=read_ticket_file(path,'csv' if Path(path).suffix.lower()=='.csv' else 'txt',ChannelRules(**saved))
+        if QMessageBox.question(self,'Revisar jornada y precio',f'Asignar {len(bets)} apuestas a {self.round.key}, precio actual {money(self.round.price_cents)}?\nEl archivo conserva signos/Plenos pero no certifica jornada, precio vigente ni validación. Verifica correspondencia antes de importar.')!=QMessageBox.StandardButton.Yes:return
         self.set_system(self.service.imported(self.round,Path(path).stem,bets))
 
     def import_json(self):
@@ -1264,7 +1347,24 @@ class MainWindow(QMainWindow):
             source,plan=self.data_context
             if self.system!=source:
                 self.background_status('La quiniela cambió; la reducción no se ha aplicado.');return
-            self.set_system(self.service.reduced_copy(source,plan,result));self.background_status('Copia reducida creada. La quiniela anterior sigue en Mis Sistemas.');return
+            bets=result['bets'];verification=result['verification']
+            self.set_system(self.service.reduced_copy(source,plan,bets,verification=verification));self.background_status('Reducida creada y verificada sobre '+str(verification['universe_total'])+' resultados; premio económico no garantizado.');return
+        if self.data_kind=='portfolio':
+            source=self.data_context
+            self.repository.record_event('optimization_run',result.report)
+            if self.system!=source or self.round.key!=source.round_key:
+                self.background_status('Cálculo registrado para su jornada; la quiniela abierta cambió y no se modifica.');return
+            self.optimization_result=result;self.optimization_source=source
+            from quiniela_ai_studio.ui.portfolio_dialogs import result_dialog
+            self.optimization_dialog=result_dialog(self,result,source);self.optimization_dialog.show()
+            self.portfolio_summary.setText(f'Propuesta: {result.report["selected"]} apuestas · {money(result.report["cost_cents"])} · {result.report["optimality"]}. Revisa la ventana antes de aplicar.')
+            return
+        if self.data_kind=='verification':
+            self.repository.record_event('coverage_verification',dict(round_key=self.data_context.round_key,revision=self.data_context.revision,**result))
+            dialog=QDialog(self);dialog.setWindowTitle('Cobertura verificada · '+self.data_context.round_key);dialog.resize(700,500);layout=QVBoxLayout(dialog)
+            label=QLabel(f'Universo {result["universe_total"]} · {result["universe"]}\nCobertura {result["status"]} · mínimo {result["minimum_hits"] if result["minimum_hits"] is not None else "NO VERIFICADO"}. Garantía condicional, no premio económico.');label.setWordWrap(True);layout.addWidget(label)
+            _,model=self.table(('Aciertos','Uniforme','Ponderada'),layout)
+            model.update_rows([(k,f'{result["uniform"][k]:.2%}',f'{result["weighted"][k]:.2%}' if result['weighted'] else 'No disponible') for k in ('14','13','12','11','10')]);self.coverage_window=dialog;dialog.show();return
         if self.data_kind=='sources':
             source=self.data_context
             if self.data_worker.cancel_event.is_set():return
@@ -1532,7 +1632,7 @@ class MainWindow(QMainWindow):
         self.reduction_picker.setEnabled(enabled and self.round.editable and not self.export_busy())
         self.reduction_source.setEnabled(enabled)
         self.reduction_differentiation.setEnabled(enabled and self.round.editable and not self.export_busy())
-        self.reduction_pleno_level.setEnabled(enabled and self.round.editable and not self.export_busy())
+        self.reduction_pleno_level.setEnabled(enabled and self.round.editable and not self.export_busy() and self.pleno_mode.currentData()=='auto')
         from quiniela_ai_studio.domain.reduction_tables import TABLES
         rows=[]
         for table in TABLES:
@@ -1565,7 +1665,14 @@ class MainWindow(QMainWindow):
         from quiniela_ai_studio.domain.reductions import plan_reduction, reduced_bets
         system=self.system
         plan=plan_reduction(system.base,system.plenos,self.reduction_picker.currentData(),[i for i,c in enumerate(self.reduction_checks) if c.isChecked()])
-        self.start_background('reduction',(system,plan),lambda cancel,status:reduced_bets(plan,cancel))
+        from quiniela_ai_studio.domain.coverage import make_universe, verify_coverage
+        universe=make_universe(plan.selection.base,self.frozen_round().snapshot('sport'),limit=10000,seed=0)
+        def operation(cancel,status):
+            bets=reduced_bets(plan,cancel)
+            status('Verificando las columnas reales generadas…')
+            verification=verify_coverage(bets,universe,cancelled=cancel,progress=lambda done,total:status(f'Verificación: {done}/{total}'))
+            return dict(bets=bets,verification=verification)
+        self.start_background('reduction',(system,plan),operation)
 
     def show_audit(self):
         rows=self.repository.audit()

@@ -6,12 +6,21 @@ Aplicación de Quiniela para escritorio y Android. La versión de escritorio
 puede leer los datos instalados por WIN1X2; ambas versiones descargan datos,
 porcentajes y marcadores directamente de sus proveedores públicos.
 
-## Quiniela AI Studio — v0.1 ejecutable (revisión 0.1.13)
+## Quiniela AI Studio — v1.0.0
 
 Interfaz gráfica en español que conserva la experiencia visual de Quiniela Local:
 fondo azul, boleto compacto siempre visible a la izquierda, casillas 1/X/2 y
 Pleno 0/1/2/M, secciones a la derecha y **Descargar datos** en la cabecera.
 El núcleo está en `src/quiniela_ai_studio/{domain,application,infrastructure,ui}`.
+
+Nuevo: **Optimizar mis apuestas** calcula una cartera por presupuesto/objetivo y
+muestra una propuesta antes de aplicar. Incluye cobertura uniforme/ponderada
+14/13+/12+/11+/10+, comparación, distancias, aportación marginal y auditoría.
+El verificador independiente comprueba las columnas reales de las reducidas.
+**TuLotero** prepara boletos de Pleno común y TXT/CSV para introducir manualmente:
+no sube archivos, envía apuestas ni cobra. El Pleno es **Manual** por defecto;
+elige **Automático** explícitamente si quieres que lo modifiquen las barras.
+[Manual y límites v1.0.0](docs/STUDIO_V1_0.md).
 
 Linux Mint, Python **3.11 o posterior**:
 
@@ -38,7 +47,7 @@ funciona sin conexión con la demo y los datos ya importados. Windows:
 6. Puedes marcar varios goles por equipo en el Pleno; cada pareja aumenta apuestas y coste.
    Los porcentajes 0/1/2/M aparecen debajo de sus casillas, en filas separadas, según mercado o
    popularidad. Descarga porcentajes para incorporarlos a la quiniela abierta.
-   La barra preselecciona también el Pleno: nivel 0 elige un marcador,
+   En modo **Automático**, la barra preselecciona el Pleno: nivel 0 elige un marcador,
    nivel 10 los 16. Puedes ajustar las casillas después. Si faltan datos conserva
    tu Pleno con aviso. El contador muestra columnas × parejas del Pleno y coste;
    generación y TXT incluyen todas las parejas seleccionadas.
@@ -72,8 +81,9 @@ RUN_PC_GUI_TESTS=1 python3 -m unittest discover -q
 [Índice](docs/00_INDICE.md)
 
 Se conserva `python3 app.py` y el acceso Quiniela Local como respaldo.
-No se declara paridad completa, IA entrenada, garantías ni soporte nativo Windows
-comprobado. Android queda fuera de este desarrollo.
+No se declara paridad completa, IA entrenada, garantías económicas ni soporte
+nativo Windows comprobado. Las garantías combinatorias se etiquetan por universo
+y método de verificación. Android queda fuera de este desarrollo.
 
 ## Aplicación Android autónoma
 
@@ -105,7 +115,7 @@ y futuras son de consulta. **En curso** vuelve a la quiniela editable.
 Las descargas se ejecutan en segundo plano y los datos quedan disponibles
 sin conexión tras la primera actualización. Véase [Android](android/README.md).
 
-## Funciones de escritorio
+## Funciones del escritorio anterior (Tkinter, respaldo)
 
 - Detecta la temporada y la jornada vigente.
 - Lee los 15 partidos y horarios desde `Datosg/PRE*.txt` y `Datosg/Hor*.txt`.

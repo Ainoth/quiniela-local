@@ -1,5 +1,20 @@
 # Cambios
 
+## 1.0.0 — 13/10/2026 · Optimización verificable y boletos manuales
+
+- Entrega pedida como v0.1.14 y renumerada a v1.0.0 por el usuario.
+- RF-RED-002 / RF-GAR-001/002/003: carteras con ganancia marginal, intercambio,
+  exhaustivo acotado y muestreo reproducible; cobertura uniforme/ponderada
+  independiente, mínimos condicionales y certificado solo cuando procede.
+- RF-PRO-005 / RF-AUD-001: cuatro objetivos (valor esperado no disponible),
+  fuentes deportivas separadas de popularidad, propuesta antes de aplicar,
+  comparación, aportaciones, auditoría y remanente de presupuesto.
+- RF-QUI-002: Pleno manual predeterminado; automatismo explícito, parejas
+  múltiples/diversificadas y modelo independiente de goles etiquetado.
+- RF-ARC-009: asistente manual TuLotero 2–8 por boleto, Pleno común, reglas
+  configurables, TXT/CSV con relectura. Sin importación automática/envío/pago.
+- Sin cambios destructivos de datos/esquema ni nuevas dependencias pesadas.
+  Documentación y límites: `docs/STUDIO_V1_0.md`.
 ## 0.1.13 — 13/10/2026 · Normal y Reducidas independientes
 
 - RF-QUI-005/006: dos constructores independientes por jornada; Normal y
