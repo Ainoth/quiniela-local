@@ -1,6 +1,6 @@
 # Índice del proyecto de escritorio
 
-Guía actual: [Quiniela AI Studio v1.0.1](STUDIO_V1_0.md): elección al arrancar, boleto fijo, Aciertos completo y mejoras de Inicio; conserva las carteras, cobertura y preparación manual de v1.0.0. [Plan del motor](planes/V1_OPTIMIZACION.md).
+Guía actual: [Quiniela AI Studio v1.0.2](STUDIO_V1_0.md): icono de barra de tareas, elección al arrancar, boleto fijo, Aciertos completo y mejoras de Inicio; conserva las carteras, cobertura y preparación manual de v1.0.0. [Plan del motor](planes/V1_OPTIMIZACION.md).
 Los registros v0.1.0/v0.1.1 siguientes describen entregas anteriores.
 
 - [Especificación de PC](ESPECIFICACION_PC.md): objetivo completo, arquitectura,

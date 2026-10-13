@@ -47,6 +47,9 @@ App visual y moderna, sin exceso de opciones, que presente primero las tareas qu
 - Ajuste de escalado UI; tema oscuro/claro; persistencia de preferencia.
 - Atajos documentados; ayuda contextual con ejemplos de categorías de premio y diferencia entre garantía y probabilidad.
 - Linux Mint Cinnamon y Windows: respetar apariencia nativa, no usar rutas absolutas incrustadas.
+- RF-UX-005: conservar el icono de Quiniela Local en ventanas y barra de tareas,
+  incluido en el paquete instalable; identidad estable para asociar el acceso
+  directo con las ventanas. Validar Linux y Windows por separado.
 
 ## 6. Preparación del flujo automático
 

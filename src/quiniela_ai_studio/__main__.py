@@ -57,12 +57,14 @@ def main():
         from PySide6.QtCore import QTimer
         from PySide6.QtWidgets import QApplication
 
+        from quiniela_ai_studio.ui.branding import APPLICATION_ID, configure_application
         from quiniela_ai_studio.ui.window import STYLE, MainWindow
     except ImportError:
         repository.close()
         print('Instala la interfaz: python -m pip install -e .', file=sys.stderr)
         return 1
-    application=QApplication(sys.argv[:1]);application.setStyle('Fusion');application.setStyleSheet(STYLE)
+    application=QApplication([APPLICATION_ID]);application.setStyle('Fusion');application.setStyleSheet(STYLE)
+    configure_application(application)
     window=MainWindow(repository);window.show()
     if args.smoke_test:QTimer.singleShot(700,window.close)
     else:QTimer.singleShot(0,lambda:window.safe(window.start_session))

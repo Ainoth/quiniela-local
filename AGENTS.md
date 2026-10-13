@@ -40,7 +40,8 @@ popularidad con ROI ni preparación manual TuLotero con validación/importación
 automática. Preserva TXT personales y hashes de versiones anteriores. Android
 no forma parte de esta entrega; Windows necesita validación nativa explícita.
 
-La revisión activa v1.0.1 recoge la elección al arrancar y las correcciones de
-interfaz solicitadas. Consulta el CHANGELOG y la matriz; el algoritmo de
+La revisión activa v1.0.2 restaura además el icono de barra de tareas; v1.0.1
+recoge la elección al arrancar y las correcciones de interfaz solicitadas.
+Consulta el CHANGELOG y la matriz; el algoritmo de
 optimización sigue siendo `portfolio-1.0.0`. No se renumeran algoritmos ni
 versiones de datos por una actualización visual.

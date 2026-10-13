@@ -1,5 +1,16 @@
 # Cambios
 
+## 1.0.2 — 14/10/2026 · Icono de escritorio
+
+- RF-UX-005: ventana y diálogos Qt cargan el icono de Quiniela Local. La imagen
+  queda incluida en la wheel, sin depender de la carpeta del repositorio.
+  Identidad estable para agrupar ventanas en Linux y Windows; acceso directo
+  local asociado mediante `StartupWMClass=quiniela-ai-studio`.
+- Linux/X11: icono y clase de ventana comprobados. Windows nativo sigue pendiente.
+- 11 regresiones de arranque/distribución correctas; Ruff E9/F/I y acceso directo
+  válidos. Wheel/sdist construidas, icono cargado desde la wheel aislada y
+  arranque nativo comprobado con perfil temporal.
+
 ## 1.0.1 — 14/10/2026 · Arranque y distribución de escritorio
 
 - RF-UX-004: recuperado el formato clásico de tabla para la base: partido,

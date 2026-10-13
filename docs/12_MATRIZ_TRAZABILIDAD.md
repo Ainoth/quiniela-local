@@ -1,5 +1,12 @@
 # 12 · Matriz de trazabilidad de requisitos
 
+RF-UX-005 (v1.0.2): icono de Quiniela Local en ventanas y diálogos Qt y barra
+de tareas; imagen incluida en la wheel y clase de ventana estable. Verificación
+nativa Linux/X11 de `WM_CLASS` y los 65.536 píxeles de `_NET_WM_ICON`, herencia
+de icono en diálogo y carga del recurso desde una instalación aislada. Regresión
+de arranque y distribución mediante las pruebas existentes. Identidad Windows
+preparada, ejecución nativa pendiente.
+
 RF-UX-004 (v1.0.1): tabla clásica de la base con número, partido, hora,
 porcentajes y 1/X/2; filas alternas, Pleno compacto y ancho fijo. La fuente
 deportiva y la popularidad se muestran por separado según la selección, sin
@@ -77,6 +84,7 @@ Esta tabla está generada inicialmente a partir de `01_ESPECIFICACION_FUNCIONAL.
 
 | Requisito | Entrega prevista | Estado inicial | Descripción |
 |---|---|---|---|
+| `RF-UX-005` | v1.0.2 | IMPLEMENTADO | Icono de ventana/barra de tareas, recurso empaquetado y asociación estable del acceso directo. Windows pendiente de validación nativa. |
 | `RF-UX-004` | v1.0.1 | IMPLEMENTADO | Tabla clásica con horario y porcentajes de la fuente elegida; Pleno compacto y datos ausentes explícitos. |
 | `RF-UX-003` | v1.0.1 | IMPLEMENTADO | Inicio sin botón ni instrucciones para crear ejemplos. |
 | `RF-UX-002` | v1.0.1 | IMPLEMENTADO | Boleto de tamaño estable y prioridad a todos los resultados en Aciertos. |
@@ -201,7 +209,7 @@ Esta tabla está generada inicialmente a partir de `01_ESPECIFICACION_FUNCIONAL.
 | `RF-AUD-007` | v0.1/v0.9 | PARCIAL | Diagnóstico entendible de importaciones fallidas, dependencia ausente y errores de datos. |
 | `RF-AUD-008` | v0.1/v0.9 | PARCIAL | Instalación portable sin rutas de usuario incrustadas; registro de versión de datos y migraciones. |
 
-**Requisitos RF inventariados:** 122.
+**Requisitos RF inventariados:** 123.
 
 ### Seguimiento obligatorio
 

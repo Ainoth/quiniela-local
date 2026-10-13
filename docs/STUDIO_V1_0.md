@@ -1,4 +1,4 @@
-# Quiniela AI Studio v1.0.1
+# Quiniela AI Studio v1.0.2
 
 Entrega solicitada inicialmente como v0.1.14; el usuario cambió el número a
 v1.0.0. Es una ampliación del proyecto existente, no una nueva aplicación.
@@ -7,6 +7,12 @@ No se modifican Android, archivos personales ni esquema/hashes anteriores.
 La actualización 1.0.1 añade la elección de quiniela al arrancar, el boleto de
 ancho fijo con el formato clásico de tabla, más espacio para los marcadores
 de Aciertos e Inicio sin crear ejemplos. Conserva el motor y los límites de 1.0.0.
+
+La corrección 1.0.2 restaura el icono de Quiniela Local en ventanas, diálogos
+y barra de tareas. La imagen se distribuye dentro del paquete Qt, también
+al instalar una wheel fuera del repositorio. En Linux, la identidad de ventana
+y `StartupWMClass` son `quiniela-ai-studio`; la entrada de menú puede llamarse
+`quiniela-ai-studio.desktop`. Cierra y vuelve a abrir para ver el cambio.
 
 ## Uso
 

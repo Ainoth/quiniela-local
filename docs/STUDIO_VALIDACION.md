@@ -249,6 +249,22 @@ formato de importación TuLotero documentado. Windows nativo y validación/pago
 externos no probados. Siguiente fase: pruebas de escala/UX y validación nativa
 Windows, manteniendo separadas estimación probabilística y garantía combinatoria.
 
+## Corrección v1.0.2 — 14/10/2026
+
+- RF-UX-005: icono original incluido en `ui/assets` mediante package-data.
+  Verificación Qt/X11 con perfil temporal: `WM_CLASS` es `quiniela-ai-studio`,
+  `_NET_WM_ICON` contiene 256×256 píxeles (lectura `xprop -len 1000000` para
+  evitar truncar la propiedad) y un diálogo hereda el icono.
+- Wheel/sdist construidas con entorno aislado de setuptools; importación desde
+  la wheel en `/tmp`, fuera del código fuente: recurso PNG legible e icono válido.
+  `--smoke-test` nativo de esa wheel correcto con perfil temporal.
+- 11 pruebas de `test_startup.py` y `test_aciertos_layout.py` correctas;
+  Ruff E9/F/I en código cambiado y `git diff --check` correctos. Acceso directo
+  y entrada de menú locales asociados con `StartupWMClass=quiniela-ai-studio`,
+  comprobados mediante `desktop-file-validate`.
+- Windows: AppUserModelID preparado; sin validación nativa en esta entrega.
+  Las ventanas ya abiertas necesitan reiniciarse para cargar el icono.
+
 ## Publicación v1.0.1 — 14/10/2026
 
 - Versión de paquete, interfaz, README y manual: 1.0.1. El motor permanece

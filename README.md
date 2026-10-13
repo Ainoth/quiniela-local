@@ -6,7 +6,7 @@ Aplicación de Quiniela para escritorio y Android. La versión de escritorio
 puede leer los datos instalados por WIN1X2; ambas versiones descargan datos,
 porcentajes y marcadores directamente de sus proveedores públicos.
 
-## Quiniela AI Studio — v1.0.1
+## Quiniela AI Studio — v1.0.2
 
 Interfaz gráfica en español que conserva la experiencia visual de Quiniela Local:
 fondo azul, boleto fijo en tabla con partido, hora y porcentajes junto a 1/X/2,
@@ -29,7 +29,11 @@ El verificador independiente comprueba las columnas reales de las reducidas.
 **TuLotero** prepara boletos de Pleno común y TXT/CSV para introducir manualmente:
 no sube archivos, envía apuestas ni cobra. El Pleno es **Manual** por defecto;
 elige **Automático** explícitamente si quieres que lo modifiquen las barras.
-[Manual y límites v1.0.1](docs/STUDIO_V1_0.md).
+[Manual y límites v1.0.2](docs/STUDIO_V1_0.md).
+
+La ventana y la barra de tareas recuperan el icono de Quiniela Local; se incluye
+en el paquete instalable. En Linux, el acceso directo debe usar
+`StartupWMClass=quiniela-ai-studio` para asociarse con la ventana.
 
 Linux Mint, Python **3.11 o posterior**:
 
