@@ -1,30 +1,66 @@
 """Escritorio Qt en español: siete secciones y un sistema activo."""
-from datetime import datetime
+import json
+import shutil
+import sqlite3
+import threading
 from dataclasses import asdict, replace
+from datetime import datetime
 from decimal import Decimal
 from functools import partial
 from pathlib import Path
-import json
-import threading
-import shutil
-import sqlite3
 
-from PySide6.QtCore import Qt, QAbstractTableModel, QModelIndex, QThread, Signal, QTimer
-from PySide6.QtGui import QShortcut, QKeySequence, QColor
-from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QGridLayout, QLabel, QPushButton, QListWidget, QStackedWidget, QComboBox,
-    QTableView, QHeaderView, QLineEdit, QSpinBox, QDoubleSpinBox, QSlider,
-    QCheckBox, QFileDialog, QMessageBox, QScrollArea, QProgressBar, QAbstractItemView,
-    QDialog, QDialogButtonBox, QGroupBox, QTabBar, QSplitter)
-from quiniela_ai_studio import __version__
-from quiniela_ai_studio.domain.models import utcnow, round_from_dict
-from quiniela_ai_studio.domain import engine
-from quiniela_ai_studio.infrastructure import files
-from quiniela_ai_studio.application.services import SystemService
-from quiniela_ai_studio.infrastructure.providers import migrate_legacy, scrutiny_record, text
-from quiniela_ai_studio.infrastructure.integration import (prepare_data, reconcile_import, public_snapshot, live_for_round,
-                          read_legacy_systems, scrutiny_from_cache)
+from PySide6.QtCore import QAbstractTableModel, QModelIndex, Qt, QThread, QTimer, Signal
+from PySide6.QtGui import QColor, QKeySequence, QShortcut
+from PySide6.QtWidgets import (
+    QAbstractItemView,
+    QCheckBox,
+    QComboBox,
+    QDialog,
+    QDialogButtonBox,
+    QDoubleSpinBox,
+    QFileDialog,
+    QGridLayout,
+    QGroupBox,
+    QHBoxLayout,
+    QHeaderView,
+    QLabel,
+    QLineEdit,
+    QListWidget,
+    QMainWindow,
+    QMessageBox,
+    QProgressBar,
+    QPushButton,
+    QScrollArea,
+    QSlider,
+    QSpinBox,
+    QSplitter,
+    QStackedWidget,
+    QTabBar,
+    QTableView,
+    QVBoxLayout,
+    QWidget,
+)
+
 from live_results import LiveMatch
+from quiniela_ai_studio import __version__
+from quiniela_ai_studio.application.services import SystemService
+from quiniela_ai_studio.domain import engine
+from quiniela_ai_studio.domain.models import round_from_dict, utcnow
+from quiniela_ai_studio.infrastructure import files
+from quiniela_ai_studio.infrastructure.integration import (
+    fetch_round_sources,
+    live_for_round,
+    prepare_data,
+    public_snapshot,
+    read_legacy_systems,
+    reconcile_import,
+    scrutiny_from_cache,
+)
+from quiniela_ai_studio.infrastructure.providers import (
+    migrate_legacy,
+    scrutiny_record,
+    text,
+)
 
 STYLE = """
 QWidget {font-family: "DejaVu Sans", "Segoe UI"; font-size: 12px; color: #eaf4ff; background: #071a33;}
@@ -285,6 +321,7 @@ class MainWindow(QMainWindow):
 
     def refresh(self):
         round_ = self.round
+        self.update_source_status()
         view_round = round_from_dict(json.loads(self.system.round_snapshot)) if self.system and self.system.round_snapshot else round_
         self.system_label.setText(f'Abierta: {self.system.name} · v{self.system.revision}' if self.system else 'Ninguna quiniela abierta')
         modes = dict(simulation='DEMO FICTICIA · datos de ejemplo', current='EN CURSO · puedes editar', past='ANTERIOR · solo consulta', future='FUTURA · consulta')
@@ -427,8 +464,12 @@ class MainWindow(QMainWindow):
         note=QLabel('Un nivel mayor añade más signos y aumenta el coste. El nivel 10 puede producir 3.456 apuestas. Los partidos bloqueados no cambian.')
         note.setWordWrap(True);note.setObjectName('muted');layout.addWidget(note)
         row=QHBoxLayout();row.addWidget(QLabel('Elegir signos según'))
-        self.ranking_source=QComboBox();self.ranking_source.addItem('Datos deportivos, si hay','sport');self.ranking_source.addItem('Elecciones de otros jugadores','public');row.addWidget(self.ranking_source,1)
-        self.button('Usar los últimos datos',self.refresh_system_sources,row,editable=True);layout.addLayout(row)
+        self.ranking_source=QComboBox();self.ranking_source.addItem('Probabilidades de mercado (casas de apuestas)','sport');self.ranking_source.addItem('Signos jugados en Quinielista (popularidad)','public');row.addWidget(self.ranking_source,1)
+        self.button('Descargar porcentajes de esta jornada',self.refresh_system_sources,row,editable=True);layout.addLayout(row)
+        self.source_status=QLabel();self.source_status.setWordWrap(True);layout.addWidget(self.source_status)
+        self.ranking_source.currentIndexChanged.connect(self.update_source_status)
+        note=QLabel('Mercado: estima las posibilidades de 1/X/2; no garantiza aciertos. Popularidad: muestra qué apuesta la gente, no la probabilidad deportiva. Descargar no cambia tus signos ni tus apuestas. Después pulsa Cambiar el boleto si quieres aplicar la fuente elegida. El Pleno se elige aparte.')
+        note.setWordWrap(True);note.setObjectName('muted');layout.addWidget(note)
         layout=left_layout
         row=QHBoxLayout();self.generate_button=self.button('Generar',self.start_generation,row,primary=True,editable=True)
         self.cancel_button=self.button('Cancelar',self.cancel_generation,row);self.cancel_button.setEnabled(False)
@@ -484,12 +525,24 @@ class MainWindow(QMainWindow):
     def apply_template(self):
         if not self.system:raise ValueError('Pulsa Nuevo para crear una quiniela.')
         kind=self.ranking_source.currentData()
-        if kind=='public' and not self.frozen_round().snapshot(kind):raise ValueError('Pulsa Usar los últimos datos para añadir las elecciones de otros jugadores.')
+        if not self.frozen_round().snapshot(kind):raise ValueError('Esta fuente no tiene porcentajes para esta quiniela. Pulsa Descargar porcentajes de esta jornada. No se sustituirán por valores inventados.')
         self.set_system(self.service.template(self.system,self.coverage.value(),kind))
 
     def refresh_system_sources(self):
         if not self.system:raise ValueError('Pulsa Nuevo para crear una quiniela.')
-        self.set_system(self.service.refresh_sources(self.system))
+        if self.round.season=='DEMO':
+            self.background_status('La demo tiene porcentajes ficticios, no descargables. Pulsa Descargar datos en la cabecera y selecciona una jornada real.');return
+        context=self.system
+        round_=self.round
+        self.start_background('sources',context,lambda cancel,status:fetch_round_sources(round_,self.repository.path.parent/'source-cache',cancelled=cancel))
+
+    def update_source_status(self,*_):
+        snapshot=self.frozen_round().snapshot(self.ranking_source.currentData())
+        if snapshot:
+            captured=datetime.fromisoformat(snapshot.captured_at).astimezone()
+            self.source_status.setText(f'{self.round.key} · {snapshot.source}\nCaptura: {captured:%d/%m/%Y %H:%M}. Datos guardados en esta versión de tu quiniela; no son una actualización automática.')
+        else:
+            self.source_status.setText(f'{self.round.key} · Sin porcentajes de esta fuente. Descárgalos antes de aplicar recomendaciones. No se usa 40/30/30 ni un modelo oculto.')
 
     def start_generation(self):
         if not self.system:raise ValueError('Pulsa Nuevo para crear una quiniela.')
@@ -740,7 +793,7 @@ class MainWindow(QMainWindow):
 
     def build_analysis(self):
         layout=self.page_layout(3);self.analysis_info=QLabel();self.analysis_info.setWordWrap(True);layout.addWidget(self.analysis_info)
-        self.analysis_view,self.analysis_model=self.table(('Partido','Datos deportivos (%)','Jugadores (%)'),layout)
+        self.analysis_view,self.analysis_model=self.table(('Partido','Mercado / fuente deportiva (%)','Popularidad en Quinielista (%)'),layout)
         self.ai_status=QLabel('IA: pendiente. La app todavía no aprende de los resultados ni hace pronósticos propios. Aquí puedes consultar los datos que has descargado.');self.ai_status.setWordWrap(True);layout.addWidget(self.ai_status)
         note=QLabel('Cada grupo muestra 1 / X / 2. Los datos deportivos estiman resultados; las elecciones de otros jugadores muestran qué signos prefieren.');note.setWordWrap(True);layout.addWidget(note)
 
@@ -748,7 +801,7 @@ class MainWindow(QMainWindow):
         round_=self.round;system=self.system
         if system and system.round_snapshot: round_=round_from_dict(json.loads(system.round_snapshot))
         lines=[]
-        for kind,label in (('sport','Datos deportivos'),('public','Elecciones de otros jugadores')):
+        for kind,label in (('sport','Mercado / fuente deportiva'),('public','Popularidad en Quinielista')):
             snap=round_.snapshot(kind)
             lines.append(f'{label}: {snap.source if snap else "sin datos disponibles"}')
         if system:
@@ -1085,6 +1138,18 @@ class MainWindow(QMainWindow):
             if self.system!=source:
                 self.background_status('La quiniela cambió; la reducción no se ha aplicado.');return
             self.set_system(self.service.reduced_copy(source,plan,result));self.background_status('Copia reducida creada. La quiniela anterior sigue en Mis Sistemas.');return
+        if self.data_kind=='sources':
+            source=self.data_context
+            if self.data_worker.cancel_event.is_set():return
+            if self.system!=source or self.round.key!=source.round_key:
+                self.background_status('La quiniela cambió durante la descarga; no se han aplicado los porcentajes. Vuelve a descargarlos en la jornada que deseas.');return
+            try:
+                self.repository.save_round(result)
+                self.set_system(self.service.refresh_sources(source))
+                missing=' Mercado no publicado para esta jornada.' if not result.snapshot('sport') else ''
+                self.background_status('Porcentajes descargados y guardados. Tus signos, apuestas y precio no cambian.'+missing+' Pulsa Cambiar el boleto para aplicar la fuente elegida.')
+            except (ValueError,OSError,sqlite3.Error) as exc:self.background_error(str(exc))
+            return
         if self.data_kind=='export':
             self.repository.record_event('export_development',{**self.data_context, 'file':result['file'],'quantity':result['quantity']})
             self.background_status(f'{result["quantity"]:,} apuestas exportadas a {result["file"]}. El sistema de origen se conserva.')
@@ -1334,7 +1399,7 @@ class MainWindow(QMainWindow):
 
     def apply_reduction(self):
         if not self.reduction_enabled.isChecked():raise ValueError('Activa primero la opción de quiniela reducida.')
-        from quiniela_ai_studio.domain.reductions import plan_reduction,reduced_bets
+        from quiniela_ai_studio.domain.reductions import plan_reduction, reduced_bets
         system=self.system
         plan=plan_reduction(system.base,system.plenos,self.reduction_picker.currentData(),[i for i,c in enumerate(self.reduction_checks) if c.isChecked()])
         self.start_background('reduction',(system,plan),lambda cancel,status:reduced_bets(plan,cancel))

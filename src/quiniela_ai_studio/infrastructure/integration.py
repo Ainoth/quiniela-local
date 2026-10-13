@@ -15,11 +15,21 @@ from xml.etree import ElementTree
 
 import data_updater
 from live_results import LiveMatch, fetch_live_results
-
-from quiniela_ai_studio.domain.models import Bet, ProbabilitySnapshot, Round, SystemVersion, round_dict, utcnow
 from quiniela_ai_studio.domain.engine import Cancelled, union_base
+from quiniela_ai_studio.domain.models import (
+    Bet,
+    ProbabilitySnapshot,
+    Round,
+    SystemVersion,
+    round_dict,
+    utcnow,
+)
 from quiniela_ai_studio.infrastructure.files import read_bytes
-from quiniela_ai_studio.infrastructure.providers import load_win1x2, scrutiny_record, text
+from quiniela_ai_studio.infrastructure.providers import (
+    load_win1x2,
+    scrutiny_record,
+    text,
+)
 
 # Variantes nominales documentadas, sin coincidencia difusa ni orden implícito.
 TEAM_ALIASES = {
@@ -37,6 +47,14 @@ TEAM_ALIASES = {
     "RACINGSANTANDER": "RACINGS",
     "DEPORTIVOCORUNA": "DEPORTIVO",
     "DEPORTIVOLACORUNA": "DEPORTIVO",
+    "MANCHUNITED": "MANUNITED",
+    "MANCHESTERUNITED": "MANUNITED",
+    "BAYERNMUNICH": "BMUNICH",
+    "BORDORTMUND": "BDORTMUND",
+    "BORUSSIADORTMUND": "BDORTMUND",
+    "MANCHESTCITY": "MANCITY",
+    "MANCHESTERCITY": "MANCITY",
+    "CSUCRAIOVA": "UCRAIOVA",
 }
 
 
@@ -81,6 +99,45 @@ def public_snapshot(
         snapshots=tuple(s for s in round_.snapshots if s.kind != "public")
         + (snapshot,),
     )
+
+
+def probability_snapshots(round_: Round, payload: bytes, captured_at: str | None = None) -> Round:
+    """Lee público y mercado del XML publicado; no inventa probabilidades ausentes."""
+    updated = public_snapshot(round_, payload, captured_at)
+    matches = ElementTree.fromstring(payload).findall(".//partido")[:14]
+    fields = tuple(f"p_bf_{sign}desc" for sign in "1X2")
+    if not any(any(field in match.attrib for field in fields) for match in matches):
+        fields = tuple(f"p_bf_{sign}" for sign in "1X2")
+    if not any(any(field in match.attrib for field in fields) for match in matches):
+        return updated
+    import math
+
+    rows = []
+    for match in matches:
+        try:
+            values = tuple(float(match.attrib[field]) for field in fields)
+        except (ValueError, KeyError) as exc:
+            raise ValueError("La fuente de mercado está incompleta o contiene valores inválidos.") from exc
+        if any(not math.isfinite(v) or not 0 <= v <= 100 for v in values) or not 99 <= sum(values) <= 101:
+            raise ValueError("Los porcentajes de mercado no son válidos o no suman 100.")
+        rows.append(tuple(v / sum(values) for v in values))
+    snapshot = ProbabilitySnapshot(
+        "sport", "Quinielista / Eduardo Losilla · mercado (Betfair/casas de apuestas)",
+        captured_at or utcnow(), tuple(rows), "porcentajes publicados; sin calibración propia",
+    )
+    return replace(updated, snapshots=tuple(s for s in updated.snapshots if s.kind != "sport") + (snapshot,))
+
+
+def fetch_round_sources(round_: Round, cache: Path, *, cancelled=lambda: False) -> Round:
+    """Descarga exclusivamente la jornada solicitada, validando también sus equipos."""
+    if round_.season == "DEMO":
+        raise ValueError("La demo es ficticia. Descarga partidos y selecciona una jornada real.")
+    checkpoint(cancelled)
+    payload = data_updater._download(data_updater.QUINIELISTA_PERCENTAGES.format(round_no=round_.number))
+    updated = probability_snapshots(round_, payload)
+    checkpoint(cancelled)
+    data_updater._atomic_write(cache / f"porcentajes_{round_.season}_J{round_.number:02d}.xml", payload)
+    return updated
 
 
 @dataclass(frozen=True)
@@ -157,7 +214,7 @@ def prepare_data(
                 path = data_updater.fetch_percentages(
                     current.season, current.number, stage
                 )
-                updated = public_snapshot(current, path.read_bytes())
+                updated = probability_snapshots(current, path.read_bytes())
                 rounds[rounds.index(current)] = updated
             except (OSError, ValueError, KeyError, ElementTree.ParseError) as exc:
                 warnings.append(
@@ -171,7 +228,7 @@ def prepare_data(
                         captured = datetime.fromtimestamp(
                             path.stat().st_mtime, timezone.utc
                         ).isoformat()
-                        rounds[i] = public_snapshot(round_, read_bytes(path), captured)
+                        rounds[i] = probability_snapshots(round_, read_bytes(path), captured)
                     except (
                         OSError,
                         ValueError,

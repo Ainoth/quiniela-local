@@ -1,5 +1,12 @@
 # 12 · Matriz de trazabilidad de requisitos
 
+Revisión 0.1.10: RF-JOR-007 y RF-PRO-008 añaden descarga explícita de fuentes
+para la jornada abierta y estado visible; RF-PRO-001/002 incorporan mercado y
+popularidad de Quinielista por separado. No se declara cobertura completa de
+fuentes, calibración, LAE separado o predicción del Pleno. Evidencia:
+`tests/studio/test_probability_sources.py`; decisión y alcance en
+`planes/FUENTES_PORCENTAJES.md`.
+
 Esta tabla está generada inicialmente a partir de `01_ESPECIFICACION_FUNCIONAL.md`. Codex debe convertir los rangos de versión en una **versión precisa** al implementar cada requisito y sustituir PENDIENTE por IMPLEMENTADO solo tras superar las pruebas pertinentes.
 
 | Requisito | Entrega prevista | Estado inicial | Descripción |

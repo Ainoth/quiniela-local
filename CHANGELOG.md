@@ -1,5 +1,20 @@
 # Cambios
 
+## 0.1.10 — 13/10/2026 · Porcentajes reales y textos claros
+
+- RF-JOR-007 / RF-PRO-008: sustituido «Usar los últimos datos» (solo copiaba
+  SQLite) por una descarga asíncrona de la jornada abierta. Identidad completa,
+  rechazo de resultados si cambia el sistema y conservación ante fallos.
+- RF-PRO-001 / RF-PRO-002: importación del mercado `p_bf_*desc` ya publicado en
+  el XML completo, separado de los signos jugados en Quinielista. No es una IA
+  propia ni demuestra mayor tasa de acierto. Pleno y LAE separado pendientes.
+- Fuente, hora de captura y ausencia de porcentajes visibles. Descargar no
+  modifica apuestas/precio; las recomendaciones requieren una fuente existente.
+- Equivalencias explícitas de abreviaturas verificadas en jornada 13 para
+  Manchester United/City, Bayern, Dortmund y CSU Craiova; no coincidencia difusa.
+- Plan y pruebas: `docs/planes/FUENTES_PORCENTAJES.md` y
+  `tests/studio/test_probability_sources.py`. Android sin cambios.
+
 ## 0.1.9 — 12/10/2026 · Guardar apuestas y preparar su carga manual
 
 - RF-ARC-009: Guardar apuestas (TXT) visible desde cualquier pestaña; conserva
