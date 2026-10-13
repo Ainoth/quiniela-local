@@ -197,7 +197,7 @@ class DataTask(QThread):
 
 
 class MainWindow(QMainWindow):
-    SECTIONS = ('Inicio', 'Crear Quiniela', 'Optimizar', 'Análisis', 'Aciertos', 'Mis Sistemas', 'Configuración', 'Reducidas')
+    SECTIONS = ('Inicio', 'Normal', 'Optimizar', 'Análisis', 'Aciertos', 'Mis Sistemas', 'Configuración', 'Reducidas')
 
     def __init__(self, repository):
         super().__init__()
@@ -207,6 +207,8 @@ class MainWindow(QMainWindow):
         self.worker = None
         self.data_worker = None
         self.data_buttons = []
+        self.template_timer=QTimer(self);self.template_timer.setSingleShot(True);self.template_timer.setInterval(150);self.template_timer.timeout.connect(self.apply_pending_template)
+        self.template_context=None
         self.live_matches = None
         self.close_pending = False
         self.edit_buttons = []
@@ -250,6 +252,7 @@ class MainWindow(QMainWindow):
         self.build_evaluation(); self.build_systems(); self.build_settings();self.build_reductions()
         self.navigation.currentRowChanged.connect(self.pages.setCurrentIndex)
         self.navigation.currentRowChanged.connect(self.ensure_live_updates)
+        self.navigation.currentRowChanged.connect(self.construction_page_changed)
         self.round_picker.currentIndexChanged.connect(self.select_round)
         self.navigation.setCurrentRow(0)
         self.load_rounds()
@@ -301,8 +304,10 @@ class MainWindow(QMainWindow):
     def select_round(self, *_):
         if not self.round_picker.currentData(): return
         self.repository.set_setting('selected_round', self.round_picker.currentData())
-        systems = self.repository.systems(self.round.key)
-        self.system = systems[-1] if systems else None
+        self.template_timer.stop()
+        mode='reduced' if self.navigation.currentRow()==7 else 'normal'
+        self.system=self.saved_builder(mode)
+        self.restore_builder_controls()
         self.choose_reduction_positions()
         self.restore_filter_controls()
         self.result_input.setText('-'*14)
@@ -321,12 +326,13 @@ class MainWindow(QMainWindow):
         self.reset_manual_inputs()
         self.ensure_live_updates()
         self.refresh()
+        if mode=='reduced' and not self.system and self.round.editable:self.construction_page_changed(7)
 
     def refresh(self):
         round_ = self.round
         self.update_source_status()
         view_round = round_from_dict(json.loads(self.system.round_snapshot)) if self.system and self.system.round_snapshot else round_
-        self.system_label.setText(f'Abierta: {self.system.name} · v{self.system.revision}' if self.system else 'Ninguna quiniela abierta')
+        self.system_label.setText(f'{"REDUCIDA" if self.construction_mode()=="reduced" else "NORMAL"} · {self.system.name} · v{self.system.revision}' if self.system else 'Ninguna quiniela abierta')
         modes = dict(simulation='DEMO FICTICIA · datos de ejemplo', current='EN CURSO · puedes editar', past='ANTERIOR · solo consulta', future='FUTURA · consulta')
         mode_label = modes[round_.mode] if round_.mode != 'current' or round_.editable else 'SOLO CONSULTA · jornada pasada'
         self.metadata.setText(f'{mode_label} · {view_round.source}\nDatos usados: {datetime.fromisoformat(view_round.captured_at).astimezone():%d/%m/%Y %H:%M} · Precio por apuesta: {money(view_round.price_cents)} (referencia local)')
@@ -348,6 +354,10 @@ class MainWindow(QMainWindow):
         self.update_filter_controls()
         self.quick_conditions_slider.setEnabled(round_.editable and not ((self.worker and self.worker.isRunning()) or (self.data_worker and self.data_worker.isRunning())))
         system = self.system
+        number=json.loads(system.parameters).get('reduction_choice',json.loads(system.parameters).get('reduction',self.reduction_picker.currentData())) if system else None
+        self.ballot_title.setText(f'BASE PARA REDUCIDA {number}' if self.construction_mode()=='reduced' else 'QUINIELA NORMAL')
+        self.coverage.setEnabled(bool(system and self.construction_mode()=='normal' and round_.editable and not busy))
+        self.differentiation.setEnabled(bool(system and round_.editable and not busy))
         for i, match in enumerate(view_round.matches[:14]):
             kickoff=match.kickoff[:10]+' '+match.kickoff[10:] if len(match.kickoff)==15 else match.kickoff
             self.match_labels[i].setText(f'{i+1:02}  {match.home} – {match.away}')
@@ -394,7 +404,9 @@ class MainWindow(QMainWindow):
         layout = self.page_layout(0)
         self.home_info = QLabel(); self.home_info.setWordWrap(True); layout.addWidget(self.home_info)
         row = QHBoxLayout()
-        self.button('Crear una quiniela', self.new_system, row, primary=True, editable=True)
+        self.button('Crear quiniela normal', self.new_system, row, primary=True, editable=True)
+        self.button('Crear reducida',lambda:self.navigation.setCurrentRow(7),row,editable=True)
+        layout.addLayout(row);row=QHBoxLayout()
         self.button('Probar ejemplo de 6 apuestas', self.example_system, row, editable=True)
         self.button('Consultar aciertos', lambda: self.navigation.setCurrentRow(4), row)
         layout.addLayout(row)
@@ -408,8 +420,10 @@ class MainWindow(QMainWindow):
 
     def new_system(self):
         if not self.round.editable: raise ValueError('Jornada de consulta.')
-        self.system = self.service.new(self.round)
-        self.navigation.setCurrentRow(1); self.refresh()
+        mode='reduced' if self.navigation.currentRow()==7 else 'normal'
+        self.set_system(self.service.new(self.round,'Mi reducida' if mode=='reduced' else 'Mi quiniela normal',mode=mode))
+        if mode=='reduced':self.rebuild_reduced_template()
+        else:self.navigation.setCurrentRow(1)
 
     def example_system(self):
         self.new_system()
@@ -418,7 +432,7 @@ class MainWindow(QMainWindow):
 
     def build_builder(self):
         layout = self.ballot.layout()
-        title=QLabel('PARTIDOS DE LA JORNADA');title.setObjectName('title');layout.addWidget(title)
+        self.ballot_title=QLabel('QUINIELA NORMAL');self.ballot_title.setObjectName('title');layout.addWidget(self.ballot_title)
         row = QHBoxLayout(); self.name_input = QLineEdit(); self.name_input.setPlaceholderText('Nombre de tu quiniela')
         self.name_input.editingFinished.connect(lambda: self.safe(self.rename))
         row.addWidget(self.name_input)
@@ -468,16 +482,20 @@ class MainWindow(QMainWindow):
         left_layout=layout;layout=self.page_layout(1)
         row=QHBoxLayout();row.addWidget(QLabel('Añadir dobles y triples (0–10)'))
         self.coverage=QSlider(Qt.Orientation.Horizontal);self.coverage.setRange(0,10);row.addWidget(self.coverage,1)
-        self.coverage_label=QLabel('0');row.addWidget(self.coverage_label);self.coverage.valueChanged.connect(lambda v:self.coverage_label.setText(str(v)))
-        self.button('Cambiar el boleto', self.apply_template, row, editable=True);layout.addLayout(row)
+        self.coverage_label=QLabel('0');row.addWidget(self.coverage_label);self.coverage.valueChanged.connect(lambda v:self.coverage_label.setText(str(v)));self.coverage.valueChanged.connect(self.schedule_template)
+        self.coverage.sliderPressed.connect(self.schedule_template)
+        layout.addLayout(row)
         note=QLabel('Un nivel mayor añade signos y goles del Pleno y aumenta el coste. Nivel 0: un resultado del Pleno; nivel 10: los 16 marcadores, hasta 55.296 apuestas con 3.456 columnas base. Los partidos bloqueados no cambian.')
         note.setWordWrap(True);note.setObjectName('muted');layout.addWidget(note)
         row=QHBoxLayout();row.addWidget(QLabel('Elegir signos según'))
         self.ranking_source=QComboBox();self.ranking_source.addItem('Mercado: casas de apuestas','sport');self.ranking_source.addItem('Popularidad: Quinielista','public');row.addWidget(self.ranking_source,1)
         self.button('Descargar porcentajes',self.refresh_system_sources,row,editable=True).setToolTip('Descarga los porcentajes de los 14 partidos y del Pleno para la jornada abierta, sin cambiar tus apuestas.');layout.addLayout(row)
         self.source_status=QLabel();self.source_status.setWordWrap(True);layout.addWidget(self.source_status)
-        self.ranking_source.currentIndexChanged.connect(self.update_source_status)
-        note=QLabel('Mercado: estima resultados; no garantiza aciertos. Popularidad: muestra qué apuesta la gente. Descargar no cambia tus signos ni tus apuestas. Cambiar el boleto aplica la fuente al boleto y al Pleno. Cada pareja de goles del Pleno multiplica las apuestas; puedes ajustar las casillas manualmente.')
+        self.ranking_source.currentIndexChanged.connect(self.ranking_source_changed)
+        self.differentiation=QSlider(Qt.Orientation.Horizontal);self.differentiation.setRange(0,10)
+        row=QHBoxLayout();row.addWidget(QLabel('Diferenciación del público'));row.addWidget(self.differentiation,1);self.differentiation_label=QLabel('0');row.addWidget(self.differentiation_label);layout.addLayout(row)
+        self.differentiation.valueChanged.connect(lambda value:self.differentiation_label.setText(str(value)));self.differentiation.valueChanged.connect(self.schedule_template)
+        note=QLabel('Las barras actualizan el boleto automáticamente. Diferenciación 0: seguir la fuente elegida. Subir requiere Mercado y popularidad; favorece signos menos populares en relación con su probabilidad. Son pesos de selección, no probabilidades ni rentabilidad: puede reducir tus aciertos y no garantiza grandes premios. El Pleno multiplica las apuestas.')
         note.setWordWrap(True);note.setObjectName('muted');layout.addWidget(note)
         layout=left_layout
         row=QHBoxLayout();self.generate_button=self.button('Generar',self.start_generation,row,primary=True,editable=True)
@@ -523,20 +541,106 @@ class MainWindow(QMainWindow):
         self.safe(lambda:self.set_system(self.service.edit(self.system,self.system.base,self.system.locks,pleno,pleno_choices=choices)))
 
     def set_system(self,system):
-        changed=not self.system or self.system.system_id!=system.system_id
+        changed=not self.system or not system or self.system.system_id!=system.system_id
         self.system=system
-        if changed:self.restore_filter_controls();self.choose_reduction_positions()
+        self.remember_builder()
+        if changed:self.template_timer.stop();self.restore_builder_controls();self.restore_filter_controls();self.choose_reduction_positions()
         self.refresh()
+
+    @staticmethod
+    def system_mode(system):
+        if not system:return 'normal'
+        params=json.loads(system.parameters)
+        return params.get('construction_mode','reduced' if 'reduction' in params else 'normal')
+
+    def construction_mode(self):
+        return self.system_mode(self.system) if self.system else ('reduced' if self.navigation.currentRow()==7 else 'normal')
+
+    def remember_builder(self):
+        if not self.system:return
+        key='builder_modes:'+self.system.round_key
+        saved=self.repository.setting(key,{})
+        saved[self.system_mode(self.system)]=self.system.system_id
+        self.repository.set_setting(key,saved)
+
+    def saved_builder(self,mode):
+        key=self.repository.setting('builder_modes:'+self.round.key,{}).get(mode)
+        if key:
+            candidate=self.repository.load(key)
+            if candidate.round_key==self.round.key and self.system_mode(candidate)==mode:return candidate
+        systems=[s for s in self.repository.systems(self.round.key) if self.system_mode(s)==mode and (mode!='reduced' or json.loads(s.parameters).get('construction_mode')=='reduced')]
+        return systems[-1] if systems else None
+
+    def restore_builder_controls(self):
+        params=json.loads(self.system.parameters) if self.system else {}
+        for slider,value in ((self.coverage,params.get('level',0)),(self.differentiation,params.get('differentiation_level',0)),(self.reduction_pleno_level,params.get('level',0)),(self.reduction_differentiation,params.get('differentiation_level',0))):
+            slider.blockSignals(True);slider.setValue(value);slider.blockSignals(False)
+        self.coverage_label.setText(str(self.coverage.value()));self.differentiation_label.setText(str(self.differentiation.value()))
+        self.reduction_diff_label.setText(str(self.reduction_differentiation.value()));self.reduction_level_label.setText(str(self.reduction_pleno_level.value()))
+        for combo in (self.ranking_source,self.reduction_source):
+            combo.blockSignals(True);combo.setCurrentIndex(max(0,combo.findData(params.get('kind','sport'))));combo.blockSignals(False)
+        self.reduction_picker.blockSignals(True);self.reduction_picker.setCurrentIndex(params.get('reduction_choice',params.get('reduction',1))-1);self.reduction_picker.blockSignals(False)
+
+    def construction_page_changed(self,index):
+        self.template_timer.stop()
+        self.update_export_controls()
+        if index not in (1,7) or not self.round_picker.currentData():return
+        mode='reduced' if index==7 else 'normal'
+        if self.system and self.system_mode(self.system)==mode:
+            self.restore_builder_controls();self.refresh();return
+        self.remember_builder()
+        candidate=self.saved_builder(mode)
+        if not candidate and mode=='reduced' and self.round.editable:
+            candidate=self.service.new(self.round,'Mi reducida',mode='reduced')
+            self.set_system(candidate);self.rebuild_reduced_template();return
+        self.set_system(candidate)
+
+    def ranking_source_changed(self,index):
+        if hasattr(self,'reduction_source'):
+            self.reduction_source.blockSignals(True);self.reduction_source.setCurrentIndex(index);self.reduction_source.blockSignals(False)
+        self.update_source_status();self.schedule_template()
+
+    def schedule_template(self,*_):
+        if not self.system or self.navigation.currentRow() not in (1,7) or not self.round.editable:return
+        if self.export_busy():return
+        mode=self.construction_mode()
+        if (mode=='normal') != (self.navigation.currentRow()==1):return
+        self.template_context=(self.system.system_id,self.system.round_key,mode,self.system.revision)
+        if hasattr(self,'reduction_differentiation'):
+            self.reduction_differentiation.blockSignals(True);self.reduction_differentiation.setValue(self.differentiation.value());self.reduction_differentiation.blockSignals(False)
+            self.reduction_diff_label.setText(str(self.differentiation.value()));self.reduction_level_label.setText(str(self.reduction_pleno_level.value()))
+        self.template_timer.start()
+        self.update_export_controls()
+
+    def apply_pending_template(self):
+        if not self.system or self.template_context!=(self.system.system_id,self.round.key,self.construction_mode(),self.system.revision):
+            self.update_export_controls();return
+        if self.export_busy() or not self.round.editable:return
+        try:
+            if self.construction_mode()=='reduced':self.rebuild_reduced_template()
+            else:self.apply_template()
+        except (ValueError,KeyError) as exc:self.background_status('El boleto anterior se conserva. '+str(exc));self.update_export_controls()
+
+    def rebuild_reduced_template(self,*_):
+        self.template_timer.stop()
+        if not self.system or self.construction_mode()!='reduced':return
+        try:
+            updated=self.service.reduced_template(self.system,self.reduction_picker.currentData(),self.ranking_source.currentData(),
+                pleno_level=self.reduction_pleno_level.value(),differentiation=self.differentiation.value())
+            self.set_system(updated);self.choose_reduction_positions()
+        except ValueError as exc:
+            self.background_status(str(exc));self.reduction_info.setText(str(exc))
 
     def undo(self):
         if self.system:self.set_system(self.service.undo(self.system))
 
     def apply_template(self):
+        self.template_timer.stop()
         if not self.system:raise ValueError('Pulsa Nuevo para crear una quiniela.')
         kind=self.ranking_source.currentData()
         if not self.frozen_round().snapshot(kind):raise ValueError('Esta fuente no tiene porcentajes para esta quiniela. Pulsa Descargar porcentajes. No se sustituirán por valores inventados.')
         has_pleno=bool(self.frozen_round().snapshot(kind).pleno_values)
-        self.set_system(self.service.template(self.system,self.coverage.value(),kind,include_pleno=True))
+        self.set_system(self.service.template(self.system,self.coverage.value(),kind,include_pleno=True,differentiation=self.differentiation.value()))
         if not has_pleno:self.background_status('Signos aplicados. Esta fuente no publica porcentajes del Pleno; se conserva tu selección de goles, sin inventar resultados.')
 
     def refresh_system_sources(self):
@@ -558,9 +662,14 @@ class MainWindow(QMainWindow):
             self.source_status.setText(f'{self.round.key} · {snapshot.source}\nCaptura: {captured:%d/%m/%Y %H:%M}. Datos guardados en esta versión de tu quiniela; no son una actualización automática.')
         else:
             self.source_status.setText(f'{self.round.key} · Sin porcentajes de esta fuente. Descárgalos antes de aplicar recomendaciones. No se usa 40/30/30 ni un modelo oculto.')
+        if hasattr(self,'reduction_source'):self.reduction_source.setToolTip(self.source_status.text())
 
     def start_generation(self):
         if not self.system:raise ValueError('Pulsa Nuevo para crear una quiniela.')
+        pending=self.template_timer.isActive()
+        self.template_timer.stop()
+        if pending:self.apply_pending_template()
+        if self.construction_mode()=='reduced':return self.apply_reduction()
         if self.worker and self.worker.isRunning():return
         if self.data_worker and self.data_worker.isRunning():raise ValueError('Espera a que termine la actualización de datos.')
         if not self.system.plenos:raise ValueError('En el Pleno, elige los goles del local y del visitante: 0, 1, 2 o M (3 o más). Después pulsa Generar.')
@@ -820,6 +929,9 @@ class MainWindow(QMainWindow):
             snap=round_.snapshot(kind)
             lines.append(f'{label}: {snap.source if snap else "sin datos disponibles"}')
         if system:
+            params=json.loads(system.parameters)
+            if params.get('differentiation_level',0):
+                lines.append(f'Diferenciación del público: {params["differentiation_level"]}/10. Selección original con puntuación mercado/popularidad. Los porcentajes deportivos de esta tabla siguen siendo los del proveedor; los pesos no son probabilidades ni premios esperados. Puede reducir aciertos. No hay validación retrospectiva de este criterio.')
             lines.extend((f'Combinaciones de signos diferentes: {len({b.column for b in system.bets}):,}',f'Total de apuestas: {system.quantity:,}','Puedes consultar cómo se creó en el historial de operaciones.'))
             if round_.snapshot('sport') and system.bets:
                 lines.append(f'Probabilidad calculada de acertar los 14 con estas combinaciones: {engine.probability_mass(system.bets,round_.snapshot("sport")):.6%} (supone partidos independientes y no incluye el Pleno).')
@@ -958,7 +1070,7 @@ class MainWindow(QMainWindow):
                     any(job and job.isRunning() for job in (self.worker,self.data_worker,self.filter_job)))
 
     def update_export_controls(self):
-        busy=self.export_busy()
+        busy=self.export_busy() or self.template_timer.isActive()
         ready=bool(self.system and self.system.bets and not busy)
         self.export_button.setEnabled(ready)
         self.export_button.setToolTip('Guarda las apuestas exactas de la quiniela abierta, con sus Plenos.' if ready else 'Espera a que termine el cálculo.' if busy else 'Abre una quiniela con apuestas o pulsa Generar debajo del boleto.')
@@ -1367,20 +1479,38 @@ class MainWindow(QMainWindow):
     def build_reductions(self):
         from quiniela_ai_studio.domain.reduction_tables import TABLES
         outer=self.page_layout(7)
-        note=QLabel('Tablas del artículo de SELAE (BOE 2009). No es un envío oficial. Se crea una copia desde el boleto, sin aplicar los filtros de Optimizar. Los partidos sin marcar se juegan al directo.');note.setWordWrap(True);outer.addWidget(note)
-        self.reduction_enabled=QCheckBox('Quiero usar una quiniela reducida');self.reduction_enabled.toggled.connect(self.choose_reduction_positions);outer.addWidget(self.reduction_enabled)
+        note=QLabel('Base independiente de Normal. Elige tipo y fuente: se proponen fijos, dobles y triples propios. Puedes ajustar las casillas.');note.setWordWrap(True);note.setToolTip('Matrices BOE 2009; no es una apuesta validada ni un envío oficial.');outer.addWidget(note)
         self.reduction_picker=QComboBox()
         for table in TABLES:
             self.reduction_picker.addItem(f'Reducida {table.number}: {table.widths.count(2)} dobles + {table.widths.count(3)} triples → {len(table.patterns)} columnas',table.number)
-        self.reduction_picker.currentIndexChanged.connect(self.choose_reduction_positions);outer.addWidget(self.reduction_picker)
-        scroll=QScrollArea();scroll.setWidgetResizable(True);content=QWidget();layout=QVBoxLayout(content);scroll.setWidget(content);outer.addWidget(scroll,1)
+        self.reduction_picker.currentIndexChanged.connect(self.reduction_type_changed);outer.addWidget(self.reduction_picker)
+        row=QHBoxLayout();self.reduction_source=QComboBox();self.reduction_source.addItem('Mercado: casas de apuestas','sport');self.reduction_source.addItem('Popularidad: Quinielista','public');self.reduction_source.currentIndexChanged.connect(self.ranking_source.setCurrentIndex);row.addWidget(self.reduction_source,1)
+        self.button('Descargar porcentajes',self.refresh_system_sources,row,editable=True);outer.addLayout(row)
+        row=QHBoxLayout();row.addWidget(QLabel('Diferenciación del público'));self.reduction_differentiation=QSlider(Qt.Orientation.Horizontal);self.reduction_differentiation.setRange(0,10);self.reduction_differentiation.valueChanged.connect(self.differentiation.setValue);row.addWidget(self.reduction_differentiation,1);self.reduction_diff_label=QLabel('0');row.addWidget(self.reduction_diff_label);outer.addLayout(row)
+        note=QLabel('0: seguir la fuente elegida. Subir requiere Mercado + popularidad: favorece signos relativamente poco jugados. No garantiza más aciertos ni premios; puede perder más. Popularidad de Quinielista, no SELAE.');note.setWordWrap(True);note.setObjectName('muted');outer.addWidget(note)
+        row=QHBoxLayout();row.addWidget(QLabel('Cobertura del Pleno (0–10)'));self.reduction_pleno_level=QSlider(Qt.Orientation.Horizontal);self.reduction_pleno_level.setRange(0,10);self.reduction_pleno_level.valueChanged.connect(self.schedule_template);row.addWidget(self.reduction_pleno_level,1);self.reduction_level_label=QLabel('0');row.addWidget(self.reduction_level_label);outer.addLayout(row)
+        self.reduction_options_view,self.reduction_options_model=self.table(('Tipo','Base específica','Columnas','Con Pleno / coste'),outer)
+        self.reduction_options_view.setMaximumHeight(205)
+        self.reduction_options_view.verticalHeader().hide()
+        self.reduction_options_view.verticalHeader().setMinimumSectionSize(20)
+        self.reduction_options_view.verticalHeader().setDefaultSectionSize(23)
+        self.reduction_options_view.horizontalHeader().setSectionResizeMode(0,QHeaderView.ResizeMode.ResizeToContents)
+        self.reduction_options_view.horizontalHeader().setSectionResizeMode(2,QHeaderView.ResizeMode.ResizeToContents)
+        self.reduction_options_view.clicked.connect(lambda index:self.reduction_picker.setCurrentIndex(index.row()) if self.round.editable else None)
+        positions_toggle=QCheckBox('Ajustar posiciones de la reducción manualmente');outer.addWidget(positions_toggle)
+        scroll=QScrollArea();scroll.setWidgetResizable(True);content=QWidget();layout=QVBoxLayout(content);scroll.setWidget(content);outer.addWidget(scroll,1);scroll.hide();positions_toggle.toggled.connect(scroll.setVisible)
         self.reduction_checks=[]
         for i in range(14):
             check=QCheckBox();check.toggled.connect(self.refresh_reduction);layout.addWidget(check);self.reduction_checks.append(check)
         self.reduction_info=QLabel();self.reduction_info.setWordWrap(True);outer.addWidget(self.reduction_info)
-        self.reduction_apply=self.button('Crear copia reducida',self.apply_reduction,outer,primary=True)
-        self.button('Cancelar cálculo',self.cancel_data,outer)
+        actions=QHBoxLayout();self.reduction_apply=self.button('Generar apuestas reducidas',self.apply_reduction,actions,primary=True)
+        self.button('Cancelar cálculo',self.cancel_data,actions);outer.addLayout(actions)
+        self.button('Proponer base según porcentajes',self.rebuild_reduced_template,outer)
         self.choose_reduction_positions()
+
+    def reduction_type_changed(self,*_):
+        if self.system and self.construction_mode()=='reduced' and self.navigation.currentRow()==7:self.schedule_template()
+        else:self.choose_reduction_positions()
 
     def choose_reduction_positions(self):
         from quiniela_ai_studio.domain.reduction_tables import TABLES
@@ -1389,6 +1519,8 @@ class MainWindow(QMainWindow):
         if self.system:
             for width in (2,3):
                 selected.update([i for i,mask in enumerate(self.system.base) if len(mask)==width][:table.widths.count(width)])
+            params=json.loads(self.system.parameters)
+            if params.get('reduction_choice',params.get('reduction'))==table.number and 'positions' in params:selected=set(params['positions'])
         for i,check in enumerate(self.reduction_checks):
             check.blockSignals(True);check.setChecked(i in selected);check.blockSignals(False)
         self.refresh_reduction()
@@ -1396,24 +1528,40 @@ class MainWindow(QMainWindow):
     def refresh_reduction(self):
         if not hasattr(self,'reduction_apply') or not self.round_picker.currentData():return
         from quiniela_ai_studio.domain.reductions import plan_reduction
-        enabled=self.reduction_enabled.isChecked()
-        self.reduction_picker.setEnabled(enabled)
+        enabled=bool(self.system and self.construction_mode()=='reduced')
+        self.reduction_picker.setEnabled(enabled and self.round.editable and not self.export_busy())
+        self.reduction_source.setEnabled(enabled)
+        self.reduction_differentiation.setEnabled(enabled and self.round.editable and not self.export_busy())
+        self.reduction_pleno_level.setEnabled(enabled and self.round.editable and not self.export_busy())
+        from quiniela_ai_studio.domain.reduction_tables import TABLES
+        rows=[]
+        for table in TABLES:
+            count=len(table.patterns)*len(self.system.plenos) if self.system else 0
+            rows.append((table.number,f'{table.widths.count(2)} dobles / {table.widths.count(3)} triples',len(table.patterns),f'{count} / {money(count*self.frozen_round().price_cents)}' if count else 'Elige el Pleno'))
+        self.reduction_options_model.update_rows(rows)
+        self.reduction_options_view.selectRow(self.reduction_picker.currentIndex())
+        self.generate_button.setText('Generar reducida' if enabled else 'Generar')
         for i,check in enumerate(self.reduction_checks):
             check.setText(f'{i+1:02} · {self.round.matches[i].home} – {self.round.matches[i].away} · {self.system.base[i] if self.system else "sin boleto"}')
             check.setEnabled(bool(enabled and self.system and len(self.system.base[i])>1))
         self.reduction_apply.setEnabled(False)
-        if not self.system:
-            self.reduction_info.setText('Abre una quiniela o crea un boleto.');return
+        if not enabled:
+            self.reduction_info.setText('Entra en Reducidas para crear su propia base. La quiniela normal no se modifica.');return
         try:
             plan=plan_reduction(self.system.base,self.system.plenos,self.reduction_picker.currentData(),[i for i,c in enumerate(self.reduction_checks) if c.isChecked()])
             price=self.frozen_round().price_cents
-            self.reduction_info.setText(f'{plan.before:,} → {plan.after:,} apuestas · coste {money(plan.after*price)}\nSi aciertas todos los signos del boleto: al menos {plan.table.minimum_hits} aciertos en los 14. Esto no garantiza el Pleno ni un premio en cualquier resultado.')
+            self.builder_info.setText(f'Base propia: {sum(len(s)==1 for s in self.system.base)} fijos / {sum(len(s)==2 for s in self.system.base)} dobles / {sum(len(s)==3 for s in self.system.base)} triples\nReducida {plan.table.number}: {plan.after:,} apuestas · {money(plan.after*price)} · guardadas: {self.system.quantity:,}')
+            columns=plan.after//len(self.system.plenos)
+            self.pleno_selection_info.setText(f'{columns:,} columnas reducidas × {len(self.system.plenos)} Plenos = {plan.after:,} apuestas\nCoste de la reducida: {money(plan.after*price)} · {len(self.system.plenos)} parejas de goles')
+            self.reduction_info.setText(f'Al generar esta tabla: {plan.before:,} → {plan.after:,} apuestas · coste {money(plan.after*price)}\nCondicional a acertar toda esta base: al menos {plan.table.minimum_hits} en los 14. No garantiza el Pleno ni dinero. Si después quitas apuestas en Optimizar, esta cobertura ya no está verificada.')
             busy=bool((self.data_worker and self.data_worker.isRunning()) or (self.worker and self.worker.isRunning()) or (self.filter_job and self.filter_job.isRunning()))
             self.reduction_apply.setEnabled(enabled and self.round.editable and plan.after<=engine.MAX_GENERATED and not busy)
         except ValueError as exc:self.reduction_info.setText(str(exc))
 
     def apply_reduction(self):
-        if not self.reduction_enabled.isChecked():raise ValueError('Activa primero la opción de quiniela reducida.')
+        if self.construction_mode()!='reduced':raise ValueError('Crea la base independiente en Reducidas.')
+        pending=self.template_timer.isActive();self.template_timer.stop()
+        if pending:self.apply_pending_template()
         from quiniela_ai_studio.domain.reductions import plan_reduction, reduced_bets
         system=self.system
         plan=plan_reduction(system.base,system.plenos,self.reduction_picker.currentData(),[i for i,c in enumerate(self.reduction_checks) if c.isChecked()])
@@ -1426,6 +1574,7 @@ class MainWindow(QMainWindow):
         dialog.setDetailedText('\n'.join(f'{date} · {action} · {detail}' for date,action,revision,detail in rows));dialog.exec()
 
     def closeEvent(self,event):
+        self.template_timer.stop()
         self.live_timer.stop();self.manual_eval_timer.stop()
         if self.live_worker and self.live_worker.isRunning():
             self.close_pending=True;self.live_worker.cancel_event.set();event.ignore();return

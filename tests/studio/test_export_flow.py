@@ -70,9 +70,14 @@ def test_visible_global_save_keeps_reduced_bets_and_frozen_price(window, tmp_pat
     monkeypatch.setattr(window, 'show_export_result', lambda *args: result.append(args))
     path = tmp_path / 'reducida'
     monkeypatch.setattr(QFileDialog, 'getSaveFileName', lambda *args: (str(path), ''))
-    for index in (1, 2, 5, 7):
+    for index in (2, 5, 7):
         window.navigation.setCurrentRow(index)
         assert window.export_button.isVisible() and window.export_button.isEnabled()
+    window.navigation.setCurrentRow(1)
+    assert window.system.system_id == source.system_id
+    assert not window.export_button.isEnabled()  # Normal has its own ungenerated base.
+    window.navigation.setCurrentRow(7)
+    assert window.system == reduced and window.export_button.isEnabled()
     window.export_button.click()
     path = path.with_suffix('.txt')
     assert len(path.read_text().splitlines()) == 18

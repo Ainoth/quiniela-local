@@ -17,9 +17,11 @@ class SystemService:
     def __init__(self, repository):
         self.repository = repository
 
-    def new(self, round_, name='Mi quiniela'):
+    def new(self, round_, name='Mi quiniela', *, mode='normal'):
+        if mode not in ('normal', 'reduced'):
+            raise ValueError('Modo normal o reducido requerido.')
         system = SystemVersion(str(uuid.uuid4()), 1, round_.key, name,
-                               ('1',) * 14, (False,) * 14, '', (), utcnow(), round_snapshot=json.dumps(round_dict(round_)))
+                               ('1',) * 14, (False,) * 14, '', (), utcnow(), parameters=json.dumps(dict(construction_mode=mode)), round_snapshot=json.dumps(round_dict(round_)))
         self.repository.save(system, 'create')
         return system
 
@@ -33,6 +35,12 @@ class SystemService:
         if not allow_review:
             self._editable(system)
         revision = self.repository.load(system.system_id).revision + 1
+        if 'parameters' in changes:
+            old, new = json.loads(system.parameters), json.loads(changes['parameters'])
+            for key in ('construction_mode', 'reduction_choice', 'differentiation_level', 'kind', 'level'):
+                if key in old and key not in new:
+                    new[key] = old[key]
+            changes['parameters'] = json.dumps(new)
         updated = replace(system, revision=revision, created_at=utcnow(), **changes)
         self.repository.save(updated, action)
         return updated
@@ -57,10 +65,13 @@ class SystemService:
             params['plenos']=list(system.plenos)
         return self.version(system, base=normalized, locks=tuple(locks), pleno=pleno, bets=(), origin='manual',parameters=json.dumps(params))
 
-    def template(self, system, level, kind='sport', *, include_pleno=False):
+    def template(self, system, level, kind='sport', *, include_pleno=False, differentiation=0):
         round_ = self._editable(system)
         frozen = round_from_dict(json.loads(system.round_snapshot)) if system.round_snapshot else round_
         snapshot = frozen.snapshot(kind)
+        if differentiation:
+            from quiniela_ai_studio.domain.strategies import selection_weights
+            snapshot = selection_weights(frozen, kind, differentiation)
         base = coverage_template(system.base, system.locks, level, snapshot)
         masks = system.goal_masks
         pairs = system.plenos
@@ -71,8 +82,28 @@ class SystemService:
             pairs = tuple(a + b for a in masks[0] for b in masks[1])
             pleno = pairs[0] if len(pairs) == 1 else ''
         return self.version(system, base=base, pleno=pleno, bets=(), origin=f'plantilla nivel {level}',
-                            parameters=json.dumps(dict(level=level, source=snapshot.source if snapshot else 'orden 1/X/2 sin modelo', kind=kind,
+                            parameters=json.dumps(dict(level=level, source=snapshot.source if snapshot else 'orden 1/X/2 sin modelo', kind=kind, differentiation_level=differentiation,
                                                       pleno_masks=list(masks),plenos=list(pairs))))
+
+    def reduced_template(self, system, number, kind='sport', *, pleno_level=0, differentiation=0):
+        self._editable(system)
+        if json.loads(system.parameters).get('construction_mode') != 'reduced':
+            raise ValueError('Crea una base independiente en Reducidas; no se usa la quiniela normal.')
+        from quiniela_ai_studio.domain.engine import pleno_template
+        from quiniela_ai_studio.domain.reductions import reduction_template
+        from quiniela_ai_studio.domain.strategies import selection_weights
+        frozen = round_from_dict(json.loads(system.round_snapshot))
+        weights = selection_weights(frozen, kind, differentiation)
+        base, positions = reduction_template(system.base, system.locks, number, weights)
+        masks, pairs, pleno = system.goal_masks, system.plenos, system.pleno
+        if weights.pleno_values:
+            masks = pleno_template(weights, pleno_level)
+            pairs = tuple(a+b for a in masks[0] for b in masks[1])
+            pleno = pairs[0] if len(pairs) == 1 else ''
+        return self.version(system, base=base, pleno=pleno, bets=(), origin=f'Base independiente para reducida {number}',
+                            parameters=json.dumps(dict(construction_mode='reduced',reduction_choice=number,
+                                positions=list(positions),kind=kind,differentiation_level=differentiation,level=pleno_level,
+                                source=weights.source,pleno_masks=list(masks),plenos=list(pairs))))
 
     def generated(self, system, bets):
         self._editable(system)
@@ -191,7 +222,10 @@ class SystemService:
         copy=replace(system,system_id=str(uuid.uuid4()),revision=1,
                      name=f'{system.name} · Reducida {plan.table.number}',bets=tuple(bets),created_at=utcnow(),
                      origin=f'Tabla de reducción {plan.table.number}',
-                     parameters=json.dumps(dict(reduction=plan.table.number,positions=list(plan.positions),
+                     parameters=json.dumps(dict(construction_mode='reduced',reduction_choice=plan.table.number,
+                                                differentiation_level=json.loads(system.parameters).get('differentiation_level',0),
+                                                kind=json.loads(system.parameters).get('kind','sport'),level=json.loads(system.parameters).get('level',0),
+                                                reduction=plan.table.number,positions=list(plan.positions),
                                                 plenos=list(plan.selection.plenos),source_system_id=system.system_id,
                                                 source_revision=system.revision,conditional_minimum_hits=plan.table.minimum_hits,
                                                 table_source='Artículo SELAE: tablas BOE-A-2009-12204')))

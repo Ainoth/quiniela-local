@@ -19,6 +19,33 @@ class ReductionPlan:
     after: int
 
 
+def reduction_template(base, locks, number: int, weights):
+    """Base independiente: múltiples en posiciones ambiguas, fijos según fuente."""
+    from .models import SIGNS, normalize_base
+    base = normalize_base(base)
+    if type(number) is not int or not 1 <= number <= len(TABLES):
+        raise ValueError('Elige una de las seis reducciones.')
+    if len(locks) != 14 or any(type(v) is not bool for v in locks):
+        raise ValueError('Se requieren 14 bloqueos válidos.')
+    table = TABLES[number - 1]
+    ranking = [sorted(SIGNS, key=lambda s: (-weights.values[i][SIGNS.index(s)], SIGNS.index(s))) for i in range(14)]
+    result = [base[i] if locks[i] else ranking[i][0] for i in range(14)]
+    remaining = sorted((i for i in range(14) if not locks[i]), key=lambda i: (max(weights.values[i]), i))
+    positions = []
+    for width in (3, 2):
+        locked = [i for i in range(14) if locks[i] and len(base[i]) == width]
+        required = table.widths.count(width)
+        if len(locked) > required or required - len(locked) > len(remaining):
+            raise ValueError('Los bloqueos no permiten este tipo de reducida. Desbloquea o elige otra tabla.')
+        chosen = locked + remaining[:required - len(locked)]
+        remaining = remaining[required - len(locked):]
+        for i in chosen:
+            if not locks[i]:
+                result[i] = ''.join(s for s in SIGNS if s in ranking[i][:width])
+        positions.extend(chosen)
+    return tuple(result), tuple(sorted(positions))
+
+
 def plan_reduction(base, plenos, number: int, positions) -> ReductionPlan:
     """Map table groups to selected match ordinals, doubles and triples separately."""
     if type(number) is not int or not 1 <= number <= 6:

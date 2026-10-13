@@ -1,5 +1,12 @@
 # 12 · Matriz de trazabilidad de requisitos
 
+Revisión 0.1.13: RF-QUI-005/006 separan Normal y Reducidas por sistemas propios;
+RF-GEN-003/005 añaden barra reactiva y bases específicas respetando bloqueos;
+RF-RED-001/002 reutilizan las seis matrices con elección de tipo; RF-PRO-003/008
+añaden diferenciación opcional como pesos originales, no rentabilidad/probabilidad.
+Pruebas `tests/studio/test_construction_modes.py`; alcance y decisiones en
+`planes/MODOS_REDUCIDAS_REACTIVOS.md`. Backtesting y rentabilidad siguen pendientes.
+
 Revisión 0.1.12: RF-PRO-008 / RF-QUI-002 separan visualmente porcentajes y
 casillas del Pleno, alineados por goles, sin alterar la selección ni cálculos.
 Prueba: `test_percentages_are_separate_and_aligned_below_goals` en

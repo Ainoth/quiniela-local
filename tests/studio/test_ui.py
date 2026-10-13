@@ -1,13 +1,16 @@
 import os
+
 os.environ.setdefault('QT_QPA_PLATFORM','offscreen')
 from dataclasses import replace
+
 import pytest
 from PySide6.QtCore import Qt
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication, QFileDialog
+
 from quiniela_studio.demo import demo_round
 from quiniela_studio.storage import Repository
-from quiniela_studio.ui import MainWindow, STYLE
+from quiniela_studio.ui import STYLE, MainWindow
 
 
 @pytest.fixture(scope='session')
@@ -153,6 +156,7 @@ def test_filters_and_restore_origin_ui(window):
 
 def test_close_during_background_operation_cancels_without_import(window,tmp_path):
     import threading
+
     from quiniela_studio.integration import prepare_data
     from tests.studio.test_integration import data_folder
     folder=data_folder(tmp_path/'Datosg')
@@ -172,10 +176,11 @@ def test_close_during_background_operation_cancels_without_import(window,tmp_pat
 
 
 def test_sqlite_pc_copies_in_qt(window,tmp_path,monkeypatch):
-    from tests.studio.test_integration import data_folder
-    from quiniela_studio.providers import load_win1x2
-    from pc_store import SystemStore
     from PySide6.QtWidgets import QMessageBox
+
+    from pc_store import SystemStore
+    from quiniela_studio.providers import load_win1x2
+    from tests.studio.test_integration import data_folder
     round_=load_win1x2(data_folder(tmp_path/'Datosg'))[-1]
     window.repository.save_round(round_);window.load_rounds(round_.key)
     path=tmp_path/'old.sqlite3';store=SystemStore(path)
@@ -372,8 +377,9 @@ def test_close_cancels_pending_live_optimization(window,application):
 
 def test_live_worker_superseded_request_and_close_are_safe(window,monkeypatch,application):
     import threading
-    from quiniela_ai_studio.domain.filters import BasicFilters
+
     from quiniela_ai_studio.domain.engine import Cancelled
+    from quiniela_ai_studio.domain.filters import BasicFilters
     original_apply=BasicFilters.apply;started=threading.Event()
     def slow_apply(spec,bets,cancelled=lambda:False):
         if spec.variants==(5,8):
@@ -452,7 +458,9 @@ def test_multiple_pleno_buttons_and_optional_reduction_copy(window):
     assert original.quantity==324 and original.cost(window.round)==24300
     window.navigation.setCurrentRow(7)
     assert not window.reduction_apply.isEnabled()
-    window.reduction_enabled.setChecked(True)
+    assert window.system.system_id!=original.system_id
+    for side,goals in ((0,'01'),(1,'2M')):
+        for goal in goals:QTest.mouseClick(window.goal_buttons[side][goal],Qt.MouseButton.LeftButton)
     assert window.reduction_apply.isEnabled()
     window.reduction_apply.click();wait_for_data(window)
     assert window.system.system_id!=original.system_id
@@ -464,8 +472,8 @@ def test_multiple_pleno_buttons_and_optional_reduction_copy(window):
 
 def test_automatic_marker_refresh_updates_hits_misses_and_pleno(window,monkeypatch):
     from live_results import LiveMatch
-    from quiniela_studio.domain import Bet
     from quiniela_studio import ui
+    from quiniela_studio.domain import Bet
     round_=replace(window.round,season='26-27',number=12)
     window.repository.save_round(round_);window.load_rounds(round_.key)
     system=window.service.imported(round_,'Seguimiento',(Bet('1'*14,'01'),Bet('1'*13+'X','01')));window.set_system(system)
@@ -516,6 +524,7 @@ def test_manual_results_selector_updates_without_check_button(window):
 
 def test_live_bad_identity_and_close_do_not_corrupt_cache(window,monkeypatch,application):
     import threading
+
     from live_results import LiveMatch
     from quiniela_studio import ui
     round_=replace(window.round,season='26-27',number=12)

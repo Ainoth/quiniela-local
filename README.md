@@ -6,7 +6,7 @@ Aplicación de Quiniela para escritorio y Android. La versión de escritorio
 puede leer los datos instalados por WIN1X2; ambas versiones descargan datos,
 porcentajes y marcadores directamente de sus proveedores públicos.
 
-## Quiniela AI Studio — v0.1 ejecutable (revisión 0.1.12)
+## Quiniela AI Studio — v0.1 ejecutable (revisión 0.1.13)
 
 Interfaz gráfica en español que conserva la experiencia visual de Quiniela Local:
 fondo azul, boleto compacto siempre visible a la izquierda, casillas 1/X/2 y
@@ -25,23 +25,32 @@ funciona sin conexión con la demo y los datos ya importados. Windows:
 
 1. En Inicio, pulsa **Probar ejemplo de 6 apuestas**: 6 apuestas, 4,50 € de demo.
 2. Edita signos y Pleno en el boleto; las selecciones parciales se guardan.
-3. En Crear Quiniela, genera, revisa hasta 100 filas y exporta TXT/JSON.
+3. En **Normal**, mueve la barra: el boleto se actualiza automáticamente.
+   Genera, revisa hasta 100 filas y exporta TXT/JSON.
 4. Para datos reales, **Descargar datos** o Configuración → importar carpeta/ZIP.
    En Crear, **Descargar porcentajes** actualiza realmente por
    Internet las fuentes del sistema abierto, sin cambiar signos ni apuestas.
    **Mercado** son estimaciones publicadas de casas de apuestas; **popularidad**
    son signos jugados en Quinielista. No son equivalentes ni garantizan aciertos.
-   La fuente y hora de captura aparecen debajo. **Cambiar el boleto** aplica la
-   fuente elegida respetando partidos bloqueados; no inventa valores si falta.
+   La fuente y hora de captura aparecen debajo. Las barras aplican la fuente
+   elegida respetando partidos bloqueados; no inventan valores si falta.
 5. En **Aciertos**, el marcador y tus aciertos/fallos se actualizan solos. La demo usa resultados manuales.
 6. Puedes marcar varios goles por equipo en el Pleno; cada pareja aumenta apuestas y coste.
    Los porcentajes 0/1/2/M aparecen debajo de sus casillas, en filas separadas, según mercado o
    popularidad. Descarga porcentajes para incorporarlos a la quiniela abierta.
-   **Cambiar el boleto** preselecciona también el Pleno: nivel 0 elige un marcador,
+   La barra preselecciona también el Pleno: nivel 0 elige un marcador,
    nivel 10 los 16. Puedes ajustar las casillas después. Si faltan datos conserva
    tu Pleno con aviso. El contador muestra columnas × parejas del Pleno y coste;
    generación y TXT incluyen todas las parejas seleccionadas.
-7. **Reducidas** crea, si lo eliges, una copia desde las tablas del artículo SELAE (BOE 2009).
+7. **Reducidas** tiene una base independiente de Normal. Elige entre seis tipos
+   de tablas BOE 2009: se proponen fijos/dobles/triples propios por porcentajes,
+   se muestran columnas y coste con el Pleno y puedes ajustar las casillas.
+   **Generar reducida** produce sus apuestas exactas sin tocar la normal.
+   Cambiar entre Normal y Reducidas recupera cada sistema por jornada.
+   **Diferenciación del público** (0–10), disponible en ambos modos, compara
+   mercado y popularidad de Quinielista: un criterio original de selección,
+   no una probabilidad ni cálculo de rentabilidad. Puede reducir aciertos y
+   no garantiza premios mayores. Requiere ambas fuentes y seleccionar Mercado.
 8. **Guardar apuestas (TXT)**, en la cabecera, guarda las apuestas de la quiniela
    abierta. En Mis Sistemas puedes guardar directamente la fila elegida. Al
    terminar aparecen la ruta, el número de apuestas y los pasos para cargar

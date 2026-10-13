@@ -1,5 +1,21 @@
 # Cambios
 
+## 0.1.13 — 13/10/2026 · Normal y Reducidas independientes
+
+- RF-QUI-005/006: dos constructores independientes por jornada; Normal y
+  Reducidas recuperan sus propios sistemas, sin copiar la base normal.
+- RF-GEN-003/005: barra normal reactiva con agrupación de eventos (150 ms),
+  protección de jornada/revisión, sin necesitar «Cambiar el boleto».
+- RF-RED-001/002: seis tipos disponibles; base específica por porcentajes,
+  fijos/dobles/triples según cada tabla y bloqueos; alternativas/coste con Pleno,
+  ajuste manual opcional y generación exacta. Normal permanece intacta.
+- RF-PRO-003/008: diferenciación original 0–10 con log(p) − alpha*log(q), solo
+  como pesos de selección; requiere mercado y popularidad de Quinielista.
+  No sustituye las probabilidades del proveedor ni calcula premios esperados.
+  Puede reducir aciertos; no garantiza rentabilidad o exclusividad.
+- Pruebas de todos los tipos, independencia/reinicio, Pleno, exportación, fuentes,
+  bloqueos y eventos atrasados. Sin migración de hashes antiguos ni cambios Android.
+
 ## 0.1.12 — 13/10/2026 · Pleno más claro y ordenado
 
 - RF-PRO-008 / RF-QUI-002: panel visual del Pleno con casillas 0/1/2/M
