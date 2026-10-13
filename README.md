@@ -6,12 +6,21 @@ Aplicación de Quiniela para escritorio y Android. La versión de escritorio
 puede leer los datos instalados por WIN1X2; ambas versiones descargan datos,
 porcentajes y marcadores directamente de sus proveedores públicos.
 
-## Quiniela AI Studio — v1.0.0
+## Quiniela AI Studio — v1.0.1
 
 Interfaz gráfica en español que conserva la experiencia visual de Quiniela Local:
-fondo azul, boleto compacto siempre visible a la izquierda, casillas 1/X/2 y
+fondo azul, boleto fijo en tabla con partido, hora y porcentajes junto a 1/X/2,
 Pleno 0/1/2/M, secciones a la derecha y **Descargar datos** en la cabecera.
 El núcleo está en `src/quiniela_ai_studio/{domain,application,infrastructure,ui}`.
+La columna **Modelo % / Jugado %** muestra la fuente elegida, con sus datos
+guardados en la quiniela; los nombres completos y la procedencia están en la
+ayuda al pasar el ratón. El Pleno conserva las selecciones múltiples.
+
+Al abrir, pregunta si quieres continuar tu última quiniela. **Sí, continuar**
+recupera la guardada; **No, empezar una nueva** crea una normal para la jornada
+actual y conserva las anteriores en Mis Sistemas. Si faltan los partidos
+actuales, los descarga; sin conexión conserva tus quinielas y avisa. Un perfil
+que solo contiene la demo sigue usando partidos ficticios claramente indicados.
 
 Nuevo: **Optimizar mis apuestas** calcula una cartera por presupuesto/objetivo y
 muestra una propuesta antes de aplicar. Incluye cobertura uniforme/ponderada
@@ -20,7 +29,7 @@ El verificador independiente comprueba las columnas reales de las reducidas.
 **TuLotero** prepara boletos de Pleno común y TXT/CSV para introducir manualmente:
 no sube archivos, envía apuestas ni cobra. El Pleno es **Manual** por defecto;
 elige **Automático** explícitamente si quieres que lo modifiquen las barras.
-[Manual y límites v1.0.0](docs/STUDIO_V1_0.md).
+[Manual y límites v1.0.1](docs/STUDIO_V1_0.md).
 
 Linux Mint, Python **3.11 o posterior**:
 
@@ -32,7 +41,7 @@ El primer arranque crea el entorno e instala PySide6 y platformdirs. Después
 funciona sin conexión con la demo y los datos ya importados. Windows:
 `run_studio.bat` (preparado, pendiente de ejecución nativa).
 
-1. En Inicio, pulsa **Probar ejemplo de 6 apuestas**: 6 apuestas, 4,50 € de demo.
+1. En Inicio, pulsa **Crear quiniela normal** o **Crear reducida**.
 2. Edita signos y Pleno en el boleto; las selecciones parciales se guardan.
 3. En **Normal**, mueve la barra: el boleto se actualiza automáticamente.
    Genera, revisa hasta 100 filas y exporta TXT/JSON.

@@ -1,5 +1,33 @@
 # 12 · Matriz de trazabilidad de requisitos
 
+RF-UX-004 (v1.0.1): tabla clásica de la base con número, partido, hora,
+porcentajes y 1/X/2; filas alternas, Pleno compacto y ancho fijo. La fuente
+deportiva y la popularidad se muestran por separado según la selección, sin
+alterar valores de cálculo ni inventar datos ausentes. Verificado en
+`test_aciertos_layout.py`: calendario, cambio de fuente, ausencia de datos,
+hash/bets intactos y geometría estable. Pleno y bloqueos mantienen su cobertura
+de interacción en las pruebas existentes.
+
+RF-UX-003 (v1.0.1): retirado el acceso de crear ejemplo y su texto de Inicio;
+crear normal/reducida y consultar aciertos comparten la fila de acciones.
+Verificación de las acciones visibles en Qt y regresión existente de interfaz
+`test_ui.py`. README actualizado para el recorrido actual.
+
+RF-UX-002 (v1.0.1): ancho fijo del boleto, filas compactas alineadas arriba y
+espacio sobrante debajo de los controles. Aciertos da prioridad a sus 15 filas
+de marcador (14 partidos y Pleno); la tabla inferior queda más pequeña y permite
+ajustar el reparto. En pantallas bajas se usa desplazamiento. Pruebas en
+`test_aciertos_layout.py`: posiciones estables entre 1200×975 y 1920×1080,
+marcadores completos, selección de apuesta conservada y controles a 1024×768.
+
+RF-QUI-010 (v1.0.1): pregunta de arranque en español; Sí continúa el sistema
+abierto por última vez, también reducido, y No crea una quiniela normal nueva
+para la jornada actual. Conserva IDs, hashes y versiones anteriores. Descarga
+asíncrona si falta la jornada; sin conexión no fabrica una jornada actual ni
+retoma la anterior. Perfil solo demo explícito. Pruebas en `test_startup.py`:
+clics reales Sí/No, reapertura con modos separados, importación, fallo de red
+y primera sesión offline. `--smoke-test` no muestra la pregunta.
+
 Continuación v1.0.0: RF-RED-002 comparaciones de cardinalidad exacta con DP por
 Pleno; RF-AUD-001 inicio/fallo/cancelación correlacionados; RF-PRO-001 datos
 numéricos extremos rechazados; RF-UX-001 cancelación visible y avanzados
@@ -49,6 +77,9 @@ Esta tabla está generada inicialmente a partir de `01_ESPECIFICACION_FUNCIONAL.
 
 | Requisito | Entrega prevista | Estado inicial | Descripción |
 |---|---|---|---|
+| `RF-UX-004` | v1.0.1 | IMPLEMENTADO | Tabla clásica con horario y porcentajes de la fuente elegida; Pleno compacto y datos ausentes explícitos. |
+| `RF-UX-003` | v1.0.1 | IMPLEMENTADO | Inicio sin botón ni instrucciones para crear ejemplos. |
+| `RF-UX-002` | v1.0.1 | IMPLEMENTADO | Boleto de tamaño estable y prioridad a todos los resultados en Aciertos. |
 | `RF-JOR-001` | v0.1/v0.5 | PARCIAL | Crear, abrir, modificar y archivar temporadas, jornadas y sus 15 partidos. |
 | `RF-JOR-002` | v0.1/v0.5 | PARCIAL | Validar orden 1..14 y partido 15; detectar duplicados y entradas incompletas. |
 | `RF-JOR-003` | v0.1/v0.5 | PENDIENTE | Registrar equipos, fecha/hora con zona horaria, competición y estado del evento. |
@@ -66,6 +97,7 @@ Esta tabla está generada inicialmente a partir de `01_ESPECIFICACION_FUNCIONAL.
 | `RF-QUI-007` | v0.1/v0.8 | PENDIENTE | Sistemas mixtos: combinar columnas concretas, bloques múltiples y reducciones sin duplicación involuntaria. |
 | `RF-QUI-008` | v0.1/v0.8 | PENDIENTE | Construcción manual desde fichero existente y edición segura de combinaciones importadas. |
 | `RF-QUI-009` | v0.1/v0.8 | PENDIENTE | Preparar modelo de Elige8 como modalidad independiente y opcional; requisitos de validación específicos en versión posterior. |
+| `RF-QUI-010` | v1.0.1 | IMPLEMENTADO | Preguntar al arrancar: continuar la última quiniela o crear otra normal en la jornada actual, conservando las guardadas. |
 | `RF-GEN-001` | v0.4/v0.6 | PENDIENTE | Generar apuestas al azar con semilla reproducible y distribución configurable. |
 | `RF-GEN-002` | v0.4/v0.6 | PENDIENTE | Generador ponderado por probabilidades por partido y Pleno al 15. |
 | `RF-GEN-003` | v0.4/v0.6 | PENDIENTE | Generar signos, dobles y triples dada una cantidad o distribución de riesgo. |
@@ -169,7 +201,7 @@ Esta tabla está generada inicialmente a partir de `01_ESPECIFICACION_FUNCIONAL.
 | `RF-AUD-007` | v0.1/v0.9 | PARCIAL | Diagnóstico entendible de importaciones fallidas, dependencia ausente y errores de datos. |
 | `RF-AUD-008` | v0.1/v0.9 | PARCIAL | Instalación portable sin rutas de usuario incrustadas; registro de versión de datos y migraciones. |
 
-**Requisitos RF inventariados:** 118.
+**Requisitos RF inventariados:** 122.
 
 ### Seguimiento obligatorio
 

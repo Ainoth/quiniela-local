@@ -1,13 +1,35 @@
-# Quiniela AI Studio v1.0.0
+# Quiniela AI Studio v1.0.1
 
 Entrega solicitada inicialmente como v0.1.14; el usuario cambió el número a
 v1.0.0. Es una ampliación del proyecto existente, no una nueva aplicación.
 No se modifican Android, archivos personales ni esquema/hashes anteriores.
 
+La actualización 1.0.1 añade la elección de quiniela al arrancar, el boleto de
+ancho fijo con el formato clásico de tabla, más espacio para los marcadores
+de Aciertos e Inicio sin crear ejemplos. Conserva el motor y los límites de 1.0.0.
+
 ## Uso
 
 Linux Mint/Python 3.11+: `./run_studio.sh`. Conserva el icono de escritorio.
 Windows: `run_studio.bat`; código portable, ejecución nativa aún no comprobada.
+
+El boleto conserva su ancho y la posición de sus casillas al ampliar la ventana.
+Muestra partido, hora y porcentajes junto a 1/X/2 en filas alternas. **Modelo %**
+muestra la fuente deportiva guardada; **Jugado %** muestra popularidad. Al
+cambiar la fuente se actualiza la columna. Los datos ausentes quedan señalados;
+no se sustituyen por un modelo inventado. El Pleno conserva equipos, parejas
+múltiples, porcentajes y modo manual/automático en un bloque compacto.
+En Aciertos, el área superior muestra los 14 partidos y el Pleno; la lista de
+apuestas queda más pequeña debajo. Puedes ajustar el separador entre ambas.
+En pantallas de poca altura las tablas permiten desplazamiento.
+
+Al arrancar, **Sí, continuar** abre la última quiniela normal o reducida sin
+crear versiones nuevas. **No, empezar una nueva** crea una normal de la jornada
+actual; la anterior permanece en Mis Sistemas. Si no hay datos de una jornada
+actual editable, la app los descarga en segundo plano y crea el boleto al
+terminar. Si falla la descarga, avisa y no abre la anterior ni inventa una
+jornada actual. En un perfil que solo contiene demo, la nueva es ficticia y
+sigue señalizada. Sin quinielas anteriores no aparece la pregunta.
 
 1. Normal/Reducidas siguen separadas. El Pleno inicia en **Manual**. **Automático
    según fuente** permite que las barras seleccionen goles. **Diversificado**

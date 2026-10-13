@@ -1,10 +1,11 @@
 import argparse
 import os
-from pathlib import Path
 import sys
+from pathlib import Path
+
 from quiniela_ai_studio import __version__
-from quiniela_ai_studio.infrastructure.storage import Repository
 from quiniela_ai_studio.infrastructure.demo import demo_round
+from quiniela_ai_studio.infrastructure.storage import Repository
 
 
 def default_data_dir():
@@ -23,7 +24,12 @@ def main():
     if not repository.rounds():
         repository.save_round(demo_round())
     if args.self_check:
-        from quiniela_ai_studio.domain.engine import generate, coverage_template, size, evaluate
+        from quiniela_ai_studio.domain.engine import (
+            coverage_template,
+            evaluate,
+            generate,
+            size,
+        )
         bets=generate(('1X','1','1X2')+('1',)*11,'M1')
         assert len(bets)==6
         assert size(coverage_template(('1',)*14,(False,)*14,10))==3456
@@ -50,7 +56,8 @@ def main():
     try:
         from PySide6.QtCore import QTimer
         from PySide6.QtWidgets import QApplication
-        from quiniela_ai_studio.ui.window import MainWindow, STYLE
+
+        from quiniela_ai_studio.ui.window import STYLE, MainWindow
     except ImportError:
         repository.close()
         print('Instala la interfaz: python -m pip install -e .', file=sys.stderr)
@@ -58,6 +65,7 @@ def main():
     application=QApplication(sys.argv[:1]);application.setStyle('Fusion');application.setStyleSheet(STYLE)
     window=MainWindow(repository);window.show()
     if args.smoke_test:QTimer.singleShot(700,window.close)
+    else:QTimer.singleShot(0,lambda:window.safe(window.start_session))
     return application.exec()
 
 

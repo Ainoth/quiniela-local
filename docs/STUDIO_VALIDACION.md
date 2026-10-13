@@ -248,3 +248,22 @@ desactivado sin datos económicos fiables; TXT/CSV agrupados propios, no un
 formato de importación TuLotero documentado. Windows nativo y validación/pago
 externos no probados. Siguiente fase: pruebas de escala/UX y validación nativa
 Windows, manteniendo separadas estimación probabilística y garantía combinatoria.
+
+## Publicación v1.0.1 — 14/10/2026
+
+- Versión de paquete, interfaz, README y manual: 1.0.1. El motor permanece
+  `portfolio-1.0.0`; no se modifican reglas, esquema ni hashes anteriores.
+- 228 pruebas Studio correctas; 2 omitidas por TXT personales opcionales ausentes.
+  32 pruebas heredadas de escritorio correctas. Ruff E9/F/I en archivos de código
+  y pruebas modificados; diff correcto.
+- Arranque de elección probado por clic en Sí/No, normal/reducida, caché y errores
+  de descarga. Conservación de apuestas/hashes previos comprobada.
+- Boleto fijo, Aciertos completo y tabla clásica revisados visualmente con
+  datos sintéticos explícitos; geometría comprobada a 1024×768, 1200×975 y
+  1920×1080. Pleno múltiple y procedencia de porcentajes permanecen comprobados.
+- Self-check y arranque Qt/X11 correctos con perfil temporal. Wheel/sdist 1.0.1
+  construidas; importación y arranque Qt de la wheel fuera del código fuente
+  verificados. Instalación editable y acceso de escritorio actualizados.
+- Publicación limitada a código, documentación y pruebas. ZIP original, TXT
+  personales, bases SQLite y apuestas del usuario permanecen fuera del commit.
+  Windows nativo sigue pendiente, conforme al alcance de la base.

@@ -1,5 +1,28 @@
 # Cambios
 
+## 1.0.1 — 14/10/2026 · Arranque y distribución de escritorio
+
+- RF-UX-004: recuperado el formato clásico de tabla para la base: partido,
+  hora, porcentajes y 1/X/2, filas alternas y Pleno compacto. Modelo/Jugado
+  muestran la fuente seleccionada, con procedencia y ausencia de datos explícitas.
+
+- RF-UX-003: retirados de Inicio el botón de crear ejemplo y su explicación;
+  acciones de crear normal/reducida y consultar aciertos agrupadas.
+
+- RF-UX-002: boleto de ancho fijo con filas compactas; deja de ensancharse y
+  desplazar pronósticos al maximizar. Aciertos reserva altura a los 14 resultados
+  y el Pleno; tabla de apuestas inferior más pequeña y reparto ajustable. Los
+  controles siguen accesibles en pantallas pequeñas, con desplazamiento.
+
+- RF-QUI-010: pregunta de arranque para continuar la última quiniela normal o
+  reducida, o crear una normal nueva para la jornada actual. Conserva las
+  versiones anteriores; descarga asíncrona si faltan datos actuales, con error
+  claro en modo offline. La prueba de arranque automático omite la pregunta.
+
+- Validación de 1.0.1: 228 pruebas Studio y 32 históricas correctas; 2 TXT
+  personales opcionales ausentes. Ruff E9/F/I, self-check y arranque correctos;
+  wheel/sdist construidas y arranque de la wheel aislada verificado.
+
 ## 1.0.0 — 13/10/2026 · Optimización verificable y boletos manuales
 
 - Continuación: referencias con idéntica cantidad mediante DP por Pleno;

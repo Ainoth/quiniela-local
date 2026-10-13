@@ -45,6 +45,11 @@ El usuario debe poder pasar de «quiero gastar como máximo X euros» a un conju
 - **RF-QUI-007** Sistemas mixtos: combinar columnas concretas, bloques múltiples y reducciones sin duplicación involuntaria.
 - **RF-QUI-008** Construcción manual desde fichero existente y edición segura de combinaciones importadas.
 - **RF-QUI-009** Preparar modelo de Elige8 como modalidad independiente y opcional; requisitos de validación específicos en versión posterior.
+- **RF-QUI-010** Al abrir, preguntar si se continúa la última quiniela normal o
+  reducida. Sí recupera la versión guardada; No crea una nueva normal de la
+  jornada actual sin alterar las anteriores. Si faltan datos actuales,
+  descargarlos sin bloquear la interfaz; un error no abre la anterior ni
+  presenta una jornada pasada como actual. Un perfil solo demo sigue señalado.
 
 ### M03 — Generadores / asistente inteligente
 
@@ -187,7 +192,22 @@ El usuario debe poder pasar de «quiero gastar como máximo X euros» a un conju
 - **RF-AUD-007** Diagnóstico entendible de importaciones fallidas, dependencia ausente y errores de datos.
 - **RF-AUD-008** Instalación portable sin rutas de usuario incrustadas; registro de versión de datos y migraciones.
 
-### Complemento de interfaz v1.0.0
+### Complemento de interfaz v1.0.x
+
+- **RF-UX-004** Recuperar el formato clásico de la quiniela base con número,
+  partido, hora, porcentajes de la fuente elegida y casillas 1/X/2 alineadas.
+  Filas alternas, tamaño estable y Pleno compacto. Distinguir modelo deportivo
+  de popularidad y señalar ausencia de datos sin inventar valores. Conservar
+  bloqueos, selecciones múltiples, fuentes congeladas y apuestas guardadas.
+
+- **RF-UX-003** Inicio ofrece crear normal/reducida y consultar aciertos;
+  retirar el botón de crear ejemplo y las instrucciones que lo recomiendan.
+
+- **RF-UX-002** El boleto conserva ancho y filas compactas al ampliar la ventana,
+  sin desplazar los signos ni estirar partidos. En Aciertos se prioriza ver los
+  14 resultados y el Pleno en la tabla superior; la lista de apuestas ocupa
+  menos altura. Las pantallas pequeñas conservan desplazamiento y controles
+  de Pleno/Generar accesibles.
 
 - **RF-UX-001** En Optimizar, progreso y cancelación accesibles en la misma
   pantalla; presupuesto y acciones visibles a 1024×768 aun desplegando opciones

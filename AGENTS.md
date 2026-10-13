@@ -29,7 +29,7 @@ Construir **Quiniela AI Studio**, una app de escritorio Linux/Windows en españo
 
 Sigue `CODEX_EMPEZAR_AQUI.md` y `docs/08_PLAN_VERSIONES.md`; desarrolla **solo v0.1** como vertical end-to-end inicial. Consulta el catálogo completo para preservar la extensibilidad, pero no intentes desarrollar todos los reductores y filtros de una sola vez.
 
-## Entrega activa posterior al arranque: v1.0.0
+## Entrega activa posterior al arranque: v1.0.x
 
 La primera tarea anterior registra el arranque histórico. El usuario solicita
 ahora v1.0.0 (antes denominada v0.1.14), sobre la app existente. Consulta
@@ -39,3 +39,8 @@ anteriores de seguridad, trazabilidad y separación de capas. Nunca confundas
 popularidad con ROI ni preparación manual TuLotero con validación/importación
 automática. Preserva TXT personales y hashes de versiones anteriores. Android
 no forma parte de esta entrega; Windows necesita validación nativa explícita.
+
+La revisión activa v1.0.1 recoge la elección al arrancar y las correcciones de
+interfaz solicitadas. Consulta el CHANGELOG y la matriz; el algoritmo de
+optimización sigue siendo `portfolio-1.0.0`. No se renumeran algoritmos ni
+versiones de datos por una actualización visual.
