@@ -1,5 +1,14 @@
 # Cambios
 
+## 0.1.12 — 13/10/2026 · Pleno más claro y ordenado
+
+- RF-PRO-008 / RF-QUI-002: panel visual del Pleno con casillas 0/1/2/M
+  separadas de una fila inferior de porcentajes, alineada por columnas.
+- Casillas más amplias, título diferenciado y resumen de coste en dos líneas.
+  Sin selección se muestran instrucciones, no una multiplicación por cero.
+- Cálculos, selección múltiple y exportación sin cambios. Prueba de geometría
+  para alineación y visibilidad de Generar a 1024×768. Android sin cambios.
+
 ## 0.1.11 — 13/10/2026 · Porcentajes y preselección del Pleno múltiple
 
 - RF-PRO-001/002/008: porcentajes 0/1/2/M del local y visitante en la fuente

@@ -1,5 +1,10 @@
 # 12 · Matriz de trazabilidad de requisitos
 
+Revisión 0.1.12: RF-PRO-008 / RF-QUI-002 separan visualmente porcentajes y
+casillas del Pleno, alineados por goles, sin alterar la selección ni cálculos.
+Prueba: `test_percentages_are_separate_and_aligned_below_goals` en
+`tests/studio/test_pleno_probabilities.py`.
+
 Revisión 0.1.11: RF-PRO-001/002/008 incorporan marginales 0/1/2/M del Pleno,
 RF-GEN-003/005 preselección progresiva explícita y RF-QUI-002/003 visibilidad
 del producto de columnas y parejas. Pruebas: `tests/studio/test_pleno_probabilities.py`;

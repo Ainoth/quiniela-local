@@ -6,7 +6,7 @@ Aplicación de Quiniela para escritorio y Android. La versión de escritorio
 puede leer los datos instalados por WIN1X2; ambas versiones descargan datos,
 porcentajes y marcadores directamente de sus proveedores públicos.
 
-## Quiniela AI Studio — v0.1 ejecutable (revisión 0.1.11)
+## Quiniela AI Studio — v0.1 ejecutable (revisión 0.1.12)
 
 Interfaz gráfica en español que conserva la experiencia visual de Quiniela Local:
 fondo azul, boleto compacto siempre visible a la izquierda, casillas 1/X/2 y
@@ -35,7 +35,7 @@ funciona sin conexión con la demo y los datos ya importados. Windows:
    fuente elegida respetando partidos bloqueados; no inventa valores si falta.
 5. En **Aciertos**, el marcador y tus aciertos/fallos se actualizan solos. La demo usa resultados manuales.
 6. Puedes marcar varios goles por equipo en el Pleno; cada pareja aumenta apuestas y coste.
-   Los porcentajes 0/1/2/M aparecen junto a cada casilla, según mercado o
+   Los porcentajes 0/1/2/M aparecen debajo de sus casillas, en filas separadas, según mercado o
    popularidad. Descarga porcentajes para incorporarlos a la quiniela abierta.
    **Cambiar el boleto** preselecciona también el Pleno: nivel 0 elige un marcador,
    nivel 10 los 16. Puedes ajustar las casillas después. Si faltan datos conserva

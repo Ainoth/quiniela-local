@@ -48,3 +48,10 @@ self-check y arranque Qt nativo correctos. Inspección visual a 1024×768:
 porcentajes junto a casillas y botón Generar dentro de la ventana.
 Descarga real 26-27/J13 comprobada: mercado local 33,97/36,68/19,80/9,55 y
 visitante 18,18/30,99/26,42/24,41; popularidad se conserva separada.
+
+Revisión visual 0.1.12: sustituida la mezcla horizontal casilla-porcentaje por
+un panel de dos equipos, cada uno con casillas y una fila inferior de
+porcentajes de solo lectura, alineados con 0/1/2/M. Casillas 48×27, porcentajes
+de menor tamaño y resumen en dos líneas; sin selección se muestran instrucciones.
+Se mantiene la lógica múltiple. Prueba de posiciones/alineación y botón Generar
+dentro de la ventana de 1024×768; inspección visual antes de la entrega.

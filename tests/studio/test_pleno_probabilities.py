@@ -145,3 +145,23 @@ def test_maximum_includes_full_fifteen(window):
     window.apply_template()
     assert size(window.system.base) * len(window.system.plenos) == 55296
     assert json.loads(window.system.parameters)['plenos'] == list(window.system.plenos)
+
+
+def test_percentages_are_separate_and_aligned_below_goals(window):
+    from PySide6.QtCore import QPoint
+    from PySide6.QtTest import QTest
+    window.resize(1024, 768)
+    window.new_system()
+    QTest.qWait(20)
+    for side in range(2):
+        for goal in '012M':
+            button = window.goal_buttons[side][goal]
+            percentage = window.goal_percentages[side][goal]
+            button_pos = button.mapTo(window.pleno_panel, QPoint(0, 0))
+            percentage_pos = percentage.mapTo(window.pleno_panel, QPoint(0, 0))
+            assert percentage_pos.x() == button_pos.x()
+            assert percentage_pos.y() >= button_pos.y() + button.height()
+            assert percentage.width() == button.width()
+            assert button.text() == goal
+    assert 'Elige al menos un gol' in window.pleno_selection_info.text()
+    assert window.generate_button.mapTo(window, QPoint(0, 0)).y() + window.generate_button.height() <= window.height()

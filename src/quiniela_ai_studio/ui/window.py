@@ -67,6 +67,9 @@ QWidget {font-family: "DejaVu Sans", "Segoe UI"; font-size: 12px; color: #eaf4ff
 QLabel#brand {font-size:24px; font-weight:bold; color:#49dbff; background:#0b315c;}
 QLabel#title {font-size:20px; font-weight:bold; color:#ffc83d;}
 QLabel#muted {color:#8fb5d8;}
+QWidget#plenoPanel {background:#0b2948; border:1px solid #28577d; border-radius:6px;}
+QLabel#plenoTeam {background:transparent; color:#eaf4ff; font-weight:bold;}
+QLabel#plenoPercentage {background:#123450; color:#8ec8e8; font-size:10px; border-radius:3px; padding:1px;}
 QLabel#footer {background:#d89b12; color:#10213a; font-weight:bold; padding:7px;}
 QWidget#hero {background:#0b315c;}
 QPushButton {background:#123b65; border:1px solid #2d6b9e; border-radius:4px; padding:6px 9px; color:#eaf6ff;}
@@ -369,7 +372,7 @@ class MainWindow(QMainWindow):
             for goal,button in buttons.items():
                 button.setChecked(bool(system and goal in system.goal_masks[side]))
                 button.setEnabled(bool(system and round_.editable and not busy))
-        self.pleno_selection_info.setText(f'Local: {len(system.goal_masks[0])} opciones · Visitante: {len(system.goal_masks[1])} · {len(system.plenos)} parejas del Pleno\n{engine.size(system.base):,} columnas × {len(system.plenos)} Plenos = {engine.size(system.base)*len(system.plenos):,} apuestas · {money(engine.size(system.base)*len(system.plenos)*view_round.price_cents)} si juegas todas. M = 3 o más.' if system else 'Marca goles del local y visitante. M = 3 o más. Cada pareja del Pleno multiplica las apuestas.')
+        self.pleno_selection_info.setText(f'{engine.size(system.base):,} columnas × {len(system.plenos)} Plenos = {engine.size(system.base)*len(system.plenos):,} apuestas\nCoste si juegas todas: {money(engine.size(system.base)*len(system.plenos)*view_round.price_cents)} · {len(system.plenos)} parejas de goles' if system and system.plenos else 'Elige al menos un gol para el local y otro para el visitante.\nPuedes marcar varias casillas. M significa 3 goles o más.')
         self.preview_model.update_rows([(b.column,b.pleno or '—',b.quantity) for b in system.bets[:100]] if system else [])
         self.preview_info.setText(f'{quantity:,} apuestas listas. Pulsa Guardar apuestas (TXT) para sacar el archivo.' if quantity else 'Elige los signos y los goles del Pleno y pulsa Generar debajo del boleto.' if system else 'Pulsa Nuevo para empezar una quiniela.')
         self.name_input.blockSignals(True); self.name_input.setText(system.name if system else ''); self.name_input.blockSignals(False)
@@ -441,7 +444,7 @@ class MainWindow(QMainWindow):
             lock.clicked.connect(partial(self.toggle_lock,i));grid.addWidget(lock,i+1,4);self.lock_buttons.append(lock)
         grid.setColumnStretch(0,1)
         scroll.setWidget(grid_widget);layout.addWidget(scroll,1)
-        row=QHBoxLayout();self.pleno_match_label=QLabel();self.pleno_match_label.setWordWrap(True);row.addWidget(self.pleno_match_label)
+        row=QHBoxLayout();self.pleno_match_label=QLabel();self.pleno_match_label.setWordWrap(True);self.pleno_match_label.setStyleSheet('color:#ffc83d; font-weight:bold;');row.addWidget(self.pleno_match_label)
         self.pleno_combos=[]
         for _ in range(2):
             combo=QComboBox();combo.addItems(['—','0','1','2','M']);combo.currentIndexChanged.connect(self.change_pleno)
@@ -449,15 +452,18 @@ class MainWindow(QMainWindow):
         layout.addLayout(row)
         self.goal_buttons=[]
         self.goal_percentages=[]
+        self.pleno_panel=QWidget();self.pleno_panel.setObjectName('plenoPanel')
+        pleno_grid=QGridLayout(self.pleno_panel);pleno_grid.setContentsMargins(10,8,10,8);pleno_grid.setHorizontalSpacing(9);pleno_grid.setVerticalSpacing(3)
         for side,label_text in enumerate(('Local','Visitante')):
-            row=QHBoxLayout();row.setSpacing(2);row.addWidget(QLabel(label_text));buttons={};percentages={}
-            for goal in '012M':
-                button=QPushButton(goal);button.setCheckable(True);button.setFixedSize(35,25)
+            team_label=QLabel(label_text);team_label.setObjectName('plenoTeam');pleno_grid.addWidget(team_label,side*3,0,2,1);buttons={};percentages={}
+            for column,goal in enumerate('012M',1):
+                button=QPushButton(goal);button.setCheckable(True);button.setFixedSize(48,27);button.setToolTip('3 goles o más' if goal=='M' else f'{goal} goles')
                 button.clicked.connect(lambda checked=False,i=side,g=goal:self.toggle_goal(i,g))
-                row.addWidget(button);buttons[goal]=button
-                percentage=QLabel('—');percentage.setStyleSheet('font-size:10px; color:#8fb5d8;');row.addWidget(percentage);percentages[goal]=percentage
-            row.addStretch();layout.addLayout(row);self.goal_buttons.append(buttons)
+                pleno_grid.addWidget(button,side*3,column);buttons[goal]=button
+                percentage=QLabel('—');percentage.setObjectName('plenoPercentage');percentage.setFixedWidth(48);percentage.setAlignment(Qt.AlignmentFlag.AlignCenter);pleno_grid.addWidget(percentage,side*3+1,column);percentages[goal]=percentage
+            self.goal_buttons.append(buttons)
             self.goal_percentages.append(percentages)
+        pleno_grid.setRowMinimumHeight(2,7);pleno_grid.setColumnStretch(5,1);layout.addWidget(self.pleno_panel)
         self.pleno_selection_info=QLabel();self.pleno_selection_info.setWordWrap(True);layout.addWidget(self.pleno_selection_info)
         left_layout=layout;layout=self.page_layout(1)
         row=QHBoxLayout();row.addWidget(QLabel('Añadir dobles y triples (0–10)'))

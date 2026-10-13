@@ -1,6 +1,6 @@
 # Índice del proyecto de escritorio
 
-Guía actual: [Entrega ejecutable v0.1](STUDIO_V01_ENTREGA.md), revisión 0.1.11. Incluye porcentajes y preselección del Pleno múltiple, descarga explícita de mercado y popularidad, Aciertos automático, Reducidas opcional y guardado guiado de apuestas.
+Guía actual: [Entrega ejecutable v0.1](STUDIO_V01_ENTREGA.md), revisión 0.1.12. Incluye panel del Pleno con porcentajes separados, preselección múltiple, descarga explícita de mercado y popularidad, Aciertos automático, Reducidas opcional y guardado guiado de apuestas.
 Los registros v0.1.0/v0.1.1 siguientes describen entregas anteriores.
 
 - [Especificación de PC](ESPECIFICACION_PC.md): objetivo completo, arquitectura,
