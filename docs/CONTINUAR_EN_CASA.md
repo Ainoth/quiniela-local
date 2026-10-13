@@ -4,6 +4,13 @@ Trabajo pausado el 13/10/2026 por petición del usuario. La numeración ya es
 v1.0.0, pero este commit es un incremento de desarrollo, no la certificación
 de que toda la especificación esté terminada.
 
+Desarrollo reanudado en casa el 13/10/2026. El registro siguiente de pausa se
+conserva como contexto; las correcciones posteriores están documentadas en
+`STUDIO_V1_0.md`, `STUDIO_VALIDACION.md` y el plan de optimización.
+Se han corregido comparaciones de cardinalidad, auditoría de cancelación/error,
+informes obsoletos al editar/restaurar, desbordamientos numéricos y ranking de
+probabilidades diminutas, además del acceso a opciones avanzadas y cancelación.
+
 ## Estado guardado
 
 Motor independiente de optimización por presupuesto, cobertura marginal,
@@ -40,11 +47,12 @@ y unos 56 KB de pico atribuible al cálculo.
 - Revisión completa de conformidad con la especificación y de casos límite
   de presupuesto, agrupación, cancelación y entradas numéricas extremas.
 - Comprobación visual interactiva de todas las pantallas modificadas.
-- Revisar igualdad de cantidades en comparaciones con restricciones de
-  agrupación y el registro de ejecuciones canceladas o fallidas.
+- Continuar ampliando pruebas de escala y revisión de casos extremos;
+  cardinalidades y registro de cancelaciones/fallos ya tienen regresiones.
 - El límite temporal acota la búsqueda; la verificación posterior puede
   prolongar el tiempo total. Revisar este comportamiento en universos grandes.
-- Validar empaquetado y ejecución nativa en Windows; no probado aquí.
+- El empaquetado wheel y su importación aislada se han validado en Linux;
+  falta ejecución nativa en Windows.
 - El valor esperado permanece desactivado sin datos económicos suficientes.
   Las coberturas muestreadas no son garantías matemáticas.
 

@@ -1,5 +1,16 @@
 # 12 · Matriz de trazabilidad de requisitos
 
+Continuación v1.0.0: RF-RED-002 comparaciones de cardinalidad exacta con DP por
+Pleno; RF-AUD-001 inicio/fallo/cancelación correlacionados; RF-PRO-001 datos
+numéricos extremos rechazados; RF-UX-001 cancelación visible y avanzados
+desplazables. Regresiones: `test_portfolio.py` y `test_v1_gui.py`.
+RF-GAR-001/003: retirar informes obsoletos al editar/restaurar sin destruir
+versiones anteriores; RF-PRO-005: diferencias de masa menores de 1e-12 siguen
+contando en búsqueda exhaustiva. Oráculos y persistencia: `test_portfolio.py`.
+RF-PRO-005: ranking y objetivo de masa reescalados desde logaritmos, incluidas
+marginales del Pleno; regresiones de subdesbordamiento (1e-100 y 1e-300), aviso
+y log(masa) conservado en informe y vista previa.
+
 v1.0.0: RF-RED-002 carteras por objetivo; RF-GAR-001/002/003 verificador
 independiente y métricas por universo; RF-PRO-005 masa deportiva; RF-QUI-002
 Pleno explícito/manual/diversificado; RF-ARC-009 preparación TuLotero con

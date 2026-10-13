@@ -16,6 +16,16 @@ configurables, agrupación sin modificar Plenos, TXT/CSV con relectura.
 Pleno manual predeterminado y automatismo solo explícito; modelo marginal
 independiente de goles opcional, sin confundirlo con distribución conjunta real.
 
+## Continuación en el equipo de casa
+
+RF-RED-002/RF-AUD-001/RF-PRO-001: corregir comparaciones atrapadas en grupos
+de Pleno, auditar inicio/cancelación/error con el mismo ID de ejecución, validar
+enteros extremos sin OverflowError y mostrar cancelación/progreso en Optimizar.
+RF-UX-001: parámetros avanzados dentro del área desplazable; los controles de
+presupuesto no deben quedar ocultos a 1024×768. Criterios: regresión contra
+oráculo exhaustivo de cardinalidades, cancelación real en Qt sin modificar
+apuestas, errores de dominio explícitos y suites completas sin regresiones.
+
 Fuentes revisadas 13/10/2026:
 - https://tulotero.es/jugar-quiniela/ : mínimo dos apuestas para validar, hasta
   ocho sencillas por boleto y un Pleno común. Perfil versionado configurable,

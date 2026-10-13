@@ -193,3 +193,58 @@ correctos. Windows sigue pendiente de ejecución nativa.
 - Página y muestra del proveedor contrastadas sin cargar archivos ni efectuar
   compras. Abrir la web no constituye validación, envío ni pago desde Studio.
 - Windows sigue preparado y sin prueba nativa; no cambia el esquema SQLite.
+
+## Continuación v1.0.0 en casa — 13/10/2026
+
+- `./run_studio.sh --self-check` y `--smoke-test`: correctos en Linux; el
+  segundo abre/cierra Qt en X11. Instalación editable local: versión 1.0.0.
+- `.venv-studio/bin/python -m pytest -q`: **219 pruebas superadas en 74,51 s**.
+- `RUN_PC_GUI_TESTS=1 python3 -m unittest discover -q`: **32 pruebas históricas
+  superadas**. Android permanece sin cambios.
+- Ruff E9/F/I en servicios, modelos, cartera, ventana, diálogos y pruebas
+  modificadas: correcto. No se afirma limpieza completa de estilo heredado.
+- Capturas Qt/offscreen de Optimizar, propuesta y parámetros avanzados revisadas
+  a 1024×768. Detectado y corregido el recorte de avanzados: tamaño mínimo
+  vertical de 909 a 729 píxeles; botones de presupuesto/cancelación accesibles.
+- Regresiones: referencias con idéntica cantidad aun con mínimos por Pleno;
+  inicio/éxito/cancelación/fallo correlacionados; cancelar no aplica selecciones;
+  edición/restauración retiran garantías obsoletas sin borrar el histórico;
+  ranking logarítmico de probabilidades y marginales del Pleno extremadamente
+  pequeñas; datos desbordados producen error de dominio, no OverflowError.
+- Wheel 1.0.0 construida con aislamiento de dependencias de compilación,
+  importada directamente desde el archivo fuera del código fuente; comprobado
+  el caso de 72 columnas/5 € y los nuevos módulos. El primer intento sin
+  aislamiento falló por ausencia de setuptools en el entorno; el build aislado
+  lo resuelve sin añadir dependencias de cálculo a la aplicación.
+
+### Referencia cuantitativa sintética
+
+`scripts/benchmark_portfolio.py`, Python 3.12.3/Linux x86_64, probabilidades demo
+50/30/20, 9 fijos + 3 dobles + 2 triples, Pleno M0, semilla 123. Ambas carteras:
+6 apuestas, 4,50 €, remanente 0,50 €. Universos y probabilidades idénticos.
+
+| Métrica | Referencia v0.1.13 | Automático v1.0.0 |
+|---|---:|---:|
+| Cobertura uniforme 13+ | 36,11 % | 63,89 % |
+| Cobertura ponderada 13+ | 62,99 % | 79,92 % |
+| Cobertura ponderada 12+ | 89,45 % | 99,44 % |
+| Distancia media de Hamming | 1,667 | 3,133 |
+| Masa absoluta estimada de 14 | 0,02441 % | 0,01172 % |
+| Mínimo dentro de los 72 resultados | 10 | 11 |
+
+La mejora de cobertura sacrifica masa de 14. Verificación exacta sobre esta base
+sintética; selección heurística, **sin óptimo global ni premio económico
+garantizado**. Última medición con tracemalloc: 0,513 s y pico de 64.211 bytes
+atribuible al cálculo; no es un límite de rendimiento universal.
+
+Cambios principales: `application/services.py`, `domain/models.py`,
+`domain/portfolio.py`, `ui/window.py`, `ui/portfolio_dialogs.py` y sus regresiones
+`test_portfolio.py` / `test_v1_gui.py`; plan, manual, requisitos, trazabilidad,
+registro de cambios y nota de continuidad actualizados.
+
+Límites que permanecen: tiempo configurado acota la búsqueda, no toda la
+verificación posterior; muestreo no certifica garantías; valor esperado
+desactivado sin datos económicos fiables; TXT/CSV agrupados propios, no un
+formato de importación TuLotero documentado. Windows nativo y validación/pago
+externos no probados. Siguiente fase: pruebas de escala/UX y validación nativa
+Windows, manteniendo separadas estimación probabilística y garantía combinatoria.

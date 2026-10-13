@@ -2,6 +2,17 @@
 
 ## 1.0.0 — 13/10/2026 · Optimización verificable y boletos manuales
 
+- Continuación: referencias con idéntica cantidad mediante DP por Pleno;
+  auditoría correlacionada de inicio, éxito, cancelación y fallo; entradas
+  numéricas extremas sin desbordamientos no controlados.
+- Cancelación y progreso visibles en Optimizar; parámetros avanzados
+  desplazables para no ocultar botones en pantallas pequeñas.
+- Informes de garantía invalidados al editar/restaurar y conservados en el
+  histórico; búsqueda exacta sin descartar diferencias de masa inferiores a 1e-12.
+- Ranking y objetivo de masa en escala logarítmica/reescala común, incluido
+  Pleno: las probabilidades absolutas diminutas no se convierten en empates
+  ficticios; aviso e informe de log(masa) cuando el float se redondea a cero.
+
 - Entrega pedida como v0.1.14 y renumerada a v1.0.0 por el usuario.
 - RF-RED-002 / RF-GAR-001/002/003: carteras con ganancia marginal, intercambio,
   exhaustivo acotado y muestreo reproducible; cobertura uniforme/ponderada

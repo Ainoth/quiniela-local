@@ -74,7 +74,7 @@ class ProbabilitySnapshot:
         if len(self.values) != 14:
             raise ValueError("Se requieren probabilidades para los 14 partidos.")
         for row in self.values:
-            if len(row) != 3 or any(isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(v) or not 0 <= v <= 1 for v in row):
+            if len(row) != 3 or any(isinstance(v, bool) or not isinstance(v, (int, float)) or not 0 <= v <= 1 or not math.isfinite(v) for v in row):
                 raise ValueError("Probabilidades: valores finitos entre 0 y 1.")
             if not math.isclose(sum(row), 1, abs_tol=1e-6):
                 raise ValueError("Las probabilidades deben sumar 1 (tolerancia 1e-6).")
@@ -82,7 +82,7 @@ class ProbabilitySnapshot:
             if len(self.pleno_values) != 2:
                 raise ValueError("El Pleno necesita porcentajes para local y visitante.")
             for row in self.pleno_values:
-                if len(row) != 4 or any(isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(v) or not 0 <= v <= 1 for v in row) or not math.isclose(sum(row), 1, abs_tol=1e-6):
+                if len(row) != 4 or any(isinstance(v, bool) or not isinstance(v, (int, float)) or not 0 <= v <= 1 or not math.isfinite(v) for v in row) or not math.isclose(sum(row), 1, abs_tol=1e-6):
                     raise ValueError("Pleno: cuatro porcentajes válidos 0/1/2/M que sumen 1 por equipo.")
 
 

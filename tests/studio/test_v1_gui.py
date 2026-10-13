@@ -1,8 +1,10 @@
 """Integración Qt: propuesta, consentimiento de aplicación y preparación manual."""
+import json
+import threading
 from collections import Counter
 
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QFileDialog
+from PySide6.QtWidgets import QFileDialog, QMessageBox
 from test_pleno_probabilities import with_goals
 from test_portfolio import BASE72
 from test_ui import wait_for_data
@@ -27,6 +29,9 @@ def test_72_proposal_apply_and_audit(window):
     assert window.repository.load(original.system_id,original.revision)==original
     assert any('optimization_run' in str(row) for row in window.repository.audit())
     assert not window.portfolio_objective.model().item(3).isEnabled()
+    events=[(row[1],json.loads(row[3])) for row in window.repository.audit() if row[1] in ('optimization_started','optimization_run')]
+    assert {data['status'] for _,data in events}=={'started','completed'}
+    assert len({data['run_id'] for _,data in events})==1
 
 
 def test_tulotero_manual_grouping_and_csv(window,tmp_path,monkeypatch):
@@ -72,3 +77,49 @@ def test_reduction_three_actual_gui_is_verified(window):
     assert window.system.quantity==24
     assert report['universe_total']==216 and report['minimum_hits']==13
     assert 'mínimo 13' in window.footer.text()
+
+
+def test_cancelled_optimization_is_audited_without_modifying_system(window,monkeypatch):
+    from quiniela_ai_studio.domain import engine, portfolio
+    entered=threading.Event()
+    def cancellable(*args,cancelled,**kwargs):
+        entered.set()
+        while not cancelled():threading.Event().wait(.005)
+        raise engine.Cancelled('Optimización cancelada.')
+    monkeypatch.setattr(portfolio,'optimize_portfolio',cancellable)
+    original=window.service.imported(window.round,'Cancelación sintética',generate(BASE72,'M0'))
+    window.set_system(original);window.optimize()
+    for _ in range(200):
+        QTest.qWait(5)
+        if entered.is_set():break
+    assert entered.is_set()
+    window.navigation.setCurrentRow(2)
+    assert window.portfolio_cancel.isEnabled() and window.portfolio_cancel.isVisible()
+    window.portfolio_cancel.click();wait_for_data(window)
+    assert not window.portfolio_cancel.isEnabled()
+    events=[json.loads(row[3]) for row in window.repository.audit() if row[1]=='optimization_run']
+    assert events[0]['status']=='cancelled' and events[0]['input_hash']==original.hash
+    assert window.system==original and 'config' in events[0]
+
+
+def test_failed_optimization_is_audited_without_modifying_system(window,monkeypatch):
+    from quiniela_ai_studio.domain import portfolio
+    def failing(*args,**kwargs):raise ValueError('Fallo sintético de referencia.')
+    monkeypatch.setattr(portfolio,'optimize_portfolio',failing)
+    monkeypatch.setattr(QMessageBox,'warning',lambda *args:QMessageBox.StandardButton.Ok)
+    original=window.service.imported(window.round,'Fallo sintético',generate(BASE72,'M0'))
+    window.set_system(original);window.optimize();wait_for_data(window)
+    events=[json.loads(row[3]) for row in window.repository.audit() if row[1]=='optimization_run']
+    assert events[0]['status']=='failed' and 'sintético' in events[0]['error']
+    assert window.system==original
+
+
+def test_advanced_parameters_scroll_without_hiding_budget_actions(window):
+    window.navigation.setCurrentRow(2)
+    window.portfolio_advanced_toggle.setChecked(True);QTest.qWait(50)
+    assert window.minimumSizeHint().height()<=768
+    assert window.portfolio_advanced.isVisible()
+    for button in (window.budget_apply,window.portfolio_cancel):
+        assert button.isVisible()
+        assert button.mapTo(window,button.rect().bottomRight()).y()<window.height()
+    assert window.portfolio_time.isVisible()

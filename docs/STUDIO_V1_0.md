@@ -19,7 +19,10 @@ Windows: `run_studio.bat`; código portable, ejecución nativa aún no comprobad
 3. **Optimizar mis apuestas** trabaja en segundo plano y comunica cantidades
    procesadas. La propuesta conserva cada Pleno. Revisa coste, remanente,
    cobertura, comparación y contribuciones antes de **Aplicar selección**.
-   Cerrar sin aplicar conserva las apuestas. Los cálculos quedan en auditoría.
+   Cerrar sin aplicar conserva las apuestas. El progreso y **Cancelar optimización**
+   están en esa misma pantalla. Los parámetros avanzados se muestran en el área
+   desplazable, sin sacar los botones fuera de una pantalla de 1024×768.
+   Los cálculos quedan en auditoría, también si se cancelan o fallan.
 4. En Análisis puedes verificar cobertura por separado o abrir el modelo de las
    16 parejas del Pleno. Este modelo utiliza marginales y una hipótesis explícita
    de independencia entre goles; no es un modelo conjunto calibrado.
@@ -45,6 +48,12 @@ archivos originales ni multiplica premios. Probabilidades por logaritmos y
 modelo de independencia entre encuentros. El normalizador acepta filas que
 suman 1 o 100 (redondeo ±1%); rechaza valores no finitos/negativos. La utilidad
 para cuotas retira margen proporcionalmente, método aproximado documentado.
+El ranking utiliza logaritmos, también para las marginales del Pleno. El objetivo
+de masa se reescala por una constante común para evitar subdesbordamiento.
+Si la masa absoluta no es representable como float, aparece un aviso y se
+conserva `probability_mass_log` en el informe; el cero mostrado no altera la
+selección. `objective_score` de Máxima probabilidad usa esta escala relativa,
+no euros ni probabilidad absoluta.
 
 - **Automático:** 0,45 cobertura 13+ + 0,25 cobertura 12+ + 0,25 masa exacta
   relativa a todas las candidatas + 0,05 distancia media/14. Usa cobertura
@@ -84,6 +93,14 @@ incluye resultados descartados; candidatas restringidas es un universo distinto.
 En muestreo se utilizan pesos de importancia y se muestra el tamaño efectivo;
 se informa mínimo observado, nunca garantía. La probabilidad absoluta de eventos
 exactos se presenta aparte: no es el porcentaje condicional de cobertura.
+Editar signos/goles invalida los informes de cobertura de la versión actual.
+Restaurar el desarrollo retira el informe de la selección optimizada anterior.
+Ambas operaciones conservan las versiones históricas y permiten verificar de nuevo.
+
+En búsqueda exhaustiva las puntuaciones se comparan sin un umbral absoluto que
+pudiera ocultar diferencias reales cuando las probabilidades son muy pequeñas.
+Los cálculos usan coma flotante; la certificación corresponde al objetivo/modelo
+calculado, no demuestra que el modelo prediga la jornada real.
 
 Las seis modalidades siguen publicadas por SELAE y remiten al BOE 2009. Matrices
 ya transcritas se reutilizan sin inventar otras. Cada generación en Reducidas
@@ -104,11 +121,16 @@ Registro local: UUID, fecha, jornada, hash/revisión, versión del algoritmo,
 configuración, fuente/instantáneas, semilla, presupuesto, candidatas/descartadas,
 selección, coste/remanente, métricas, tiempo, advertencias y aportación marginal.
 Informe JSON exportable. Guardar informe o archivo no valida apuestas.
+El inicio y el resultado comparten ID. Cancelación/error conservan configuración,
+jornada y causa, pero no inventan métricas de una selección que no se completó.
 
 Referencias: entrada recortada determinísticamente, aleatoria con semilla y más
 probables (referencia v0.1.13). Mismo universo, modelo, techo de presupuesto,
-restricciones y cardinalidad cuando es viable. Si el mínimo por Pleno limita la
-cardinalidad, se muestra el coste real de cada referencia; no se oculta un ahorro.
+restricciones y la misma cardinalidad. Un DP de cuotas por Pleno evita quedar
+atrapado en un grupo inicial de dos apuestas cuando la referencia requiere tres.
+Con mínimo por Pleno, las referencias priorizan los grupos según su primera
+aparición y luego las apuestas del grupo según el orden de referencia; no son
+óptimos económicos. Sin restricciones, mantienen el orden global original.
 El universo completo «antes» puede costar más y no se vende como comparación a
 igual precio. Mejorar cobertura no implica mejorar la masa de 14 ni dinero.
 

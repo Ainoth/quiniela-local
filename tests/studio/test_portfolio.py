@@ -1,6 +1,8 @@
 """Fixtures sintéticos explícitos, sin apuestas reales ni pagos."""
+import json
 import math
 from collections import Counter
+from contextlib import closing
 from dataclasses import replace
 from itertools import combinations
 from pathlib import Path
@@ -19,6 +21,7 @@ from quiniela_ai_studio.domain.portfolio import (
     normalized_percentages,
     optimize_portfolio,
     probabilities_from_odds,
+    reference_portfolio,
 )
 from quiniela_ai_studio.domain.reductions import plan_reduction, reduced_bets
 from quiniela_ai_studio.domain.tickets import group_tickets
@@ -66,6 +69,34 @@ def test_small_exhaustive_matches_independent_oracle():
     assert 'óptimo global' in result.report['optimality']
 
 
+def test_exhaustive_probability_respects_tiny_but_real_score_differences():
+    base=('1X2',)+('1',)*13
+    sport=replace(demo_round().snapshot('sport'),values=((.1,.8,.1),)+((.01,.495,.495),)*13)
+    result=optimize_portfolio(engine.generate(base,'00'),base,OptimizationConfig(150,75,objective='probability',min_per_pleno=2),sport)
+    assert any(b.column[0]=='X' for b in result.bets)
+    assert math.isclose(result.report['after']['probability_mass'],.9*.01**13,rel_tol=1e-12)
+    assert 'óptimo global' in result.report['optimality']
+
+
+@pytest.mark.parametrize('minimum', [1,2])
+def test_log_ranking_survives_absolute_probability_underflow(minimum):
+    base=('1X2',)+('1',)*13
+    sport=replace(demo_round().snapshot('sport'),values=((.1,.8,.1),)+((1e-100,.5,.5),)*13)
+    result=optimize_portfolio(engine.generate(base,'00'),base,OptimizationConfig(150,75,objective='probability',min_per_pleno=minimum),sport)
+    assert any(b.column[0]=='X' for b in result.bets)
+    assert result.report['after']['probability_mass']==0
+    assert math.isclose(result.report['after']['probability_mass_log'],math.log(.9)+13*math.log(1e-100),abs_tol=1e-10)
+    assert result.report['objective_score']>1 and any('precisión' in w for w in result.report['warnings'])
+
+
+def test_pleno_log_ranking_does_not_multiply_marginals_before_logging():
+    sport=replace(demo_round().snapshot('sport'),pleno_values=((1e-300,.5,.5,2e-300),)*2)
+    bets=(Bet('1'*14,'00'),Bet('1'*14,'MM'))
+    result=optimize_portfolio(bets,('1',)*14,OptimizationConfig(75,75,objective='probability',include_pleno_probability=True),sport)
+    assert result.bets[0].pleno=='MM'
+    assert result.report['after']['probability_mass_log'] is not None
+
+
 def test_reduction_three_216_actual_columns_independent_guarantee():
     base=('1X',)*3+('1X2',)*3+('2',)*8
     plan=plan_reduction(base,('M0',),3,tuple(range(6)))
@@ -101,7 +132,7 @@ def test_filters_scope_and_missing_probabilities():
         optimize_portfolio(bets,BASE72,OptimizationConfig(500,75,objective='expected'))
 
 
-@pytest.mark.parametrize('bad', [(-1,.5,.5),(float('nan'),0,0),(0,0,0),(True,0,0),(40,40,40)])
+@pytest.mark.parametrize('bad', [(-1,.5,.5),(float('nan'),0,0),(0,0,0),(True,0,0),(40,40,40),(10**1000,0,0)])
 def test_invalid_percentages(bad):
     with pytest.raises(ValueError):normalized_percentages([bad]*14)
 
@@ -150,6 +181,85 @@ def test_channel_constraints_in_optimizer_and_baselines():
     assert group_tickets(result.bets)
     assert all(r['channel_feasible'] for r in result.report['comparisons'].values())
     assert result.report['cost_cents']<=450
+
+
+def test_reference_cardinality_does_not_get_trapped_in_early_pleno():
+    bets=tuple(Bet('1'*13+s,p) for p,signs in (('00','1X'),('11','1X2')) for s in signs)
+    reference=reference_portfolio(bets,3,2)
+    assert len(reference)==3 and {b.pleno for b in reference}=={'11'}
+    result=optimize_portfolio(bets,('1',)*13+('1X2',),OptimizationConfig(225,75,min_per_pleno=2,objective='probability'),demo_round().snapshot('sport'))
+    assert len(result.bets)==3
+    assert all(r['cost_cents']==225 for r in result.report['comparisons'].values())
+
+
+@pytest.mark.parametrize('sizes', [(1,2,3),(2,2),(3,4),(1,1,1)])
+def test_reference_cardinality_matches_exhaustive_feasibility(sizes):
+    bets=tuple(Bet('1'*(14-i)+'X'*i,p) for p,size in zip(('00','11','22'),sizes) for i in range(size))
+    for count in range(1,len(bets)+1):
+        possible=any(all(n>=2 for n in Counter(b.pleno for b in subset).values()) for subset in combinations(bets,count))
+        if possible:
+            selected=reference_portfolio(bets,count,2)
+            assert len(selected)==count and set(selected)<=set(bets)
+            assert all(n>=2 for n in Counter(b.pleno for b in selected).values())
+        else:
+            with pytest.raises(ValueError):reference_portfolio(bets,count,2)
+
+
+def test_numeric_extremes_raise_domain_errors_not_overflow():
+    from quiniela_ai_studio.domain.models import ProbabilitySnapshot
+    huge=10**1000
+    with pytest.raises(ValueError):probabilities_from_odds([(huge,3,4)]*14)
+    with pytest.raises(ValueError):OptimizationConfig(500,75,max_seconds=huge)
+    with pytest.raises(ValueError):OptimizationConfig(500,75,max_seconds=True)
+    source=demo_round().snapshot('sport')
+    with pytest.raises(ValueError):ProbabilitySnapshot('sport',source.source,source.captured_at,((huge,0,0),)*14)
+    with pytest.raises(ValueError):replace(source,pleno_values=((huge,0,0,0),(.25,)*4))
+
+
+def test_time_limit_keeps_feasible_incumbent_and_explains_unused_budget(monkeypatch):
+    from quiniela_ai_studio.domain import portfolio
+    ticks=iter(i*.0001 for i in range(10000))
+    monkeypatch.setattr(portfolio.time,'monotonic',lambda:next(ticks))
+    result=optimize_portfolio(engine.generate(BASE72,'M0'),BASE72,OptimizationConfig(500,75,max_seconds=.01),demo_round().snapshot('sport'))
+    assert result.report['time_limit_reached'] and 0<len(result.bets)<=6
+    assert result.report['cost_cents']<=500
+    assert 'aproximación' in result.report['optimality']
+    if len(result.bets)<6:
+        assert any('de hasta 6' in w and 'tiempo' in w for w in result.report['warnings'])
+
+
+def test_cancel_during_calculation_does_not_return_partial_selection():
+    stopped=False
+    def progress(done,total):
+        nonlocal stopped
+        stopped=done>=5
+    with pytest.raises(engine.Cancelled):
+        optimize_portfolio(engine.generate(BASE72,'M0'),BASE72,OptimizationConfig(500,75),cancelled=lambda:stopped,progress=progress)
+
+
+@pytest.mark.parametrize('kind', ['optimized','reduced'])
+def test_edit_invalidates_only_current_coverage_report(tmp_path,kind):
+    from quiniela_ai_studio.application.services import SystemService
+    from quiniela_ai_studio.infrastructure.storage import Repository
+    with closing(Repository(tmp_path/'proof.sqlite3')) as repository:
+        round_=demo_round();repository.save_round(round_);service=SystemService(repository)
+        if kind=='optimized':
+            source=service.imported(round_,'Sintética 72',engine.generate(BASE72,'M0'))
+            system=service.optimized(source,500);key='optimization_report'
+        else:
+            base=('1X',)*3+('1X2',)*3+('2',)*8
+            source=service.new(round_,mode='reduced')
+            source=service.edit(source,base,source.locks,'M0')
+            plan=plan_reduction(base,('M0',),3,tuple(range(6)))
+            bets=reduced_bets(plan);verification=verify_coverage(bets,make_universe(base))
+            system=service.reduced_copy(source,plan,bets,verification=verification);key='reduction_verification'
+        assert key in json.loads(system.parameters)
+        edited=service.edit(system,system.base,system.locks,'01')
+        assert not edited.bets and key not in json.loads(edited.parameters)
+        assert key in json.loads(repository.load(system.system_id,system.revision).parameters)
+        if kind=='optimized':
+            restored=service.restore_origin(system)
+            assert restored.bets==source.bets and 'optimization_report' not in json.loads(restored.parameters)
 
 
 @pytest.mark.parametrize('name', [

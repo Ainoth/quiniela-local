@@ -38,7 +38,9 @@ def result_dialog(parent,result,source):
     coverage_page=QWidget();coverage_layout=QVBoxLayout(coverage_page);tabs.addTab(coverage_page,'Cobertura')
     _,model=parent.table(('Aciertos','Uniforme','Ponderada','Antes uniforme','Antes ponderada'),coverage_layout)
     model.update_rows([(k+'+' if k!='14' else k,pct(after['uniform'][k]),pct((after['weighted'] or {}).get(k)),pct(report['before']['uniform'][k]),pct((report['before']['weighted'] or {}).get(k))) for k in ('14','13','12','11','10')])
-    info=QLabel(f'Masa exacta estimada: {pct(after["probability_mass"])} · {report["probability_model"]}\nDistancia media: {after["mean_distance"]:.3f} · escenarios {after["scenarios"]} · tamaño efectivo ponderado {after["effective_samples"]}\nValor esperado: no disponible; no se convierte popularidad en ROI.');info.setWordWrap(True);coverage_layout.addWidget(info)
+    log_mass=after.get('probability_mass_log')
+    log_note=f' · log(masa) {log_mass:.3f}' if after['probability_mass']==0 and log_mass is not None else ''
+    info=QLabel(f'Masa exacta estimada: {pct(after["probability_mass"])}{log_note} · {report["probability_model"]}\nDistancia media: {after["mean_distance"]:.3f} · escenarios {after["scenarios"]} · tamaño efectivo ponderado {after["effective_samples"]}\nValor esperado: no disponible; no se convierte popularidad en ROI.');info.setWordWrap(True);coverage_layout.addWidget(info)
     comparisons=QWidget();cl=QVBoxLayout(comparisons);tabs.addTab(comparisons,'Comparar mismo presupuesto')
     _,cm=parent.table(('Selección','Coste','13+ ponderado/uniforme','12+ ponderado/uniforme','Masa exacta','Distancia','Canal válido'),cl)
     rows=[]

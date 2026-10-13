@@ -50,7 +50,7 @@ class SystemService:
         if any(system.locks[i] and normalized[i] != system.base[i] for i in range(14)):
             raise ValueError('Desbloquea el partido antes de cambiar sus signos.')
         params=json.loads(system.parameters)
-        for key in ('filter_spec','input_revision','input_hash','input_quantity','output_quantity','from_origin','quick_level','budget_cents','ranking'):
+        for key in ('filter_spec','input_revision','input_hash','input_quantity','output_quantity','from_origin','quick_level','budget_cents','ranking','optimization_report','reduction_verification','conditional_minimum_hits'):
             params.pop(key,None)
         if pleno_choices is not None:
             if len(pleno_choices)!=2 or any(not isinstance(p,str) or len(set(p))!=len(p) or set(p)-set('012M') for p in pleno_choices):
@@ -207,7 +207,11 @@ class SystemService:
         source, bets = self.origin_bets(system)
         union = union_base(bets, system.base)
         base = tuple(system.base[i] if system.locks[i] else union[i] for i in range(14))
-        return self.version(system, bets=bets, base=base, origin=f'desarrollo original de v{source.revision}', action='restore_origin')
+        parameters=json.loads(source.parameters)
+        for key in ('optimization_report','reduction_verification','conditional_minimum_hits'):
+            parameters.pop(key,None)
+        return self.version(system, bets=bets, base=base, parameters=json.dumps(parameters),
+                            origin=f'desarrollo original de v{source.revision}', action='restore_origin')
 
     def undo(self, system):
         if system.revision <= 1:

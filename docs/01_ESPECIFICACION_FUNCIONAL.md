@@ -187,6 +187,13 @@ El usuario debe poder pasar de «quiero gastar como máximo X euros» a un conju
 - **RF-AUD-007** Diagnóstico entendible de importaciones fallidas, dependencia ausente y errores de datos.
 - **RF-AUD-008** Instalación portable sin rutas de usuario incrustadas; registro de versión de datos y migraciones.
 
+### Complemento de interfaz v1.0.0
+
+- **RF-UX-001** En Optimizar, progreso y cancelación accesibles en la misma
+  pantalla; presupuesto y acciones visibles a 1024×768 aun desplegando opciones
+  avanzadas, que se consultan en un área desplazable. Prueba Qt de regresión
+  `test_advanced_parameters_scroll_without_hiding_budget_actions`.
+
 ## 4. Requisitos no funcionales
 
 - **RNF-01 Correctitud:** prioridad sobre velocidad; oráculos de referencia para todo el dominio matemático.

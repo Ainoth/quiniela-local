@@ -3,6 +3,7 @@ import math
 import random
 import time
 from array import array
+from collections.abc import Iterable
 from dataclasses import asdict, dataclass
 from itertools import combinations
 
@@ -32,7 +33,7 @@ class OptimizationConfig:
             raise ValueError('Presupuesto y precio positivos en céntimos requeridos.')
         if self.objective not in ('auto','probability','coverage','expected'):
             raise ValueError('Objetivo desconocido.')
-        if not math.isfinite(self.max_seconds) or not .01 <= self.max_seconds <= 300:
+        if not finite_number(self.max_seconds) or not .01 <= self.max_seconds <= 300:
             raise ValueError('Tiempo máximo entre 0,01 y 300 segundos.')
         if self.universe_scope not in ('base','candidates'):
             raise ValueError('Universo base o candidatas requerido.')
@@ -52,13 +53,60 @@ class Deadline(Exception):
     pass
 
 
+def finite_number(value: object) -> bool:
+    """Rechaza también enteros que desbordan la conversión interna a float."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return False
+    try:
+        return math.isfinite(value)
+    except OverflowError:
+        return False
+
+
+def reference_portfolio(ordered: Iterable[Bet], count: int, minimum: int) -> tuple[Bet, ...]:
+    """Referencia de cardinalidad exacta, con cuotas viables por Pleno.
+
+    Prioriza grupos según su primera aparición y apuestas dentro del grupo
+    según el orden recibido. El DP de cardinalidades evita comparaciones
+    artificialmente más baratas; no pretende optimizar probabilidades.
+    """
+    ordered = tuple(dict.fromkeys(ordered))
+    if minimum == 1:
+        if len(ordered) < count:
+            raise ValueError('No existe referencia válida con la misma cantidad de apuestas.')
+        return ordered[:count]
+    groups = {}
+    for bet in dict.fromkeys(ordered):
+        groups.setdefault(bet.pleno, []).append(bet)
+    values = list(groups.values())
+    reachable = [0] * (len(values) + 1)
+    reachable[-1] = 1  # bit cero: seleccionar cero apuestas es viable.
+    mask = (1 << (count + 1)) - 1
+    for index in range(len(values) - 1, -1, -1):
+        bits = reachable[index + 1]
+        for size in range(minimum, min(count, len(values[index])) + 1):
+            bits |= reachable[index + 1] << size
+        reachable[index] = bits & mask
+    if not (reachable[0] >> count) & 1:
+        raise ValueError('No existe referencia válida con la misma cantidad de apuestas.')
+    chosen = []
+    remaining = count
+    for index, group in enumerate(values):
+        for size in list(range(min(remaining, len(group)), minimum - 1, -1)) + [0]:
+            if (reachable[index + 1] >> (remaining - size)) & 1:
+                chosen.extend(group[:size])
+                remaining -= size
+                break
+    return tuple(chosen)
+
+
 def normalized_percentages(rows):
     """Acepta fracciones o porcentajes homogéneos por fila; normaliza redondeo ±1%."""
     if len(rows)!=14:
         raise ValueError('Se requieren 14 filas de porcentajes.')
     result=[]
     for row in rows:
-        if len(row)!=3 or any(isinstance(v,bool) or not isinstance(v,(int,float)) or not math.isfinite(v) or v<0 for v in row):
+        if len(row)!=3 or any(not finite_number(v) or v<0 for v in row):
             raise ValueError('Porcentajes no válidos.')
         total=sum(row)
         if not (.99<=total<=1.01 or 99<=total<=101):
@@ -69,13 +117,13 @@ def normalized_percentages(rows):
 
 def probabilities_from_odds(rows):
     """Retirada proporcional del margen: método aproximado, no calibración."""
-    if len(rows)!=14 or any(len(row)!=3 or any(isinstance(v,bool) or not isinstance(v,(int,float)) or not math.isfinite(v) or v<=1 for v in row) for row in rows):
+    if len(rows)!=14 or any(len(row)!=3 or any(not finite_number(v) or v<=1 for v in row) for row in rows):
         raise ValueError('14 filas de cuotas decimales >1 requeridas.')
     return tuple(tuple((1/v)/sum(1/o for o in row) for v in row) for row in rows)
 
 
 def optimize_portfolio(bets, base, config: OptimizationConfig, sport=None, *, public=None,
-                       eligible=lambda bet: True, cancelled=lambda: False, progress=lambda done,total: None):
+                       eligible=lambda bet: True, cancelled=lambda: False, progress=lambda done,total: None) -> OptimizationResult:
     """Selecciona apuestas únicas conservando sus Plenos. Solo certifica búsqueda completa."""
     if config.objective=='expected':
         raise ValueError('Valor esperado no disponible: faltan recaudación, reglas de reparto y modelo fiable de acertantes. Popularidad no es ROI.')
@@ -105,24 +153,39 @@ def optimize_portfolio(bets, base, config: OptimizationConfig, sport=None, *, pu
         from .coverage import pleno_joint
         pleno_model=pleno_joint(sport)
         warnings.append('Probabilidad del Pleno estimada con independencia explícita de goles local/visitante y de los 14 encuentros.')
-    def probability(b):
-        if not sport:return None
-        value=math.exp(log_probability(b.column,sport))
-        return value*pleno_model[b.pleno] if pleno_model else value
-    full_probabilities={b:probability(b) for b in candidates}
+    def event_log(b):
+        value=log_probability(b.column,sport) if sport else -math.inf
+        if pleno_model:
+            for side,sign in enumerate(b.pleno):
+                marginal=sport.pleno_values[side]['012M'.index(sign)]
+                value+=math.log(marginal) if marginal>0 else -math.inf
+        return value
+    logs={b:event_log(b) for b in candidates}
+    peak=max(logs.values())
+    # Escala común positiva: preserva el objetivo incluso cuando exp(logP)
+    # se redondea a cero para todas las columnas.
+    relative_probabilities={b:math.exp(value-peak) if math.isfinite(peak) else 0.0 for b,value in logs.items()}
+    full_probabilities={b:math.exp(value) if sport else None for b,value in logs.items()}
+    if sport and any(math.isfinite(logs[b]) and full_probabilities[b]==0 for b in candidates):
+        warnings.append('Probabilidades absolutas inferiores a la precisión float: pueden mostrarse como 0. La selección utiliza logaritmos y pesos reescalados, no ceros ficticios.')
     mass_keys=(lambda b:(b.column,b.pleno)) if pleno_model else (lambda b:b.column)
-    def mass(selected):
+    def mass(selected, *, relative=False):
         if not sport:return None
         seen=set();total=0.0
         for b in selected:
             key=mass_keys(b)
-            if key not in seen:total+=full_probabilities[b];seen.add(key)
+            if key not in seen:total+=(relative_probabilities if relative else full_probabilities)[b];seen.add(key)
         return total
-    ranked=tuple(sorted(candidates,key=lambda b:(-(full_probabilities[b] or 0),b.column,b.pleno)))
+    def mass_log(selected):
+        unique={mass_keys(b):logs[b] for b in selected}
+        top=max(unique.values(),default=-math.inf)
+        return top+math.log(math.fsum(math.exp(v-top) for v in unique.values())) if math.isfinite(top) else None
+    ranked=tuple(sorted(candidates,key=lambda b:(-logs[b],b.column,b.pleno)))
     pool=candidates
     if len(pool)>config.candidate_limit:
         first=ranked[:config.candidate_limit//2]
-        rest=tuple(b for b in pool if b not in set(first))
+        first_set=set(first)
+        rest=tuple(b for b in pool if b not in first_set)
         sample=random.Random(config.seed).sample(rest,config.candidate_limit-len(first))
         pool=tuple(sorted(first+tuple(sample),key=lambda b:(b.column,b.pleno)))
         warnings.append(f'Cartera heurística sobre {len(pool)} candidatas de {len(candidates)}: mitad por probabilidad, mitad muestreo reproducible.')
@@ -137,7 +200,7 @@ def optimize_portfolio(bets, base, config: OptimizationConfig, sport=None, *, pu
     except Deadline:
         raise ValueError('El tiempo no permite preparar coberturas; aumenta el límite o reduce candidatas/escenarios. No se ha guardado nada.') from None
     weights=universe.weights or tuple(1/m for _ in range(m))
-    domain_mass=mass(candidates) or 1.0
+    domain_mass=mass(candidates,relative=True) or 1.0
     def profile(selected):
         best=[0]*m
         for b in selected:
@@ -147,7 +210,7 @@ def optimize_portfolio(bets, base, config: OptimizationConfig, sport=None, *, pu
         return cov
     def score(selected):
         if not selected:return 0.0
-        p=mass(selected)
+        p=mass(selected,relative=True)
         if config.objective=='probability':return p or 0
         cov=profile(selected)
         if config.objective=='coverage':return .7*cov[13]+.3*cov[12]
@@ -184,7 +247,7 @@ def optimize_portfolio(bets, base, config: OptimizationConfig, sport=None, *, pu
                         checkpoint()
                         if feasible(subset):
                             value=score(subset)
-                            if value>best_score+1e-12:best_score=value;selected=list(subset)
+                            if value>best_score:best_score=value;selected=list(subset)
                         done+=1;progress(done,exhaustive_size)
                 optimal=True
             else:
@@ -198,7 +261,7 @@ def optimize_portfolio(bets, base, config: OptimizationConfig, sport=None, *, pu
                         if config.min_per_pleno>1 and not any(c.pleno==b.pleno for c in selected):
                             peers=[c for c in pool if c.pleno==b.pleno and c!=b]
                             if len(peers)<config.min_per_pleno-1:continue
-                            peers.sort(key=lambda c:(-(full_probabilities[c] or 0),c.column))
+                            peers.sort(key=lambda c:(-logs[c],c.column))
                             action.extend(peers[:config.min_per_pleno-1])
                         if len(selected)+len(action)>maximum:continue
                         gain=(score(selected+action)-current)/len(action)
@@ -229,33 +292,27 @@ def optimize_portfolio(bets, base, config: OptimizationConfig, sport=None, *, pu
     # Verificación separada del motor y baselines de igual cardinalidad/presupuesto.
     metrics=verify_coverage(selected,universe,cancelled=cancelled)
     metrics['probability_mass']=mass(selected)
+    metrics['probability_mass_log']=mass_log(selected) if sport else None
     baselines={}
     reference_count=len(selected)
     def reference_selection(ordered):
-        chosen=[]
-        for b in ordered:
-            if b in chosen:continue
-            action=[b]
-            if config.min_per_pleno>1 and not any(c.pleno==b.pleno for c in chosen):
-                peers=[c for c in ordered if c.pleno==b.pleno and c!=b and c not in chosen]
-                if len(peers)<config.min_per_pleno-1:continue
-                action.extend(peers[:config.min_per_pleno-1])
-            if len(chosen)+len(action)<=reference_count:chosen.extend(action)
-            if len(chosen)==reference_count:break
-        return tuple(chosen)
+        return reference_portfolio(ordered, reference_count, config.min_per_pleno)
     previous=reference_selection(tuple(dict.fromkeys(Bet(b.column,b.pleno) for b in admitted)))
     shuffled=list(candidates);random.Random(config.seed).shuffle(shuffled)
     random_reference=reference_selection(shuffled)
     for name,reference in (('anterior_recortada',previous),('v0.1.13_probables',reference_selection(ranked)),('aleatoria',random_reference)):
         value=verify_coverage(reference,universe,cancelled=cancelled)
         value['probability_mass']=mass(reference)
+        value['probability_mass_log']=mass_log(reference) if sport else None
         value['cost_cents']=len(reference)*config.price_cents
         value['channel_feasible']=feasible(reference)
         cov=value['weighted'] or value['uniform']
-        value['objective_score']=(value['probability_mass'] or 0) if config.objective=='probability' else (.7*cov['13']+.3*cov['12'] if config.objective=='coverage' else .45*cov['13']+.25*cov['12']+.25*((value['probability_mass']/domain_mass) if value['probability_mass'] is not None else cov['14'])+.05*value['mean_distance']/14)
+        p=mass(reference,relative=True)
+        value['objective_score']=(p or 0) if config.objective=='probability' else (.7*cov['13']+.3*cov['12'] if config.objective=='coverage' else .45*cov['13']+.25*cov['12']+.25*((p/domain_mass) if p is not None else cov['14'])+.05*value['mean_distance']/14)
         baselines[name]=value
     before=verify_coverage(candidates,universe,cancelled=cancelled)
     before['probability_mass']=mass(candidates)
+    before['probability_mass_log']=mass_log(candidates) if sport else None
     marginal=[];prior=[]
     for b in selected:
         a=profile(prior);z=profile(prior+[b])
@@ -263,12 +320,15 @@ def optimize_portfolio(bets, base, config: OptimizationConfig, sport=None, *, pu
                              probability_gain=(mass(prior+[b]) or 0)-(mass(prior) or 0)))
         prior.append(b)
     cost=len(selected)*config.price_cents
-    if len(selected)<maximum:warnings.append('No se utilizan todos los huecos: eventos redundantes o mínimo por Pleno impiden aportar una apuesta válida adicional.')
+    if len(selected)<maximum:
+        reason='se alcanzó el límite de tiempo' if timed_out else 'no se encontró una ampliación con ganancia positiva que respete el mínimo por Pleno dentro de las candidatas exploradas'
+        warnings.append(f'Se usan {len(selected)} de hasta {maximum} apuestas: {reason}. No se afirma que no exista otra cartera mejor.')
     initial_plenos={b.pleno for b in candidates};final_plenos={b.pleno for b in selected}
     if initial_plenos!=final_plenos:warnings.append('La selección excluye algunas parejas del Pleno inicial; ninguna apuesta ha cambiado de Pleno. Revísalo antes de aplicar.')
     report=dict(algorithm_version=ALGORITHM_VERSION,config=asdict(config),algorithm=algorithm,
                 optimality=('óptimo global para el objetivo y candidatas' if universe.exact or config.objective=='probability' else 'óptimo sobre muestra; cobertura real no certificada') if optimal else 'aproximación; no óptimo global demostrado',
                 objective_score=score(selected),time_limit_reached=timed_out,initial_quantity=sum(b.quantity for b in all_bets),
+                probability_objective_scale='exp(logP - máximo logP de las candidatas); escala común, conserva el orden',
                 rejected_by_conditions=sum(b.quantity for b in all_bets)-sum(b.quantity for b in admitted),
                 candidates=len(candidates),pool=len(pool),selected=len(selected),cost_cents=cost,
                 remaining_cents=config.budget_cents-cost,before=before,after=metrics,comparisons=baselines,marginal=marginal,

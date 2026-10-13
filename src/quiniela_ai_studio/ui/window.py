@@ -3,6 +3,8 @@ import json
 import shutil
 import sqlite3
 import threading
+import time
+import uuid
 from dataclasses import asdict, replace
 from datetime import datetime
 from decimal import Decimal
@@ -206,6 +208,7 @@ class MainWindow(QMainWindow):
         self.system = None
         self.worker = None
         self.data_worker = None
+        self.data_kind = None
         self.data_buttons = []
         self.template_timer=QTimer(self);self.template_timer.setSingleShot(True);self.template_timer.setInterval(150);self.template_timer.timeout.connect(self.apply_pending_template)
         self.template_context=None
@@ -756,8 +759,16 @@ class MainWindow(QMainWindow):
         for label,key in (('Automático recomendado','auto'),('Máxima probabilidad','probability'),('Máxima cobertura 13+/12+','coverage'),('Valor esperado: no disponible','expected')):self.portfolio_objective.addItem(label,key)
         self.portfolio_objective.model().item(3).setEnabled(False);row.addWidget(self.portfolio_objective,1);budget_outer.addLayout(row)
         self.budget_apply=self.button('3. Optimizar mis apuestas',self.optimize,row,primary=True,editable=True)
+        self.portfolio_cancel=self.button('Cancelar optimización',self.cancel_data,budget_outer)
+        self.portfolio_cancel.setEnabled(False)
         advanced_toggle=QCheckBox('Parámetros avanzados');budget_outer.addWidget(advanced_toggle)
-        advanced=QWidget();advanced_layout=QGridLayout(advanced);advanced.hide();budget_outer.addWidget(advanced);advanced_toggle.toggled.connect(advanced.setVisible)
+        advanced=QGroupBox('Parámetros avanzados de optimización');advanced_layout=QGridLayout(advanced);advanced.hide()
+        # Comparte el área desplazable de condiciones: nunca desplaza los
+        # botones de presupuesto/cancelación fuera de pantallas pequeñas.
+        layout.insertWidget(1,advanced)
+        advanced_toggle.toggled.connect(advanced.setVisible)
+        advanced_toggle.toggled.connect(lambda checked:QTimer.singleShot(0,lambda:scroll.ensureWidgetVisible(advanced)) if checked else None)
+        self.portfolio_advanced_toggle=advanced_toggle;self.portfolio_advanced=advanced
         self.portfolio_seed=QSpinBox();self.portfolio_seed.setRange(0,2_000_000_000)
         self.portfolio_time=QSpinBox();self.portfolio_time.setRange(1,300);self.portfolio_time.setValue(10)
         self.portfolio_scope=QComboBox();self.portfolio_scope.addItem('Base completa (incluye descartadas)','base');self.portfolio_scope.addItem('Solo candidatas tras condiciones','candidates')
@@ -936,6 +947,8 @@ class MainWindow(QMainWindow):
 
     def optimize(self):
         if not self.system:raise ValueError('No hay un sistema activo.')
+        if (self.data_worker and self.data_worker.isRunning()) or (self.worker and self.worker.isRunning()):
+            raise ValueError('Espera o cancela la operación actual.')
         cents=int(Decimal(self.budget.cleanText().replace(',','.'))*100)
         source=self.system
         bets,base,config,frozen,spec=self.service.optimization_input(source,cents,
@@ -943,14 +956,20 @@ class MainWindow(QMainWindow):
             universe_scope=self.portfolio_scope.currentData(),min_per_pleno=self.portfolio_channel.currentData(),
             include_pleno_probability=self.portfolio_pleno_model.isChecked())
         from quiniela_ai_studio.domain.portfolio import optimize_portfolio
+        audit=dict(run_id=uuid.uuid4().hex,created_at=utcnow(),round_key=source.round_key,input_hash=source.hash,
+            input_revision=source.revision,base=list(base),filter_spec=spec.parameters(),sources=[asdict(s) for s in frozen.snapshots],
+            config=asdict(config),initial_quantity=sum(b.quantity for b in bets))
         def operation(cancel,status):
             admitted=set(spec.apply(bets,cancel))
             def progress(done,total):
                 if done==total or done%max(1,total//100)==0:status(f'Optimización: {done:,}/{total:,} · cálculo real; permite cancelar')
             result=optimize_portfolio(bets,base,config,frozen.snapshot('sport'),public=frozen.snapshot('public'),eligible=lambda b:b in admitted,cancelled=cancel,progress=progress)
-            result.report.update(run_id=__import__('uuid').uuid4().hex,created_at=utcnow(),round_key=source.round_key,input_hash=source.hash,
-                input_revision=source.revision,base=list(base),filter_spec=spec.parameters(),sources=[asdict(s) for s in frozen.snapshots])
+            result.report.update(audit,status='completed')
             return result
+        self.portfolio_audit=audit
+        self.portfolio_started=time.monotonic()
+        self.portfolio_audit_finished=False
+        self.repository.record_event('optimization_started',dict(audit,status='started'))
         self.start_background('portfolio',source,operation)
 
     def update_budget_capacity(self,*_):
@@ -1274,6 +1293,7 @@ class MainWindow(QMainWindow):
         busy=bool((self.data_worker and self.data_worker.isRunning()) or (self.worker and self.worker.isRunning()))
         for button in self.data_buttons:button.setEnabled(not busy and (button is not self.full_export_button or not self.export_busy()))
         self.data_cancel.setEnabled(bool(self.data_worker and self.data_worker.isRunning()))
+        self.portfolio_cancel.setEnabled(bool(self.data_worker and self.data_worker.isRunning() and self.data_kind=='portfolio'))
 
     def move_round(self,delta):
         keys=[r.key for r in sorted(self.repository.rounds(),key=lambda r:(r.season,r.number))]
@@ -1312,8 +1332,15 @@ class MainWindow(QMainWindow):
 
     def background_status(self,message):
         self.data_message.setText(message);self.statusBar().showMessage(message)
+        if self.data_kind=='portfolio':self.portfolio_summary.setText(message)
 
     def background_error(self,message):
+        if self.data_kind=='portfolio' and not getattr(self,'portfolio_audit_finished',True):
+            cancelled=bool(self.data_worker and self.data_worker.cancel_event.is_set())
+            self.repository.record_event('optimization_run',dict(self.portfolio_audit,
+                status='cancelled' if cancelled else 'failed',finished_at=utcnow(),
+                elapsed_seconds=time.monotonic()-self.portfolio_started,error=message))
+            self.portfolio_audit_finished=True
         self.background_status(message)
         if not self.close_pending and not (self.data_worker and self.data_worker.cancel_event.is_set()):
             QMessageBox.warning(self,'Datos anteriores conservados',message)
@@ -1321,7 +1348,7 @@ class MainWindow(QMainWindow):
     def cancel_data(self):
         if self.data_worker:
             self.data_worker.cancel_event.set()
-            self.background_status('Cancelando… Se espera a que termine la petición en curso (máximo 30 s).')
+            self.background_status('Cancelando cálculo… La quiniela anterior se conserva.' if self.data_kind=='portfolio' else 'Cancelando… Se espera a que termine la petición en curso (máximo 30 s).')
 
     def confirm_data(self,prepared):
         dialog=QDialog(self);dialog.setWindowTitle('Revisar importación de datos');dialog.resize(780,580)
@@ -1340,6 +1367,9 @@ class MainWindow(QMainWindow):
         return dialog.exec()==QDialog.DialogCode.Accepted
 
     def background_done(self,result):
+        if self.data_kind=='portfolio':
+            self.repository.record_event('optimization_run',result.report)
+            self.portfolio_audit_finished=True
         if self.close_pending:
             if hasattr(result,'directory'):shutil.rmtree(result.directory)
             return
@@ -1351,7 +1381,6 @@ class MainWindow(QMainWindow):
             self.set_system(self.service.reduced_copy(source,plan,bets,verification=verification));self.background_status('Reducida creada y verificada sobre '+str(verification['universe_total'])+' resultados; premio económico no garantizado.');return
         if self.data_kind=='portfolio':
             source=self.data_context
-            self.repository.record_event('optimization_run',result.report)
             if self.system!=source or self.round.key!=source.round_key:
                 self.background_status('Cálculo registrado para su jornada; la quiniela abierta cambió y no se modifica.');return
             self.optimization_result=result;self.optimization_source=source
