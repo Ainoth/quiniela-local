@@ -369,7 +369,7 @@ class MainWindow(QMainWindow):
             for goal,button in buttons.items():
                 button.setChecked(bool(system and goal in system.goal_masks[side]))
                 button.setEnabled(bool(system and round_.editable and not busy))
-        self.pleno_selection_info.setText(f'{len(system.plenos)} resultados del Pleno · puedes marcar varios goles por equipo' if system else 'Marca goles del local y visitante. M = 3 o más.')
+        self.pleno_selection_info.setText(f'Local: {len(system.goal_masks[0])} opciones · Visitante: {len(system.goal_masks[1])} · {len(system.plenos)} parejas del Pleno\n{engine.size(system.base):,} columnas × {len(system.plenos)} Plenos = {engine.size(system.base)*len(system.plenos):,} apuestas · {money(engine.size(system.base)*len(system.plenos)*view_round.price_cents)} si juegas todas. M = 3 o más.' if system else 'Marca goles del local y visitante. M = 3 o más. Cada pareja del Pleno multiplica las apuestas.')
         self.preview_model.update_rows([(b.column,b.pleno or '—',b.quantity) for b in system.bets[:100]] if system else [])
         self.preview_info.setText(f'{quantity:,} apuestas listas. Pulsa Guardar apuestas (TXT) para sacar el archivo.' if quantity else 'Elige los signos y los goles del Pleno y pulsa Generar debajo del boleto.' if system else 'Pulsa Nuevo para empezar una quiniela.')
         self.name_input.blockSignals(True); self.name_input.setText(system.name if system else ''); self.name_input.blockSignals(False)
@@ -448,27 +448,30 @@ class MainWindow(QMainWindow):
             combo.hide();self.pleno_combos.append(combo)
         layout.addLayout(row)
         self.goal_buttons=[]
+        self.goal_percentages=[]
         for side,label_text in enumerate(('Local','Visitante')):
-            row=QHBoxLayout();row.addWidget(QLabel(label_text));buttons={}
+            row=QHBoxLayout();row.setSpacing(2);row.addWidget(QLabel(label_text));buttons={};percentages={}
             for goal in '012M':
                 button=QPushButton(goal);button.setCheckable(True);button.setFixedSize(35,25)
                 button.clicked.connect(lambda checked=False,i=side,g=goal:self.toggle_goal(i,g))
                 row.addWidget(button);buttons[goal]=button
+                percentage=QLabel('—');percentage.setStyleSheet('font-size:10px; color:#8fb5d8;');row.addWidget(percentage);percentages[goal]=percentage
             row.addStretch();layout.addLayout(row);self.goal_buttons.append(buttons)
+            self.goal_percentages.append(percentages)
         self.pleno_selection_info=QLabel();self.pleno_selection_info.setWordWrap(True);layout.addWidget(self.pleno_selection_info)
         left_layout=layout;layout=self.page_layout(1)
         row=QHBoxLayout();row.addWidget(QLabel('Añadir dobles y triples (0–10)'))
         self.coverage=QSlider(Qt.Orientation.Horizontal);self.coverage.setRange(0,10);row.addWidget(self.coverage,1)
         self.coverage_label=QLabel('0');row.addWidget(self.coverage_label);self.coverage.valueChanged.connect(lambda v:self.coverage_label.setText(str(v)))
         self.button('Cambiar el boleto', self.apply_template, row, editable=True);layout.addLayout(row)
-        note=QLabel('Un nivel mayor añade más signos y aumenta el coste. El nivel 10 puede producir 3.456 apuestas. Los partidos bloqueados no cambian.')
+        note=QLabel('Un nivel mayor añade signos y goles del Pleno y aumenta el coste. Nivel 0: un resultado del Pleno; nivel 10: los 16 marcadores, hasta 55.296 apuestas con 3.456 columnas base. Los partidos bloqueados no cambian.')
         note.setWordWrap(True);note.setObjectName('muted');layout.addWidget(note)
         row=QHBoxLayout();row.addWidget(QLabel('Elegir signos según'))
-        self.ranking_source=QComboBox();self.ranking_source.addItem('Probabilidades de mercado (casas de apuestas)','sport');self.ranking_source.addItem('Signos jugados en Quinielista (popularidad)','public');row.addWidget(self.ranking_source,1)
-        self.button('Descargar porcentajes de esta jornada',self.refresh_system_sources,row,editable=True);layout.addLayout(row)
+        self.ranking_source=QComboBox();self.ranking_source.addItem('Mercado: casas de apuestas','sport');self.ranking_source.addItem('Popularidad: Quinielista','public');row.addWidget(self.ranking_source,1)
+        self.button('Descargar porcentajes',self.refresh_system_sources,row,editable=True).setToolTip('Descarga los porcentajes de los 14 partidos y del Pleno para la jornada abierta, sin cambiar tus apuestas.');layout.addLayout(row)
         self.source_status=QLabel();self.source_status.setWordWrap(True);layout.addWidget(self.source_status)
         self.ranking_source.currentIndexChanged.connect(self.update_source_status)
-        note=QLabel('Mercado: estima las posibilidades de 1/X/2; no garantiza aciertos. Popularidad: muestra qué apuesta la gente, no la probabilidad deportiva. Descargar no cambia tus signos ni tus apuestas. Después pulsa Cambiar el boleto si quieres aplicar la fuente elegida. El Pleno se elige aparte.')
+        note=QLabel('Mercado: estima resultados; no garantiza aciertos. Popularidad: muestra qué apuesta la gente. Descargar no cambia tus signos ni tus apuestas. Cambiar el boleto aplica la fuente al boleto y al Pleno. Cada pareja de goles del Pleno multiplica las apuestas; puedes ajustar las casillas manualmente.')
         note.setWordWrap(True);note.setObjectName('muted');layout.addWidget(note)
         layout=left_layout
         row=QHBoxLayout();self.generate_button=self.button('Generar',self.start_generation,row,primary=True,editable=True)
@@ -525,8 +528,10 @@ class MainWindow(QMainWindow):
     def apply_template(self):
         if not self.system:raise ValueError('Pulsa Nuevo para crear una quiniela.')
         kind=self.ranking_source.currentData()
-        if not self.frozen_round().snapshot(kind):raise ValueError('Esta fuente no tiene porcentajes para esta quiniela. Pulsa Descargar porcentajes de esta jornada. No se sustituirán por valores inventados.')
-        self.set_system(self.service.template(self.system,self.coverage.value(),kind))
+        if not self.frozen_round().snapshot(kind):raise ValueError('Esta fuente no tiene porcentajes para esta quiniela. Pulsa Descargar porcentajes. No se sustituirán por valores inventados.')
+        has_pleno=bool(self.frozen_round().snapshot(kind).pleno_values)
+        self.set_system(self.service.template(self.system,self.coverage.value(),kind,include_pleno=True))
+        if not has_pleno:self.background_status('Signos aplicados. Esta fuente no publica porcentajes del Pleno; se conserva tu selección de goles, sin inventar resultados.')
 
     def refresh_system_sources(self):
         if not self.system:raise ValueError('Pulsa Nuevo para crear una quiniela.')
@@ -538,6 +543,10 @@ class MainWindow(QMainWindow):
 
     def update_source_status(self,*_):
         snapshot=self.frozen_round().snapshot(self.ranking_source.currentData())
+        for side,labels in enumerate(self.goal_percentages):
+            for i,goal in enumerate('012M'):
+                labels[goal].setText(f'{snapshot.pleno_values[side][i]:.1%}' if snapshot and snapshot.pleno_values else '—')
+                labels[goal].setToolTip(f'{snapshot.source} · goles {goal}' if snapshot and snapshot.pleno_values else 'Sin porcentajes del Pleno para esta fuente; descarga datos actualizados.')
         if snapshot:
             captured=datetime.fromisoformat(snapshot.captured_at).astimezone()
             self.source_status.setText(f'{self.round.key} · {snapshot.source}\nCaptura: {captured:%d/%m/%Y %H:%M}. Datos guardados en esta versión de tu quiniela; no son una actualización automática.')

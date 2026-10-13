@@ -6,7 +6,7 @@ Aplicación de Quiniela para escritorio y Android. La versión de escritorio
 puede leer los datos instalados por WIN1X2; ambas versiones descargan datos,
 porcentajes y marcadores directamente de sus proveedores públicos.
 
-## Quiniela AI Studio — v0.1 ejecutable (revisión 0.1.10)
+## Quiniela AI Studio — v0.1 ejecutable (revisión 0.1.11)
 
 Interfaz gráfica en español que conserva la experiencia visual de Quiniela Local:
 fondo azul, boleto compacto siempre visible a la izquierda, casillas 1/X/2 y
@@ -27,7 +27,7 @@ funciona sin conexión con la demo y los datos ya importados. Windows:
 2. Edita signos y Pleno en el boleto; las selecciones parciales se guardan.
 3. En Crear Quiniela, genera, revisa hasta 100 filas y exporta TXT/JSON.
 4. Para datos reales, **Descargar datos** o Configuración → importar carpeta/ZIP.
-   En Crear, **Descargar porcentajes de esta jornada** actualiza realmente por
+   En Crear, **Descargar porcentajes** actualiza realmente por
    Internet las fuentes del sistema abierto, sin cambiar signos ni apuestas.
    **Mercado** son estimaciones publicadas de casas de apuestas; **popularidad**
    son signos jugados en Quinielista. No son equivalentes ni garantizan aciertos.
@@ -35,6 +35,12 @@ funciona sin conexión con la demo y los datos ya importados. Windows:
    fuente elegida respetando partidos bloqueados; no inventa valores si falta.
 5. En **Aciertos**, el marcador y tus aciertos/fallos se actualizan solos. La demo usa resultados manuales.
 6. Puedes marcar varios goles por equipo en el Pleno; cada pareja aumenta apuestas y coste.
+   Los porcentajes 0/1/2/M aparecen junto a cada casilla, según mercado o
+   popularidad. Descarga porcentajes para incorporarlos a la quiniela abierta.
+   **Cambiar el boleto** preselecciona también el Pleno: nivel 0 elige un marcador,
+   nivel 10 los 16. Puedes ajustar las casillas después. Si faltan datos conserva
+   tu Pleno con aviso. El contador muestra columnas × parejas del Pleno y coste;
+   generación y TXT incluyen todas las parejas seleccionadas.
 7. **Reducidas** crea, si lo eliges, una copia desde las tablas del artículo SELAE (BOE 2009).
 8. **Guardar apuestas (TXT)**, en la cabecera, guarda las apuestas de la quiniela
    abierta. En Mis Sistemas puedes guardar directamente la fila elegida. Al

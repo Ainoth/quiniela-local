@@ -93,12 +93,31 @@ def public_snapshot(
         "Quinielista · porcentajes jugados",
         captured_at or utcnow(),
         tuple(tuple(v / 100 for v in row) for row in rows),
+        pleno_values=pleno_percentages(matches[-1], "p_jugados_"),
     )
     return replace(
         round_,
         snapshots=tuple(s for s in round_.snapshots if s.kind != "public")
         + (snapshot,),
     )
+
+
+def pleno_percentages(match, prefix: str, suffix: str = "") -> tuple:
+    """Lee marginales 0/1/2/M por equipo; no supone una distribución conjunta."""
+    import math
+    fields = tuple(tuple(f"{prefix}{goal}{side}{suffix}" for goal in "012M") for side in "LV")
+    if not any(field in match.attrib for row in fields for field in row):
+        return ()
+    rows = []
+    for fields_side in fields:
+        try:
+            values = tuple(float(match.attrib[field]) for field in fields_side)
+        except (ValueError, KeyError) as exc:
+            raise ValueError("Porcentajes del Pleno incompletos o inválidos.") from exc
+        if any(not math.isfinite(v) or not 0 <= v <= 100 for v in values) or not 99 <= sum(values) <= 101:
+            raise ValueError("Los porcentajes del Pleno deben sumar 100 por equipo.")
+        rows.append(tuple(v / sum(values) for v in values))
+    return tuple(rows)
 
 
 def probability_snapshots(round_: Round, payload: bytes, captured_at: str | None = None) -> Round:
@@ -124,6 +143,7 @@ def probability_snapshots(round_: Round, payload: bytes, captured_at: str | None
     snapshot = ProbabilitySnapshot(
         "sport", "Quinielista / Eduardo Losilla · mercado (Betfair/casas de apuestas)",
         captured_at or utcnow(), tuple(rows), "porcentajes publicados; sin calibración propia",
+        pleno_values=pleno_percentages(ElementTree.fromstring(payload).findall(".//partido")[-1], "p_bf_", "desc") or pleno_percentages(ElementTree.fromstring(payload).findall(".//partido")[-1], "p_bf_"),
     )
     return replace(updated, snapshots=tuple(s for s in updated.snapshots if s.kind != "sport") + (snapshot,))
 

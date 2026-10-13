@@ -1,9 +1,16 @@
 """Casos de uso: ninguna dependencia de widgets ni red."""
-from dataclasses import replace
 import json
 import uuid
-from quiniela_ai_studio.domain.models import SystemVersion, normalize_base, utcnow, round_dict, round_from_dict
+from dataclasses import replace
+
 from quiniela_ai_studio.domain.engine import coverage_template, optimize, union_base
+from quiniela_ai_studio.domain.models import (
+    SystemVersion,
+    normalize_base,
+    round_dict,
+    round_from_dict,
+    utcnow,
+)
 
 
 class SystemService:
@@ -50,14 +57,22 @@ class SystemService:
             params['plenos']=list(system.plenos)
         return self.version(system, base=normalized, locks=tuple(locks), pleno=pleno, bets=(), origin='manual',parameters=json.dumps(params))
 
-    def template(self, system, level, kind='sport'):
+    def template(self, system, level, kind='sport', *, include_pleno=False):
         round_ = self._editable(system)
         frozen = round_from_dict(json.loads(system.round_snapshot)) if system.round_snapshot else round_
         snapshot = frozen.snapshot(kind)
         base = coverage_template(system.base, system.locks, level, snapshot)
-        return self.version(system, base=base, bets=(), origin=f'plantilla nivel {level}',
+        masks = system.goal_masks
+        pairs = system.plenos
+        pleno = system.pleno
+        if include_pleno and snapshot and snapshot.pleno_values:
+            from quiniela_ai_studio.domain.engine import pleno_template
+            masks = pleno_template(snapshot, level)
+            pairs = tuple(a + b for a in masks[0] for b in masks[1])
+            pleno = pairs[0] if len(pairs) == 1 else ''
+        return self.version(system, base=base, pleno=pleno, bets=(), origin=f'plantilla nivel {level}',
                             parameters=json.dumps(dict(level=level, source=snapshot.source if snapshot else 'orden 1/X/2 sin modelo', kind=kind,
-                                                      pleno_masks=list(system.goal_masks),plenos=list(system.plenos))))
+                                                      pleno_masks=list(masks),plenos=list(pairs))))
 
     def generated(self, system, bets):
         self._editable(system)
@@ -149,7 +164,7 @@ class SystemService:
             raise ValueError('No existe una versión anterior.')
         previous = self.repository.load(system.system_id, system.revision - 1)
         return self.version(system, base=previous.base, locks=previous.locks, pleno=previous.pleno,
-                            bets=previous.bets, origin=f'restauración v{previous.revision}', action='undo')
+                            bets=previous.bets, parameters=previous.parameters, origin=f'restauración v{previous.revision}', action='undo')
 
     def imported(self, round_, name, bets):
         # Importación de revisión permitida en jornadas históricas; no edita sistemas existentes.

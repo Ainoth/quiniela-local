@@ -1,5 +1,13 @@
 # 12 · Matriz de trazabilidad de requisitos
 
+Revisión 0.1.11: RF-PRO-001/002/008 incorporan marginales 0/1/2/M del Pleno,
+RF-GEN-003/005 preselección progresiva explícita y RF-QUI-002/003 visibilidad
+del producto de columnas y parejas. Pruebas: `tests/studio/test_pleno_probabilities.py`;
+alcance y heurística propia: `planes/PLENO_PORCENTAJES.md`. No se declara un
+modelo conjunto calibrado de goles ni garantías de acierto.
+RF-QUI-005: restauración de parámetros de selección múltiple al deshacer,
+verificada al recuperar un Pleno manual tras preselección automática.
+
 Revisión 0.1.10: RF-JOR-007 y RF-PRO-008 añaden descarga explícita de fuentes
 para la jornada abierta y estado visible; RF-PRO-001/002 incorporan mercado y
 popularidad de Quinielista por separado. No se declara cobertura completa de

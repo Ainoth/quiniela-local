@@ -1,5 +1,22 @@
 # Cambios
 
+## 0.1.11 — 13/10/2026 · Porcentajes y preselección del Pleno múltiple
+
+- RF-PRO-001/002/008: porcentajes 0/1/2/M del local y visitante en la fuente
+  congelada, visibles junto a casillas. Lectura mercado/público con identidad
+  completa y validación; los JSON anteriores siguen siendo compatibles.
+- RF-GEN-003/005: «Cambiar el boleto» preselecciona también goles del Pleno
+  con heurística propia progresiva (1 a 16 parejas), sin alterar los bloqueos
+  de los 14 partidos. Si no hay datos conserva la selección manual con aviso.
+- RF-QUI-002/003: multiplicación de columnas y parejas del Pleno explícita,
+  coste total y advertencia nivel 10 hasta 55.296 apuestas. Generación y TXT
+  incluyen cada pareja; los pares exactos importados siguen preservados salvo
+  preselección explícita. No se afirma independencia ni garantía del marcador.
+- RF-QUI-005: Deshacer recupera también las máscaras y parejas previas del
+  Pleno, no solo el campo de marcador único.
+- Pruebas y alcance: `tests/studio/test_pleno_probabilities.py`,
+  `docs/planes/PLENO_PORCENTAJES.md`. Android permanece sin cambios.
+
 ## 0.1.10 — 13/10/2026 · Porcentajes reales y textos claros
 
 - RF-JOR-007 / RF-PRO-008: sustituido «Usar los últimos datos» (solo copiaba

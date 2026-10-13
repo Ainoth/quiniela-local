@@ -1,7 +1,8 @@
 """Motor de referencia de v0.1; límites explícitos, sin garantías de reducción."""
 import itertools
 import math
-from quiniela_ai_studio.domain.models import Bet, SIGNS, normalize_base
+
+from quiniela_ai_studio.domain.models import SIGNS, Bet, normalize_base
 
 MAX_GENERATED = 100_000
 
@@ -74,6 +75,21 @@ def generate(base, pleno, cancelled=lambda: False, progress=lambda done, total: 
 # (triples, dobles), aplicado solo a posiciones sin bloqueo.
 COVERAGE_LEVELS = ((0, 0), (0, 1), (0, 2), (0, 3), (0, 4), (1, 4),
                    (1, 5), (2, 5), (2, 6), (3, 6), (3, 7))
+
+
+PLENO_COVERAGE_LEVELS = ((1, 1), (1, 1), (1, 2), (1, 2), (2, 2), (2, 2),
+                         (2, 3), (2, 3), (3, 3), (3, 4), (4, 4))
+
+
+def pleno_template(snapshot, level: int) -> tuple[str, str]:
+    """Heurística propia: ampliar 0/1/2/M por probabilidad marginal, no garantía."""
+    if type(level) is not int or not 0 <= level <= 10:
+        raise ValueError("Nivel del Pleno entre 0 y 10 requerido.")
+    if not snapshot or not snapshot.pleno_values:
+        raise ValueError("No hay porcentajes del Pleno para esta fuente.")
+    from .models import GOALS
+    widths = PLENO_COVERAGE_LEVELS[level]
+    return tuple(''.join(g for g in GOALS if g in sorted(GOALS, key=lambda g: (-snapshot.pleno_values[side][GOALS.index(g)], GOALS.index(g)))[:widths[side]]) for side in range(2))
 
 
 def coverage_template(base, locks, level, snapshot=None):

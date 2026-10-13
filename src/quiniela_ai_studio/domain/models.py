@@ -1,10 +1,10 @@
 """Entidades inmutables. Sin Qt, red, disco ni estado global de interfaz."""
-from dataclasses import dataclass, asdict
-from datetime import datetime, timezone, date
 import hashlib
 import json
 import math
 import re
+from dataclasses import asdict, dataclass
+from datetime import date, datetime, timezone
 
 SIGNS = "1X2"
 GOALS = "012M"
@@ -63,9 +63,11 @@ class ProbabilitySnapshot:
     captured_at: str
     values: tuple
     model_version: str = ""
+    pleno_values: tuple = ()
 
     def __post_init__(self):
         object.__setattr__(self, "values", tuple(tuple(row) for row in self.values))
+        object.__setattr__(self, "pleno_values", tuple(tuple(row) for row in self.pleno_values))
         if self.kind not in ("sport", "public") or not self.source:
             raise ValueError("Fuente deportiva o público requerida.")
         validate_datetime(self.captured_at)
@@ -76,6 +78,12 @@ class ProbabilitySnapshot:
                 raise ValueError("Probabilidades: valores finitos entre 0 y 1.")
             if not math.isclose(sum(row), 1, abs_tol=1e-6):
                 raise ValueError("Las probabilidades deben sumar 1 (tolerancia 1e-6).")
+        if self.pleno_values:
+            if len(self.pleno_values) != 2:
+                raise ValueError("El Pleno necesita porcentajes para local y visitante.")
+            for row in self.pleno_values:
+                if len(row) != 4 or any(isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(v) or not 0 <= v <= 1 for v in row) or not math.isclose(sum(row), 1, abs_tol=1e-6):
+                    raise ValueError("Pleno: cuatro porcentajes válidos 0/1/2/M que sumen 1 por equipo.")
 
 
 def validate_datetime(value):
