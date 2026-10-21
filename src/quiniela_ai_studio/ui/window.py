@@ -30,13 +30,13 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QHeaderView,
     QLabel,
+    QLayout,
     QLineEdit,
     QListWidget,
     QMainWindow,
     QMessageBox,
     QProgressBar,
     QPushButton,
-    QRadioButton,
     QScrollArea,
     QSizePolicy,
     QSlider,
@@ -45,8 +45,6 @@ from PySide6.QtWidgets import (
     QStackedWidget,
     QTabBar,
     QTableView,
-    QTableWidget,
-    QTableWidgetItem,
     QTabWidget,
     QVBoxLayout,
     QWidget,
@@ -67,9 +65,11 @@ from quiniela_ai_studio.infrastructure.integration import (
     reconcile_import,
     scrutiny_from_cache,
 )
-from quiniela_ai_studio.infrastructure.published_scrutiny import fetch_published_scrutiny
 from quiniela_ai_studio.infrastructure.providers import (
     migrate_legacy,
+)
+from quiniela_ai_studio.infrastructure.published_scrutiny import (
+    fetch_published_scrutiny,
 )
 from quiniela_ai_studio.ui.classic_reductions import (
     ClassicContextHeader,
@@ -78,6 +78,7 @@ from quiniela_ai_studio.ui.classic_reductions import (
     emboss_symbol,
 )
 from quiniela_ai_studio.ui.normal_generator import NormalGenerator
+from quiniela_ai_studio.ui.risk_selector import RiskSelector, risk_button
 
 
 def coverage_footer(verification):
@@ -533,13 +534,14 @@ class MainWindow(QMainWindow):
                 # the old ornamental texture obscured their dense controls.
                 canvas=ClassicReductionsCanvas(canvas_width,canvas_height,decorative=index not in (0,1))
                 canvas_layout=QVBoxLayout(canvas)
+                if index==0:canvas_layout.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
                 canvas_layout.setContentsMargins(8,4,8,10)
                 canvas_layout.setSpacing(3)
                 header=ClassicContextHeader(canvas)
                 canvas_layout.addWidget(header)
                 self.classic_reduction_canvases[index]=canvas
                 self.classic_headers[index]=header
-                page_layout.addWidget(canvas,0,Qt.AlignmentFlag.AlignHCenter|Qt.AlignmentFlag.AlignTop)
+                page_layout.addWidget(canvas,0,(Qt.AlignmentFlag.AlignLeft if index==0 else Qt.AlignmentFlag.AlignHCenter)|Qt.AlignmentFlag.AlignTop)
                 page_layout.addStretch(1)
                 page_layout=canvas_layout
             self.reduction_tab_pages.append(page);self.reduction_tab_layouts.append(page_layout)
@@ -637,10 +639,12 @@ class MainWindow(QMainWindow):
 
     def _build_count_profile_panel(self):
         """Compact joint V/X/2 history table; profile rows use the domain rule."""
-        panel=QGroupBox('Figuras')
-        panel.setObjectName('countProfilesPanel');panel.setFixedWidth(152)
-        panel.setStyleSheet('QGroupBox{border:1px solid #86bfdf;border-radius:0;margin-top:9px;padding-top:2px;} QGroupBox::title{subcontrol-origin:margin;left:4px;padding:0 3px;color:#ffc83d;font-weight:bold;}')
-        layout=QVBoxLayout(panel);layout.setContentsMargins(4,4,4,4);layout.setSpacing(2)
+        panel=QGroupBox()
+        panel.setObjectName('countProfilesPanel');panel.setFixedWidth(230)
+        panel.setStyleSheet('QGroupBox{background:#0c2742;border:1px solid #2d6489;border-radius:6px;margin-top:0;padding-top:0;}')
+        layout=QVBoxLayout(panel);layout.setContentsMargins(10,10,10,10);layout.setSpacing(6)
+        layout.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
+        heading=QLabel('2 · Figuras V / X / 2');heading.setStyleSheet('color:#56d9ef;font-weight:bold;font-size:12px;');layout.addWidget(heading)
         header=QHBoxLayout();header.addWidget(QLabel('Aplicar'))
         apply_button=SelectionSquare('Aplicar perfiles conjuntos de Cuenta',size=14)
         apply_button.setChecked(self.count_profile_active)
@@ -651,151 +655,133 @@ class MainWindow(QMainWindow):
         host=QWidget();host.setStyleSheet('background:#f7f7f7;color:#173c75;')
         table=QGridLayout(host);table.setContentsMargins(0,0,0,0);table.setHorizontalSpacing(2);table.setVerticalSpacing(0)
         for col,label in enumerate(('','Veces','V','X','2')):
-            cell=QLabel(label);cell.setAlignment(Qt.AlignmentFlag.AlignCenter);cell.setStyleSheet('font-size:8px;color:#173c75;background:#d9e8f4;font-weight:bold;')
+            cell=QLabel(label);cell.setAlignment(Qt.AlignmentFlag.AlignCenter);cell.setStyleSheet('font-size:10px;color:#173c75;background:#d9e8f4;font-weight:bold;')
             table.addWidget(cell,0,col)
 
         scroll=QScrollArea();scroll.setWidgetResizable(True);scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        scroll.setObjectName('countFiguresList');scroll.setFixedHeight(244);scroll.setWidget(host);layout.addWidget(scroll)
+        scroll.setObjectName('countFiguresList');scroll.setFixedHeight(326);scroll.setWidget(host);layout.addWidget(scroll)
         self.count_profile_panels=getattr(self,'count_profile_panels',[])
         self.count_profile_panels.append((table,host,scroll))
         self._refresh_count_profiles()
         summary=QLabel('')
-        summary.setWordWrap(True);summary.setStyleSheet('font-size:8px;color:#173c75;background:#f7f7f7;')
+        summary.setWordWrap(True);summary.setStyleSheet('font-size:10px;color:#173c75;background:#f7f7f7;')
         self.count_profile_summaries.append(summary);layout.addWidget(summary)
         return panel
 
     def _build_count_distribution_panel(self):
-        panel=QGroupBox('Distribución Signos')
-        panel.setFixedWidth(152)
-        grid=QGridLayout(panel);grid.setContentsMargins(4,4,4,4);grid.setHorizontalSpacing(2);grid.setVerticalSpacing(1)
-        for col,label in enumerate(('Signo','Veces','%')):
-            item=QLabel(label);item.setAlignment(Qt.AlignmentFlag.AlignCenter);item.setStyleSheet('font-size:8px;color:#39d9f4;font-weight:bold;');grid.addWidget(item,0,col)
-        for row,sign in enumerate(('1','X','2'),1):
-            grid.addWidget(QLabel(sign),row,0)
-            count=QLabel('—');percent=QLabel('—');count.setAlignment(Qt.AlignmentFlag.AlignRight);percent.setAlignment(Qt.AlignmentFlag.AlignRight)
-            grid.addWidget(count,row,1);grid.addWidget(percent,row,2)
+        """One shared summary, based exclusively on the selected final results."""
+        panel=QGroupBox()
+        root=QVBoxLayout(panel);root.setContentsMargins(10,10,10,10);root.setSpacing(5)
+        root.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
+        heading=QLabel('Distribución en el histórico seleccionado');heading.setStyleSheet('color:#56d9ef;font-weight:bold;font-size:12px;');root.addWidget(heading)
+        row=QHBoxLayout();root.addLayout(row)
+        for sign,title in (('1','Locales'),('X','Empates'),('2','Visitantes')):
+            column=QVBoxLayout()
+            heading=QLabel(f'{sign} · {title}');heading.setStyleSheet('color:#a9c9e3;font-size:10px;')
+            count=QLabel('—');percent=QLabel('—')
+            percent.setStyleSheet('color:#58e3bb;font-size:17px;font-weight:bold;')
+            count.setStyleSheet('color:#9bbbd4;font-size:10px;')
+            column.addWidget(heading);column.addWidget(percent);column.addWidget(count)
+            row.addLayout(column)
             self.count_distribution_labels[sign]=(count,percent)
-        self.count_distribution_total=QLabel('Sin temporadas seleccionadas')
-        self.count_distribution_total.setWordWrap(True);self.count_distribution_total.setStyleSheet('font-size:8px;color:#a9cbe4;')
-        grid.addWidget(self.count_distribution_total,4,0,1,3)
+        self.count_distribution_total=QLabel()
+        self.count_distribution_total.hide()
         self._refresh_count_profiles()
         return panel
 
     def _build_count_classic_right_panel(self,filter_panel):
-        """Build Cuenta's dense seasonal distribution, filters and legacy summary."""
-        panel=QWidget();panel.setObjectName('countClassicRightPanel');panel.setFixedWidth(280)
-        root=QVBoxLayout(panel);root.setContentsMargins(1,0,1,0);root.setSpacing(2)
-        heading=QLabel('Distribución Signos');heading.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        heading.setStyleSheet('font-size:11px;font-weight:bold;color:#62e957;padding:0;')
-        root.addWidget(heading)
-        self.count_season_table=QTableWidget(0,4);self.count_season_table.setObjectName('countSeasonDistribution')
-        self.count_season_table.setHorizontalHeaderLabels(('1','X','2','Temporadas'))
-        self.count_season_table.verticalHeader().hide()
-        self.count_season_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        self.count_season_table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
-        self.count_season_table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.count_season_table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.count_season_table.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        self.count_season_table.setFixedHeight(176)
-        for column,width in enumerate((32,32,32,173)):self.count_season_table.setColumnWidth(column,width)
-        self.count_season_table.horizontalHeader().setSectionResizeMode(3,QHeaderView.ResizeMode.Fixed)
-        self.count_season_table.verticalHeader().setDefaultSectionSize(14)
-        self.count_season_table.setStyleSheet('QTableWidget{background:#f7f7f7;color:#173c75;gridline-color:#9eb6cd;border:1px solid #8eb1cd;font-size:8px;} QHeaderView::section{background:#315b80;color:#fff;font-size:8px;padding:0;border:1px solid #7fabc9;} QTableWidget::item{padding:0 2px;}')
-        self.count_season_table.itemChanged.connect(self._count_season_table_changed)
-        root.addWidget(self.count_season_table)
+        """Single historical selector and operational filters shared by all methods."""
+        from quiniela_ai_studio.ui.season_picker import SeasonPicker
 
-        root.addSpacing(10)
-        filters=QGroupBox('FILTROS');filters.setObjectName('countLegacyFilters')
-        filters.setMinimumHeight(104)
-        filters.setStyleSheet('QGroupBox{border:1px solid #9bc9e4;border-radius:0;margin-top:8px;padding:2px;color:#55e6eb;font-weight:bold;} QGroupBox::title{subcontrol-origin:margin;left:4px;padding:0 2px;}')
-        filter_grid=QGridLayout(filters);filter_grid.setContentsMargins(3,12,3,3);filter_grid.setHorizontalSpacing(4);filter_grid.setVerticalSpacing(3)
-        self.count_filters_layout=filter_grid
-        filter_grid.addWidget(filter_panel,0,0)
-        distance_help=QLabel('Al marcar Aplicar, se activa Cuenta. Los límites indican la distancia entre dos X consecutivas; con cero o una X no se descarta.')
-        distance_help.setWordWrap(True);distance_help.setStyleSheet('font-size:9px;color:#b4d8ef;')
-        filter_grid.addWidget(distance_help,1,0)
-        root.addWidget(filters)
-
-        sums=QTableWidget(10,5);sums.setObjectName('countLegacySums');sums.setHorizontalHeaderLabels(('Condición','Valor','Reserva','Resultado','Media'))
-        sums.verticalHeader().hide();sums.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        sums.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection);sums.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        sums.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Fixed)
-        for column,width in enumerate((82,35,40,44,42)):sums.setColumnWidth(column,width)
-        sums.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        sums.verticalHeader().setDefaultSectionSize(18);sums.setFixedHeight(210)
-        sums.setStyleSheet('QTableWidget{background:#12395d;color:#f4f8ff;gridline-color:#5692b4;border:1px solid #75b7d6;font-size:7px;} QHeaderView::section{background:#147e89;color:#fff;font-size:7px;padding:0;border:1px solid #55c8d1;} QTableWidget::item{padding:0 2px;}')
-        for row,label in enumerate(('Suma Mínima','Suma Máxima','Suma Mín. (1)','Suma Máx. (1)','Suma Mín. (X)','Suma Máx. (X)','Suma Mín. (2)','Suma Máx. (2)','Suma Mín. (V)','Suma Máx. (V)')):
-            sums.setRowHeight(row,18)
-            label_item=QTableWidgetItem(label);label_item.setBackground(QColor('#0d6680'));sums.setItem(row,0,label_item)
-            value=QTableWidgetItem('');value.setBackground(QColor('#f7f7f7'));value.setForeground(QColor('#173c75'));sums.setItem(row,1,value)
-            reserve=QTableWidgetItem('');reserve.setBackground(QColor('#efc51f'));reserve.setForeground(QColor('#173c75'));sums.setItem(row,2,reserve)
-            result=QTableWidgetItem('');result.setBackground(QColor('#244d79'));sums.setItem(row,3,result)
-            average=QTableWidgetItem('');average.setBackground(QColor('#2879a4'));sums.setItem(row,4,average)
-        sums.setToolTip('Resumen visual histórico: reservas y medias aún no tienen cálculo definido. No interviene en la reducción.')
-        root.addWidget(sums)
-        self.count_legacy_sums=sums
-        mark=QLabel('Reservas y medias: pendiente de definición; no se aplican.');mark.setWordWrap(True);mark.setStyleSheet('font-size:8px;color:#a9cbe4;')
-        root.addWidget(mark)
-        self._refresh_count_season_table()
+        panel=QWidget();panel.setObjectName('countClassicRightPanel');panel.setFixedWidth(420)
+        root=QVBoxLayout(panel);root.setContentsMargins(0,0,0,0);root.setSpacing(8)
+        root.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
+        seasons=QGroupBox()
+        seasons_layout=QVBoxLayout(seasons);seasons_layout.setContentsMargins(10,10,10,10);seasons_layout.setSpacing(7)
+        seasons_layout.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
+        heading=QLabel('3 · Temporadas para el estudio');heading.setStyleSheet('color:#56d9ef;font-weight:bold;font-size:12px;');seasons_layout.addWidget(heading)
+        self.count_season_picker=SeasonPicker()
+        self.count_season_picker.selectionChanged.connect(self._count_seasons_selected)
+        seasons_layout.addWidget(self.count_season_picker)
+        root.addWidget(seasons)
+        root.addWidget(self._build_count_distribution_panel())
+        root.addWidget(filter_panel)
+        self._refresh_count_season_picker()
         return panel
 
-    def _refresh_count_season_table(self):
-        """Show real per-season 1/X/2 shares and mirror the automatic selector."""
-        if not hasattr(self,'count_season_table') or not hasattr(self,'historical_reduction_results'):
+    def _count_seasons_selected(self, selected):
+        """Apply a preset as one update, avoiding dozens of history rebuilds."""
+        for season,square in self.history_season_squares.get('Cuenta',{}).items():
+            square.blockSignals(True)
+            square.setChecked(season in selected)
+            square.blockSignals(False)
+        self._history_season_toggled('Cuenta')
+
+    def _refresh_count_season_picker(self):
+        """Refresh the single season picker from the historical inventory."""
+        if not hasattr(self,'count_season_picker'):
             return
         from collections import Counter
 
-        table=self.count_season_table;table.blockSignals(True);table.setRowCount(0)
-        seasons=sorted({str(row.get('season')) for row in self.historical_reduction_results if row.get('season')},reverse=True)
-        for row_index,season in enumerate(seasons):
-            rounds=[item for item in self.historical_reduction_results if str(item.get('season'))==season and item.get('results14')]
-            totals=Counter(sign for item in rounds for sign in item['results14']);total=sum(totals.values())
-            table.insertRow(row_index)
-            for column,sign in enumerate(('1','X','2')):
-                item=QTableWidgetItem(f'{100*totals[sign]/total:.0f}' if total else '—')
-                item.setTextAlignment(Qt.AlignmentFlag.AlignCenter);table.setItem(row_index,column,item)
-            season_item=QTableWidgetItem(season);season_item.setFlags(Qt.ItemFlag.ItemIsEnabled|Qt.ItemFlag.ItemIsUserCheckable)
-            square=self.history_season_squares.get('Cuenta',{}).get(season)
-            season_item.setCheckState(Qt.CheckState.Checked if square and square.isChecked() else Qt.CheckState.Unchecked)
-            table.setItem(row_index,3,season_item)
-        table.blockSignals(False)
+        counts=Counter(str(row['season']) for row in self.historical_reduction_results
+                       if row.get('season') and row.get('results14'))
+        selected={season for season,square in self.history_season_squares.get('Cuenta',{}).items()
+                  if square.isChecked()}
+        self.count_season_picker.set_seasons(counts,selected)
+        controls=getattr(self,'mode_automatic_controls',{}).get('Cuenta')
+        if controls:
+            controls[2].setEnabled(any(counts[season] for season in selected))
 
-    def _count_season_table_changed(self,item):
-        if item.column()!=3:return
-        square=self.history_season_squares.get('Cuenta',{}).get(item.text())
-        if square is not None and square.isChecked()!=(item.checkState()==Qt.CheckState.Checked):
-            square.setChecked(item.checkState()==Qt.CheckState.Checked)
-
-    def _sync_count_season_table_checks(self):
-        if not hasattr(self,'count_season_table'):return
-        table=self.count_season_table;table.blockSignals(True)
-        for row in range(table.rowCount()):
-            item=table.item(row,3)
-            square=self.history_season_squares.get('Cuenta',{}).get(item.text()) if item else None
-            if item and square:
-                item.setCheckState(Qt.CheckState.Checked if square.isChecked() else Qt.CheckState.Unchecked)
-        table.blockSignals(False)
+    def _sync_count_season_picker(self):
+        self._refresh_count_season_picker()
 
     def _build_count_filter_panel(self):
-        """Expose Cuenta's existing X-distance filter without duplicating its logic."""
-        panel=QGroupBox('Distancia entre equis')
-        panel.setObjectName('countDistanceFilter');panel.setFixedSize(266,43)
-        panel.setToolTip('Distancia entre equis; el filtro conserva su cálculo existente.')
-        row=QHBoxLayout(panel);row.setContentsMargins(4,3,4,3);row.setSpacing(4)
+        """Expose the actual distance rule and explain its applied state."""
+        panel=QGroupBox()
+        panel.setObjectName('countDistanceFilter')
+        layout=QVBoxLayout(panel);layout.setContentsMargins(10,10,10,10);layout.setSpacing(7)
+        layout.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
+        heading=QLabel('Distancia entre X · opcional');heading.setStyleSheet('color:#56d9ef;font-weight:bold;font-size:12px;');layout.addWidget(heading)
+        row=QHBoxLayout();row.setSpacing(6)
         check=self.filter_checks['x_distance'];check.hide()
-        apply=SelectionSquare('Aplicar filtro distancia entre equis',size=14)
+        apply=SelectionSquare('Aplicar filtro distancia entre equis',size=16)
         apply.setChecked(check.isChecked());apply.toggled.connect(check.setChecked);check.toggled.connect(apply.setChecked)
         apply.toggled.connect(lambda checked:self.reduction_activation_buttons[0].setChecked(True) if checked else None)
         self.count_distance_apply=apply
-        row.addWidget(QLabel('Aplicar'));row.addWidget(apply)
+        row.addWidget(QLabel('Aplicar'));row.addWidget(apply);row.addStretch(1)
         minimum,maximum=self.filter_ranges['x_distance']
         for widget in (minimum,maximum):
-            parent_layout=widget.parentWidget().layout() if widget.parentWidget() else None
-            if parent_layout:parent_layout.removeWidget(widget)
-            widget.setParent(panel)
-        row.addWidget(QLabel('mín.'));row.addWidget(minimum);row.addWidget(QLabel('máx.'));row.addWidget(maximum);row.addStretch(1)
+            previous=widget.parentWidget().layout() if widget.parentWidget() else None
+            if previous:previous.removeWidget(widget)
+            widget.setParent(panel);widget.setFixedWidth(54)
+        row.addWidget(QLabel('Desde'));row.addWidget(minimum);row.addWidget(QLabel('hasta'));row.addWidget(maximum)
+        layout.addLayout(row)
+        example=QLabel('X X → distancia 1     X 1 X → distancia 2')
+        example.setStyleSheet('color:#59d9ef;font-size:11px;')
+        layout.addWidget(example)
+        self.count_distance_status=QLabel()
+        self.count_distance_status.setWordWrap(True)
+        self.count_distance_status.setStyleSheet('font-size:10px;color:#b4cedf;')
+        layout.addWidget(self.count_distance_status)
+        for signal in (apply.toggled,minimum.valueChanged,maximum.valueChanged,
+                       self.reduction_activation_buttons[0].toggled):
+            signal.connect(self._update_count_distance_status)
         self.count_distance_filter=panel
+        self._update_count_distance_status()
         return panel
+
+    def _update_count_distance_status(self,*_):
+        if not hasattr(self,'count_distance_status'):
+            return
+        low,high=(spin.value() for spin in self.filter_ranges['x_distance'])
+        enabled=self.count_distance_apply.isChecked() and self.reduction_activation_buttons[0].isChecked()
+        if not enabled:
+            text='Desactivado · no descarta apuestas por distancia.'
+        elif (low,high)==(1,13):
+            text='Sin límite: de 1 a 13 admite todas las distancias.'
+        else:
+            text=f'Activo · cada separación entre dos X debe estar entre {low} y {high}. Con cero o una X no se descarta.'
+        self.count_distance_status.setText(text)
 
     def _selected_count_history_rows(self):
         selected={season for season,square in self.history_season_squares.get('Cuenta',{}).items() if square.isChecked()}
@@ -821,20 +807,20 @@ class MainWindow(QMainWindow):
             table=QGridLayout(host);table.setContentsMargins(0,0,0,0);table.setHorizontalSpacing(2);table.setVerticalSpacing(0)
             for column,label in enumerate(('','Veces','V','X','2')):
                 cell=QLabel(label);cell.setAlignment(Qt.AlignmentFlag.AlignCenter)
-                cell.setStyleSheet('font-size:8px;color:#173c75;background:#d9e8f4;font-weight:bold;')
+                cell.setStyleSheet('font-size:10px;color:#173c75;background:#d9e8f4;font-weight:bold;')
                 table.addWidget(cell,0,column)
             scroll.setWidget(host)
             self.count_profile_panels[panel_index]=(table,host,scroll)
             for row_index,profile in enumerate(sorted(available,key=lambda p:(-profiles[p],p)),1):
                 variants,x_count,two_count=profile
-                square=SelectionSquare(f'Permitir perfil histórico V {variants}, X {x_count}, 2 {two_count}',size=12)
+                square=SelectionSquare(f'Permitir perfil histórico V {variants}, X {x_count}, 2 {two_count}',size=14)
                 square.setChecked(profile in self.count_profiles_selected)
                 square.toggled.connect(lambda checked,p=profile:self._count_profile_toggled(p,checked))
                 self.count_profile_squares.setdefault(profile,[]).append(square)
                 occurrences=QLabel(str(profiles[profile]));occurrences.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
                 table.addWidget(square,row_index,0);table.addWidget(occurrences,row_index,1)
                 for col,value in enumerate(profile,2):
-                    cell=QLabel(str(value));cell.setAlignment(Qt.AlignmentFlag.AlignCenter);cell.setStyleSheet('font-size:8px;')
+                    cell=QLabel(str(value));cell.setAlignment(Qt.AlignmentFlag.AlignCenter);cell.setStyleSheet('font-size:10px;')
                     table.addWidget(cell,row_index,col)
             host.setMinimumHeight(max(scroll.viewport().height(),18*(len(available)+1)))
             host.updateGeometry()
@@ -978,7 +964,9 @@ class MainWindow(QMainWindow):
                 item=original.takeAt(0);widget=item.widget()
                 if widget is not None:
                     widget.setParent(manual);manual_layout.addWidget(widget)
-            if classic_header is not None:original.addWidget(classic_header)
+            if classic_header is not None:
+                original.addWidget(classic_header)
+                if title=='Cuenta':classic_header.hide()
             # The interval editors are superseded by the classic graphical
             # count/length grid. Keep their values in the model for migrations.
             old_box=self._existing_filter_boxes[outer_index][0]
@@ -1094,6 +1082,9 @@ class MainWindow(QMainWindow):
                     for column,sign in enumerate(signs,1):
                         square=SelectionValueSquare(f'{title}: {sign}, valor {value}')
                         square.setProperty('reductionValue',(sign,value))
+                        if title=='Cuenta':
+                            square.setFixedSize(36,20)
+                            square.setStyleSheet(square.styleSheet()+'QPushButton#selectionSquare{font-size:10px;}')
                         if title=='Cuenta' and value==15:
                             square.setText('—');square.setEnabled(False)
                         else:
@@ -1108,10 +1099,10 @@ class MainWindow(QMainWindow):
                 filter_panel=self._build_count_filter_panel()
                 manual_row=QWidget();manual_row.setObjectName('countManualRow')
                 manual_row_layout=QHBoxLayout(manual_row);manual_row_layout.setContentsMargins(0,0,0,0);manual_row_layout.setSpacing(4)
-                count_left_panel=QWidget();count_left_panel.setObjectName('countLeftPanel');count_left_panel.setFixedWidth(174)
-                left_layout=QVBoxLayout(count_left_panel);left_layout.setContentsMargins(1,1,1,1);left_layout.setSpacing(2)
-                count_heading=QLabel('Variantes, Equis, Doses');count_heading.setAlignment(Qt.AlignmentFlag.AlignCenter)
-                count_heading.setStyleSheet('font-size:10px;font-weight:bold;color:#62e957;padding:0;');left_layout.addWidget(count_heading)
+                count_left_panel=QGroupBox();count_left_panel.setObjectName('countLeftPanel');count_left_panel.setFixedWidth(210)
+                left_layout=QVBoxLayout(count_left_panel);left_layout.setContentsMargins(10,10,10,10);left_layout.setSpacing(6)
+                count_heading=QLabel('1 · Valores permitidos');count_heading.setAlignment(Qt.AlignmentFlag.AlignLeft)
+                count_heading.setStyleSheet('font-size:12px;font-weight:bold;color:#56d9ef;padding:0;');left_layout.addWidget(count_heading)
                 count_action_row=QHBoxLayout();count_action_row.setContentsMargins(0,0,0,0);count_action_row.setSpacing(3)
                 count_action_row.addWidget(QLabel('Aplicar'))
                 self.count_apply_all=SelectionSquare('Aplicar valores de V, X y 2',size=12)
@@ -1150,7 +1141,7 @@ class MainWindow(QMainWindow):
             if title=='Cuenta':methods.addTab(manual,'Manual')
             random_page=QWidget();random_layout=QVBoxLayout(random_page);random_layout.setContentsMargins(8,8,8,8)
             random_layout.addWidget(QLabel('Azar · crea una selección reproducible a partir de las apuestas disponibles.'))
-            controls=QHBoxLayout();risk=QComboBox()
+            controls=QHBoxLayout();risk=RiskSelector()
             for label,value in (('Mínimo',0),('Bajo',1),('Medio',2),('Alto',3)):risk.addItem(label,value)
             seed=QSpinBox();seed.setRange(0,2_000_000_000);seed.setValue(1)
             calculate=QPushButton('Calcular selección');controls.addWidget(QLabel('Riesgo'));controls.addWidget(risk);controls.addWidget(QLabel('Semilla'));controls.addWidget(seed);controls.addWidget(calculate);controls.addStretch()
@@ -1186,7 +1177,7 @@ class MainWindow(QMainWindow):
             if title=='Cuenta':
                 right_panel=self._build_count_classic_right_panel(filter_panel)
                 right_host_layout.addWidget(right_panel)
-            auto_controls=QHBoxLayout();auto_risk=QComboBox()
+            auto_controls=QHBoxLayout();auto_risk=RiskSelector()
             for label,value in (('Mínimo',0),('Bajo',1),('Medio',2),('Alto',3)):auto_risk.addItem(label,value)
             auto_calculate=QPushButton('Calcular');auto_controls.addWidget(QLabel('Riesgo'));auto_controls.addWidget(auto_risk);auto_controls.addWidget(auto_calculate);auto_controls.addStretch()
             auto_calculate.setEnabled(bool(seasons))
@@ -1194,22 +1185,18 @@ class MainWindow(QMainWindow):
             auto_panel=QGroupBox('Recomendación automática');auto_panel.setFixedWidth(230 if title=='Racha' else 205);auto_panel_layout=QVBoxLayout(auto_panel);auto_panel_layout.setContentsMargins(6,5,6,5);auto_panel_layout.setSpacing(5);auto_panel_layout.addLayout(auto_controls);auto_panel_layout.addWidget(auto_summary);auto_panel_layout.addStretch(1)
             automatic_row=QHBoxLayout();automatic_row.setAlignment(Qt.AlignmentFlag.AlignLeft|Qt.AlignmentFlag.AlignTop);automatic_row.setSpacing(5)
             if title=='Cuenta':
-                auto_board_host=QWidget();auto_board_layout=QVBoxLayout(auto_board_host)
-                auto_board_layout.setContentsMargins(0,0,0,0);auto_board_layout.setSpacing(1)
-                auto_board_host.setSizePolicy(QSizePolicy.Policy.Fixed,QSizePolicy.Policy.Fixed)
-                auto_board_host.setFixedWidth(178)
-                automatic_row.addWidget(auto_board_host,0,Qt.AlignmentFlag.AlignTop)
-                if title=='Cuenta':
-                    automatic_row.addWidget(profile_panel,0,Qt.AlignmentFlag.AlignTop)
-                    automatic_row.addWidget(self._build_count_distribution_panel(),0,Qt.AlignmentFlag.AlignTop)
-                    season_group.setFixedWidth(218)
-                    season_scroll.setFixedSize(198,270)
-                    automatic_row.addWidget(season_group,0,Qt.AlignmentFlag.AlignTop)
-                    automatic_row.addWidget(auto_panel,0,Qt.AlignmentFlag.AlignTop)
-                    automatic_layout.addLayout(automatic_row)
-                    # Distancia X lives inside the shared Cuenta right panel.
-                else:
-                    automatic_row.addWidget(season_group,0,Qt.AlignmentFlag.AlignTop);automatic_row.addWidget(auto_panel,0,Qt.AlignmentFlag.AlignTop);automatic_row.addStretch(1);automatic_layout.addLayout(automatic_row)
+                # One history selector and distribution shared by every method.
+                # The old canonical controls remain hidden for persistence.
+                season_group.setParent(self.classic_reduction_canvases[0]);season_group.hide()
+                imported_count.hide()
+                mode_description.setText('Elige temporadas y riesgo, calcula la propuesta y revisa los cuadros verdes. Histórico descriptivo, no predicción.')
+                automatic_layout.addLayout(automatic_row)
+                auto_panel.setFixedWidth(420)
+                auto_panel.setTitle('')
+                recommendation_heading=QLabel('4 · Elegir riesgo y calcular');recommendation_heading.setStyleSheet('color:#56d9ef;font-weight:bold;font-size:12px;');auto_panel_layout.insertWidget(0,recommendation_heading)
+                auto_calculate.setText('Calcular selección')
+                right_panel.layout().insertWidget(1,auto_panel)
+                auto_panel.hide()
             if title=='Racha':
                 automatic_layout.setContentsMargins(2,2,2,2);automatic_layout.setSpacing(3)
                 automatic_layout.addWidget(self.run_figures_note)
@@ -1230,22 +1217,26 @@ class MainWindow(QMainWindow):
                     page.layout().setContentsMargins(3,3,3,3)
                     page.layout().setSpacing(2)
                 count_canvas=self.classic_reduction_canvases[0]
-                def show_count_method(index,mode_widget=methods,shared_board=count_left_panel,shared_profile=profile_panel,
-                                      shared_right=right_host,
-                                      auto_host_layout=auto_board_layout,
-                                      auto_row=automatic_row,
+                count_canvas.setFixedWidth(930)
+                count_canvas.setStyleSheet(count_canvas.styleSheet()+"""
+                    QWidget#classicReductionCanvas QGroupBox {
+                        background:#0c2742; border:1px solid #2d6489; border-radius:6px;
+                        margin-top:0; padding-top:0; font-size:12px;
+                    }
+                    QWidget#classicReductionCanvas QGroupBox::title {
+                        subcontrol-position:top left; left:8px; color:#56d9ef;
+                    }
+                    QWidget#classicReductionCanvas QLabel {font-size:11px;}
+                    QWidget#classicReductionCanvas QPushButton {border-radius:3px;min-height:22px;}
+                """)
+                def show_count_method(index,shared_board=count_left_panel,shared_profile=profile_panel,
+                                      shared_right=right_host,automatic_row=automatic_row,
                                       manual_row_layout=manual_row_layout,random_row_layout=random_row_layout,
-                                      canvas=count_canvas):
-                    canvas.setFixedWidth(1330 if index==2 else 750)
-                    if index==2:
-                        self._move_reduction_widget(shared_board,auto_host_layout)
-                        self._move_reduction_widget(shared_profile,auto_row,1)
-                        self._move_reduction_widget(shared_right,auto_row,3)
-                    else:
-                        row_layout=manual_row_layout if index==0 else random_row_layout
-                        self._move_reduction_widget(shared_board,row_layout,0)
-                        self._move_reduction_widget(shared_profile,row_layout,1)
-                        self._move_reduction_widget(shared_right,row_layout,2)
+                                      recommendation=auto_panel):
+                    target=(manual_row_layout,random_row_layout,automatic_row)[index]
+                    for position,widget in enumerate((shared_board,shared_profile,shared_right)):
+                        self._move_reduction_widget(widget,target,position)
+                    recommendation.setVisible(index==2)
                 methods.currentChanged.connect(show_count_method)
                 original.addWidget(methods)
                 show_count_method(0)
@@ -1452,8 +1443,9 @@ class MainWindow(QMainWindow):
         self._populate_history_seasons('Racha',seasons,initial)
         select_all.clicked.connect(lambda _checked=False:self._set_history_seasons('Racha',True))
         select_none.clicked.connect(lambda _checked=False:self._set_history_seasons('Racha',False))
-        recommendation=QGroupBox('Riesgo');recommendation.setFixedWidth(112)
-        recommendation_layout=QVBoxLayout(recommendation);recommendation_layout.setContentsMargins(4,3,4,3);recommendation_layout.setSpacing(1)
+        recommendation=QGroupBox();recommendation.setFixedWidth(112)
+        recommendation_layout=QVBoxLayout(recommendation);recommendation_layout.setContentsMargins(7,8,7,8);recommendation_layout.setSpacing(4)
+        recommendation_layout.addWidget(QLabel('Riesgo'))
         auto_risk=self._make_streak_risk_group(recommendation,'Riesgo automático');self.streak_risk_groups['Automática']=auto_risk;auto_risk.setExclusive(True);auto_risk.button(0).setChecked(True)
         for radio in auto_risk.buttons():recommendation_layout.addWidget(radio)
         auto_row.addWidget(season_group,0,Qt.AlignmentFlag.AlignTop)
@@ -1877,7 +1869,7 @@ class MainWindow(QMainWindow):
         random_note.setWordWrap(True);random_note.setVisible(False);random_note.setSizePolicy(QSizePolicy.Policy.Preferred,QSizePolicy.Policy.Fixed);random_layout.addWidget(random_note)
         random_layout.addLayout(subtab_row())
         host,host_layout=host_for('Azar');random_layout.addWidget(host,0,Qt.AlignmentFlag.AlignLeft|Qt.AlignmentFlag.AlignTop);pages['Azar']=random_page;hosts['Azar']=(host,host_layout)
-        random_row=QHBoxLayout();random_risk=QComboBox()
+        random_row=QHBoxLayout();random_risk=RiskSelector()
         for label,value in (('Mínimo',0),('Medio',1),('Máximo',2)):random_risk.addItem(label,value)
         seed=QSpinBox();seed.setRange(0,2_000_000_000);seed.setValue(1);seed.setFixedWidth(78)
         seed.setAccessibleName('Semilla para Interrupciones aleatorias')
@@ -1907,7 +1899,7 @@ class MainWindow(QMainWindow):
         self._populate_history_seasons('Interrupciones',seasons,{season:(season in saved if saved is not None else True) for season in seasons})
         select_all.clicked.connect(lambda _checked=False:self._set_history_seasons('Interrupciones',True))
         select_none.clicked.connect(lambda _checked=False:self._set_history_seasons('Interrupciones',False))
-        controls=QHBoxLayout();auto_risk=QComboBox()
+        controls=QHBoxLayout();auto_risk=RiskSelector()
         for label,value in (('Mínimo',0),('Medio',1),('Máximo',2)):auto_risk.addItem(label,value)
         auto_calculate=QPushButton('Calcular');auto_summary=QLabel('Elige temporadas y calcula una recomendación basada en los resultados reales disponibles.')
         auto_summary.setWordWrap(True);auto_calculate.setEnabled(bool(seasons))
@@ -2244,12 +2236,13 @@ class MainWindow(QMainWindow):
     def _make_streak_risk_group(parent,name):
         group=QButtonGroup(parent);group.setObjectName(name)
         for index,label in enumerate(('Mínimo','Medio','Máximo')):
-            radio=QRadioButton(label);radio.setProperty('riskLevel',index);group.addButton(radio,index)
+            radio=risk_button(label);radio.setProperty('riskLevel',index);group.addButton(radio,index)
         return group
 
     @staticmethod
     def _risk_group_box(title,group):
-        box=QGroupBox(title);layout=QVBoxLayout(box);layout.setContentsMargins(4,3,4,3);layout.setSpacing(0)
+        box=QGroupBox();layout=QVBoxLayout(box);layout.setContentsMargins(7,8,7,8);layout.setSpacing(4)
+        layout.addWidget(QLabel(title))
         for radio in group.buttons():layout.addWidget(radio)
         return box
 
@@ -2583,7 +2576,7 @@ class MainWindow(QMainWindow):
             if widget is not None:widget.deleteLater()
         buttons={}
         ordered=sorted(seasons,reverse=True)
-        columns=2 if title in ('Racha','FSSeguidos','Interrupciones') else 2
+        columns=2
         if not ordered:
             empty=QLabel('No hay temporadas disponibles en el histórico integrado.')
             grid.addWidget(empty,0,0,1,columns)
@@ -2602,7 +2595,7 @@ class MainWindow(QMainWindow):
         self._refresh_history_statistics(title)
         if title=='Cuenta':
             self._refresh_count_profiles()
-            self._refresh_count_season_table()
+            self._refresh_count_season_picker()
 
     def _refresh_history_statistics(self,title=None):
         """Show exact historical frequencies in the miniature classic grid."""
@@ -2637,13 +2630,16 @@ class MainWindow(QMainWindow):
                 label.setToolTip(f'{frequency} de {len(rows)} jornadas con exactamente {count} rachas máximas de longitud {length}.' if rows else 'No hay jornadas para las temporadas elegidas.')
 
     def _set_history_seasons(self,title,checked):
+        if title=='Cuenta':
+            self._count_seasons_selected(set(self.history_season_squares[title]) if checked else set())
+            return
         for square in self.history_season_squares.get(title,{}).values():square.setChecked(checked)
 
     def _history_season_toggled(self,title):
         self._refresh_history_statistics(title)
         if title=='Cuenta':
             self._refresh_count_profiles()
-            self._sync_count_season_table_checks()
+            self._sync_count_season_picker()
         if title in ('Racha','FSSeguidos','Interrupciones'):
             current_round_key=self.round_picker.currentData()
             if title=='Interrupciones':key=self._interruption_season_setting_key()
@@ -4321,7 +4317,7 @@ class MainWindow(QMainWindow):
                     self.count_values['V'].add(variants);self.count_values['X'].add(x_count);self.count_values['2'].add(two_count)
                 for sign in ('V','X','2'):self.count_apply[sign].setChecked(True)
                 risk,summary,_calculate=self.mode_automatic_controls['Cuenta'];risk.setCurrentText(rule.generation_risk)
-                for season,square in self.history_season_squares.get('Cuenta',{}).items():square.setChecked(season in set(rule.evidence_seasons))
+                self._count_seasons_selected(set(rule.evidence_seasons))
                 summary.setText(f'{rule.evidence_sample_size} resultados finales · {len(rule.allowed_profiles)} perfiles conjuntos · objetivo muestral {rule.evidence_coverage:.0%}. No es una predicción.')
             elif rule.kind=='allowed_run_length' and rule.tab_index==1:
                 self.legacy_streak_rules.append(rule);self.run_lengths[rule.sign]=set(rule.allowed_values)

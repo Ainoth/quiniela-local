@@ -144,7 +144,7 @@ def test_count_and_streak_mode_grids_apply_and_outer_squares_preserve_settings(w
     for mode in (1,2,0):
         window.mode_tabs['Cuenta'].setCurrentIndex(mode)
         assert window.mode_tabs['Cuenta'].widget(mode).isAncestorOf(count_board)
-        assert window.classic_reduction_canvases[0].width()==(1330 if mode==2 else 750)
+        assert window.classic_reduction_canvases[0].width()==930
         assert window.count_squares[('V',14)].text()!=''
     window.count_apply['V'].setChecked(True)
     QTest.mouseClick(window.count_squares[('V',14)],Qt.MouseButton.LeftButton)
@@ -176,13 +176,10 @@ def test_cuenta_dashboard_shows_joint_figures_distribution_seasons_and_distance_
     assert window.findChild(QWidget,'countProfilesPanel') is not None
     assert set(window.count_distribution_labels)=={'1','X','2'}
     assert window.history_season_squares['Cuenta']
-    assert [window.count_season_table.horizontalHeaderItem(i).text() for i in range(4)]==['1','X','2','Temporadas']
-    assert window.count_season_table.rowCount()==len(window.history_season_squares['Cuenta'])
+    assert window.count_season_picker.boxes
     assert window.findChild(QWidget,'countClassicRightPanel') is not None
-    assert window.findChild(QWidget,'countLegacyFilters') is not None
-    assert window.count_legacy_sums.rowCount()==10
-    assert window.count_legacy_sums.verticalScrollBar().maximum()==0
-    assert window.count_legacy_sums.item(0,1).text()==''
+    assert window.findChild(QWidget,'countDistanceFilter') is not None
+    assert window.findChild(QWidget,'countLegacySums') is None
     assert window.findChild(QWidget,'countHistogramIcon') is not None
     assert window.findChild(QWidget,'countFiguresActions') is not None
     assert window.count_squares[('V',15)].isEnabled() is False
@@ -199,12 +196,10 @@ def test_cuenta_dashboard_shows_joint_figures_distribution_seasons_and_distance_
     season_square.setChecked(False)
     assert sum(int(label.text()) for label,_percent in window.count_distribution_labels.values())==14*(len(rows)-excluded_rows)
     season_square.setChecked(True)
-    season_row=next(row for row in range(window.count_season_table.rowCount())
-                    if window.count_season_table.item(row,3).text()==excluded_season)
-    season_item=window.count_season_table.item(season_row,3)
-    season_item.setCheckState(Qt.CheckState.Unchecked)
+    visible_box=window.count_season_picker.boxes[excluded_season]
+    visible_box.click()
     assert excluded_season not in {season for season,square in window.history_season_squares['Cuenta'].items() if square.isChecked()}
-    season_item.setCheckState(Qt.CheckState.Checked)
+    visible_box.click()
 
     candidates=(Bet('X'+'1'*13,'M0'),Bet('2'+'1'*13,'M0'),Bet('XX'+'1'*12,'M0'))
     window.count_profiles_selected={(1,1,0)}
@@ -223,6 +218,39 @@ def test_cuenta_dashboard_shows_joint_figures_distribution_seasons_and_distance_
     assert window.filter_spec().apply(distance_candidates)==(distance_candidates[0],)
     window.reduction_active[0]=False
     assert window.filter_spec().apply(distance_candidates)==distance_candidates
+
+
+def test_cuenta_uses_one_season_picker_and_keeps_labels_outside_scroll(window, application):
+    window.resize(1920,1040)
+    window.navigation.setCurrentRow(8)
+    window.reduction_tabs.setCurrentIndex(window.reduction_visible_indexes[0])
+    window.mode_tabs['Cuenta'].setCurrentIndex(2)
+    application.processEvents()
+    picker=window.count_season_picker
+    assert picker.summary.geometry().top()>picker.scroll.geometry().bottom()
+    canvas=window.classic_reduction_canvases[0]
+    assert canvas.width()<window.pages.width()
+    assert window.count_distance_filter.mapTo(canvas,window.count_distance_filter.rect().bottomRight()).y()<canvas.height()
+    picker.choose_recent(5)
+    selected={season for season,square in window.history_season_squares['Cuenta'].items() if square.isChecked()}
+    assert selected==picker.selected_seasons()
+    assert len(selected)==5
+    picker.choose_recent(0)
+    assert not window.mode_automatic_controls['Cuenta'][2].isEnabled()
+    picker.choose_recent(10)
+    assert window.mode_automatic_controls['Cuenta'][2].isEnabled()
+
+
+def test_every_risk_control_uses_visible_buttons(window):
+    from PySide6.QtWidgets import QButtonGroup
+    from quiniela_ai_studio.ui.risk_selector import RiskSelector
+
+    for controls in (window.mode_azar_controls,window.mode_automatic_controls):
+        for risk,*_rest in controls.values():
+            if isinstance(risk,QButtonGroup):
+                assert all(isinstance(button,QPushButton) for button in risk.buttons())
+            else:
+                assert isinstance(risk,RiskSelector)
 
 
 def test_sseguidos_three_modes_compact_panels_filter_and_share_state(window):
@@ -564,7 +592,7 @@ def test_automatic_mode_imported_final_results_builds_joint_filter(window):
     assert window.count_squares[('V',14)].text()=='2'
     assert window.count_squares[('X',14)].text()=='2'
     assert window.count_squares[('2',0)].text()=='2'
-    assert window.count_squares[('V',14)].width()==24
+    assert window.count_squares[('V',14)].width()==36
     risk,summary,_calculate=window.mode_automatic_controls['Cuenta'];risk.setCurrentIndex(0)
     window.calculate_automatic_mode('Cuenta',('V','X','2'),window.count_values,window.count_squares,risk,summary)
     window.reduction_activation_buttons[0].setChecked(True)

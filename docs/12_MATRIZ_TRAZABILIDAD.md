@@ -1,5 +1,23 @@
 # 12 · Matriz de trazabilidad de requisitos
 
+RF-UX-026/027 (v1.0.33): Cuenta presenta un solo selector de temporadas y una
+distribución compartidos por Manual/Azar/Automática. Cabeceras dentro de sus
+paneles; altura según contenido. Sin tablas vacías de reservas. Selección con
+casillas verdes, búsqueda que conserva opciones ocultas y presets por lotes.
+Pruebas: `test_season_presets_are_one_change_and_search_preserves_hidden_choices`,
+`test_cuenta_uses_one_season_picker_and_keeps_labels_outside_scroll`,
+`test_count_and_streak_mode_grids_apply_and_outer_squares_preserve_settings`.
+
+RF-FIL-026 (v1.0.33): distancia entre X muestra el rango realmente activo y
+explica la diferencia de posiciones; sin dos X no descarta. Prueba de filtro
+con apuestas reales: `test_cuenta_dashboard_shows_joint_figures_distribution_seasons_and_distance_filter`.
+
+RF-UX-028 (v1.0.33): el riesgo se elige mediante botones exclusivos en toda
+la interfaz Qt; conserva datos y etiquetas al restaurar. Pruebas:
+`test_risk_buttons_are_exclusive_and_restore_saved_labels`,
+`test_every_risk_control_uses_visible_buttons` y pruebas de métodos aleatorios
+y automáticos de `test_advanced_conditions_ui.py`.
+
 RF-UX-023 (v1.0.32): Normal muestra el flujo de elección de porcentajes,
 asignación, relleno, generación y exportación. La fuente de la matriz incluye
 solo capturas reales y perfiles locales importados; el usuario puede mantener

@@ -6,7 +6,7 @@ Aplicación de Quiniela para escritorio y Android. La versión de escritorio
 puede leer los datos instalados por WIN1X2; ambas versiones descargan datos,
 porcentajes y marcadores directamente de sus proveedores públicos.
 
-## Quiniela AI Studio — v1.0.32
+## Quiniela AI Studio — v1.0.33
 
 Interfaz gráfica en español que conserva la experiencia visual de Quiniela Local:
 fondo azul, boleto fijo en tabla con partido, hora y porcentajes junto a 1/X/2,
@@ -50,13 +50,15 @@ tener garantía condicional, nunca garantía de premio. [Diseño y alcance](docs
 **Cuenta**, **SSeguidos**, **FSSeguidos** e **Interrupciones** ofrecen métodos
 gráficos compactos con cuadrados blancos/verdes; sus filtros quedan
 desactivados hasta encender su pestaña exterior. Cuenta muestra el historial
-conjunto V/X/2 y la distribución observada 1/X/2. En Manual, la matriz,
-Figuras, distribución por temporada, FILTROS y sumas ocupan tres bloques
-compactos; las temporadas se sincronizan con el selector de Automática. La
-distancia entre equis reutiliza la regla existente. Los controles de reservas
-y medias permanecen identificados como pendientes hasta que su fórmula esté
-definida. Al activar Distancia X también se activa Cuenta, para que el filtro
-participe al generar la reducida.
+conjunto V/X/2 y la distribución observada 1/X/2. Cuenta comparte una sola
+composición entre Manual, Azar y Automática: cantidades, figuras y un único
+selector de temporadas con casillas verdes, búsqueda y accesos Últimas 5/10,
+Todas/Ninguna. El resumen muestra cuántas temporadas y jornadas se estudiarán.
+La recomendación requiere pulsar Calcular; el histórico es descriptivo.
+La tabla vacía de reservas/sumas se ha retirado. Distancia entre X explica su
+estado y la diferencia de posiciones (X1X = 2), y al activarla también activa
+Cuenta. Los niveles de riesgo de todas las reducciones son botones visibles,
+con una sola opción resaltada; se conservan sus etiquetas y cálculos.
 SSeguidos organiza `1`, `X`, `2` y `V` en cuatro paneles compactos, con límites
 de racha máxima, cantidades exactas por longitud y figuras como particiones.
 Los métodos escriben en una misma configuración; Automática usa perfiles

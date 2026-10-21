@@ -1,5 +1,17 @@
 # Cambios
 
+## 1.0.33 — Cuenta unificada y riesgo sin desplegables
+
+- RF-UX-026: Cuenta mantiene los mismos tres bloques alineados en los tres
+  métodos, usa cabeceras dentro de los paneles y ajusta su altura al contenido.
+  Retira la tabla vacía de reservas y la distribución duplicada.
+- RF-UX-027: un solo selector de temporadas con casillas verdes, búsqueda,
+  Últimas 5/10, Todas/Ninguna y recuento real de jornadas; cambios por lotes.
+- RF-FIL-026: distancia entre X muestra su estado efectivo y ejemplos de
+  separación; se comprueba con apuestas que cumplen e incumplen el rango.
+- RF-UX-028: todos los controles de riesgo usan botones con selección exclusiva,
+  conservando los valores usados por los cálculos y las versiones guardadas.
+
 ## 1.0.32 — flujo visible de Normal y filtros de Cuenta
 
 - RF-UX-023: Normal muestra el orden de trabajo, permite elegir explícitamente la matriz entre capturas reales y perfiles locales importados, y acerca descarga, relleno, generación y guardado. Las ponderaciones auxiliares indican cuándo se aplican.
