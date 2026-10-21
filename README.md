@@ -6,12 +6,19 @@ Aplicación de Quiniela para escritorio y Android. La versión de escritorio
 puede leer los datos instalados por WIN1X2; ambas versiones descargan datos,
 porcentajes y marcadores directamente de sus proveedores públicos.
 
-## Quiniela AI Studio — v1.0.31
+## Quiniela AI Studio — v1.0.32
 
 Interfaz gráfica en español que conserva la experiencia visual de Quiniela Local:
 fondo azul, boleto fijo en tabla con partido, hora y porcentajes junto a 1/X/2,
 Pleno 0/1/2/M, secciones a la derecha y **Descargar datos** en la cabecera.
 El núcleo está en `src/quiniela_ai_studio/{domain,application,infrastructure,ui}`.
+En **Normal**, la fila superior reúne descarga de porcentajes, relleno de la
+base, generación y guardado. La matriz 1/X/2 permite elegir mercado,
+popularidad o un perfil local realmente importado; la matriz editable conserva
+los valores visibles. Manual fija las cantidades de dobles y triples;
+Automática las calcula dentro del máximo de columnas. Clasificación, últimos
+cinco e historial solo alteran la matriz al aplicar expresamente sus
+ponderaciones y requieren ficheros importados para esa jornada.
 La columna **Modelo % / Jugado %** muestra la fuente elegida, con sus datos
 guardados en la quiniela; los nombres completos y la procedencia están en la
 ayuda al pasar el ratón. El Pleno conserva las selecciones múltiples.
@@ -47,7 +54,9 @@ conjunto V/X/2 y la distribución observada 1/X/2. En Manual, la matriz,
 Figuras, distribución por temporada, FILTROS y sumas ocupan tres bloques
 compactos; las temporadas se sincronizan con el selector de Automática. La
 distancia entre equis reutiliza la regla existente. Los controles de reservas
-y medias se muestran desactivados hasta que su fórmula esté definida.
+y medias permanecen identificados como pendientes hasta que su fórmula esté
+definida. Al activar Distancia X también se activa Cuenta, para que el filtro
+participe al generar la reducida.
 SSeguidos organiza `1`, `X`, `2` y `V` en cuatro paneles compactos, con límites
 de racha máxima, cantidades exactas por longitud y figuras como particiones.
 Los métodos escriben en una misma configuración; Automática usa perfiles

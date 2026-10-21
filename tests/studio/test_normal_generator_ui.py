@@ -103,6 +103,43 @@ def test_source_switch_updates_unedited_matrix_but_preserves_manual_edits(window
     assert panel._matrix_values() == edited
 
 
+def test_visible_matrix_source_controls_the_percentages_used_for_base(window):
+    window.new_system()
+    panel = window.normal_generator
+    public = panel.probability_sources["snapshot:public"]
+    choice = panel.matrix_source.findData("snapshot:public")
+    assert choice >= 0
+    panel.matrix_source.setCurrentIndex(choice)
+    assert panel.matrix_origin == "snapshot:public"
+    assert panel._matrix_values() == public.values
+    panel.matrix_source.setCurrentIndex(panel.matrix_source.findData("manual"))
+    assert panel.matrix_origin == "manual"
+    assert panel._matrix_values() == public.values
+    panel.probability_sources["local:example"] = replace(public, source="Mi archivo", kind="custom")
+    panel._refresh_matrix_sources()
+    assert panel.matrix_source.findData("local:example") >= 0
+
+
+def test_count_distance_controls_share_one_visible_filter_panel(window):
+    window.navigation.setCurrentRow(8)
+    window.reduction_tabs.setCurrentIndex(window.reduction_visible_indexes[0])
+    window.mode_tabs["Cuenta"].setCurrentIndex(0)
+    assert window.count_distance_filter.isVisible()
+    assert window.count_distance_apply.isVisible()
+    window.count_distance_apply.setChecked(True)
+    assert window.filter_checks["x_distance"].isChecked()
+    assert window.reduction_active[0]
+    window.mode_tabs["Cuenta"].setCurrentIndex(2)
+    assert window.count_distance_filter.isVisible()
+    assert window.count_distance_apply.isChecked()
+
+
+def test_footer_progress_follows_generation_progress(window):
+    window._generation_progress(3, 4)
+    assert window.progress.value() == 75
+    assert window.footer_progress.value() == 75
+
+
 def test_same_round_source_refresh_populates_matrix_and_disables_missing_factors(window):
     round_ = replace(
         with_goals(), season="26-27", number=15, mode="current", snapshots=(),

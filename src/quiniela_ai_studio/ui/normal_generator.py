@@ -98,6 +98,20 @@ class NormalGenerator(QWidget):
         base_layout = QVBoxLayout(self.base_group)
         base_layout.setContentsMargins(7, 12, 7, 7)
         base_layout.setSpacing(4)
+        source_row = QHBoxLayout()
+        source_row.addWidget(QLabel("1 · Porcentajes para elegir los partidos"))
+        self.matrix_source = QComboBox()
+        self.matrix_source.setToolTip("La matriz 1/X/2 visible es la que se usa al rellenar la base. Puedes editarla directamente.")
+        self.matrix_source.currentIndexChanged.connect(self._source_selected)
+        source_row.addWidget(self.matrix_source, 1)
+        self.download_matrix_button = QPushButton("Descargar mercado y público")
+        self.download_matrix_button.clicked.connect(lambda: self.window.safe(self.window.refresh_system_sources))
+        source_row.addWidget(self.download_matrix_button)
+        base_layout.addLayout(source_row)
+        self.source_explanation = QLabel("Elige una fuente disponible o edita la matriz. Mercado y popularidad son porcentajes distintos; los perfiles locales aparecen cuando los importas.")
+        self.source_explanation.setWordWrap(True)
+        self.source_explanation.setObjectName("muted")
+        base_layout.addWidget(self.source_explanation)
         upper = QHBoxLayout()
         self.probability_table = QTableWidget(14, 5)
         self.probability_table.setHorizontalHeaderLabels(("#", "Partido", "1", "X", "2"))
@@ -117,7 +131,7 @@ class NormalGenerator(QWidget):
         upper.addWidget(self.probability_table, 4)
 
         right = QVBoxLayout()
-        weight_box = QGroupBox("Ponderaciones (0–100%)")
+        weight_box = QGroupBox("Opcional · combinar datos auxiliares importados")
         weight_layout = QGridLayout(weight_box)
         weight_layout.setContentsMargins(6, 8, 6, 6)
         weight_layout.setHorizontalSpacing(5)
@@ -135,8 +149,11 @@ class NormalGenerator(QWidget):
             weight_layout.addWidget(title, row, 0); weight_layout.addWidget(spin, row, 1); weight_layout.addWidget(status, row, 2)
             self.weight_spin[key], self.weight_status[key] = spin, status
         right.addWidget(weight_box)
+        weight_hint = QLabel("Los pesos no afectan a la base hasta pulsar «Aplicar ponderaciones». Con 0% o sin datos importados, se usa la matriz mostrada.")
+        weight_hint.setWordWrap(True); weight_hint.setObjectName("muted")
+        right.addWidget(weight_hint)
 
-        controls_box = QGroupBox("Signos que añadirá a la base")
+        controls_box = QGroupBox("2 · Elegir dobles y triples")
         controls = QGridLayout(controls_box)
         controls.setContentsMargins(6, 8, 6, 5); controls.setHorizontalSpacing(5); controls.setVerticalSpacing(3)
         self.assignment_mode = QComboBox()
@@ -176,13 +193,13 @@ class NormalGenerator(QWidget):
         self.load_percentages.clicked.connect(lambda: self.window.safe(self._load_percentages))
         self.manage_sources.clicked.connect(lambda: self.window.safe(self._manage_sources))
         right.addLayout(save_row)
-        self.recalculate_button = QPushButton("Recalcular porcentajes")
+        self.recalculate_button = QPushButton("Aplicar ponderaciones a la matriz")
         self.recalculate_button.setFixedHeight(28); self.recalculate_button.clicked.connect(lambda: self.window.safe(self._recalculate))
         right.addWidget(self.recalculate_button)
         self.base_status = QLabel("Los porcentajes se muestran con su fuente; puedes editarlos o importar datos.")
         self.base_status.setWordWrap(True); self.base_status.setObjectName("muted"); self.base_status.setStyleSheet("font-size:10px;")
         right.addWidget(self.base_status)
-        self.fill_base_button = QPushButton("Rellenar quiniela base")
+        self.fill_base_button = QPushButton("3 · Rellenar quiniela base")
         self.fill_base_button.setObjectName("primary"); self.fill_base_button.setFixedHeight(30)
         self.fill_base_button.clicked.connect(lambda: self.window.safe(self._fill_base))
         right.addWidget(self.fill_base_button)
@@ -234,6 +251,40 @@ class NormalGenerator(QWidget):
         self._load_action_rows(None)
         self._assignment_mode_changed()
         self._apply_local_styles()
+
+    def _refresh_matrix_sources(self):
+        """List only real snapshots and imported profiles for this round."""
+        selected = self.matrix_origin
+        self.matrix_source.blockSignals(True)
+        self.matrix_source.clear()
+        self.matrix_source.addItem("Matriz editable · valores visibles", "manual")
+        for key, source in self.probability_sources.items():
+            label = ("Mercado" if key == "snapshot:sport" else
+                     "Popularidad" if key == "snapshot:public" else source.kind.capitalize())
+            self.matrix_source.addItem(f"{label} · {source.source}", key)
+        if selected == "weighted":
+            self.matrix_source.addItem("Media ponderada aplicada", "weighted")
+        index = self.matrix_source.findData(selected)
+        if index < 0:
+            self.matrix_origin = "manual"
+        self.matrix_source.setCurrentIndex(max(0, index))
+        self.matrix_source.blockSignals(False)
+
+    def _source_selected(self, _index):
+        if self._loading or not self.current_round:
+            return
+        key = self.matrix_source.currentData()
+        source = self.probability_sources.get(key)
+        if source is None:
+            if key == "manual":
+                self.matrix_origin = "manual"
+                self._matrix_edited()
+                self.base_status.setText("Matriz editable: se usarán los porcentajes visibles al rellenar la base.")
+            return
+        self._populate_probability_table(source.values)
+        self.matrix_origin = key
+        self._matrix_edited()
+        self.base_status.setText(f"Matriz desde {source.source} · captura {source.captured_at}.")
 
     @staticmethod
     def _step_buttons(spin):
@@ -295,6 +346,7 @@ class NormalGenerator(QWidget):
                     )
                     self._matrix_edited()
             self._refresh_availability(system)
+            self._refresh_matrix_sources()
             return
         self._loading = True
         self.current_round = round_
@@ -342,6 +394,7 @@ class NormalGenerator(QWidget):
         self._load_action_rows(config.get("actions"))
         self._loading = False
         self._refresh_availability(system)
+        self._refresh_matrix_sources()
         self._matrix_edited()
         self._update_theoretical_count()
 
@@ -385,6 +438,7 @@ class NormalGenerator(QWidget):
 
     def _matrix_user_edited(self, *_):
         self.matrix_origin = "manual"
+        self._refresh_matrix_sources()
         self._matrix_edited()
 
     def _configuration_changed(self, *_):
@@ -476,6 +530,7 @@ class NormalGenerator(QWidget):
             return
         self._populate_probability_table(source.values)
         self.matrix_origin = f"snapshot:{kind}"
+        self._refresh_matrix_sources()
         self.base_status.setText(f"Matriz desde {source.source} · captura {source.captured_at}.")
         self._matrix_edited()
 
@@ -509,6 +564,7 @@ class NormalGenerator(QWidget):
         )
         self.fill_base_button.setEnabled(bool(system and self.window.round.editable and self.window.system_mode(system) == "normal"))
         self._update_source_combos()
+        self._refresh_matrix_sources()
 
     def _available_sources(self, include_columns=False):
         items = [(key, source.source, source) for key, source in self.probability_sources.items()]
@@ -654,6 +710,7 @@ class NormalGenerator(QWidget):
             raise ValueError("No hay fuentes auxiliares importadas. Elige Mercado o Popularidad en la fuente de porcentajes y pulsa Rellenar quiniela base.")
         values = weighted_probabilities(sources)
         self._populate_probability_table(values); self.matrix_origin = "weighted"; self._matrix_edited()
+        self._refresh_matrix_sources()
         self.base_status.setText("Porcentajes recalculados como media ponderada de las fuentes importadas. Se normalizó cada fila a 100%.")
         self._save_configuration()
 

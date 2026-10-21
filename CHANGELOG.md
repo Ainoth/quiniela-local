@@ -1,5 +1,11 @@
 # Cambios
 
+## 1.0.32 — flujo visible de Normal y filtros de Cuenta
+
+- RF-UX-023: Normal muestra el orden de trabajo, permite elegir explícitamente la matriz entre capturas reales y perfiles locales importados, y acerca descarga, relleno, generación y guardado. Las ponderaciones auxiliares indican cuándo se aplican.
+- RF-UX-024: Cuenta reúne Distancia X y su activación en un panel legible; los resúmenes históricos sin cálculo siguen identificados como pendientes y no filtran apuestas.
+- RF-UX-025: la franja inferior muestra actividad durante tareas de datos y progreso durante la generación de apuestas.
+
 ## 1.0.31 — refresco de porcentajes en la misma jornada
 
 - RF-NOR-005: al descargar o cambiar las fuentes de mercado/popularidad se

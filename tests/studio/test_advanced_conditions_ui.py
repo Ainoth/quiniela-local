@@ -144,7 +144,7 @@ def test_count_and_streak_mode_grids_apply_and_outer_squares_preserve_settings(w
     for mode in (1,2,0):
         window.mode_tabs['Cuenta'].setCurrentIndex(mode)
         assert window.mode_tabs['Cuenta'].widget(mode).isAncestorOf(count_board)
-        assert window.classic_reduction_canvases[0].width()==(1140 if mode==2 else 700)
+        assert window.classic_reduction_canvases[0].width()==(1330 if mode==2 else 750)
         assert window.count_squares[('V',14)].text()!=''
     window.count_apply['V'].setChecked(True)
     QTest.mouseClick(window.count_squares[('V',14)],Qt.MouseButton.LeftButton)

@@ -469,7 +469,15 @@ class MainWindow(QMainWindow):
             else:
                 title=QLabel(name);title.setObjectName('title');page_layout.addWidget(title)
             self.pages.addWidget(page)
-        self.footer = QLabel();self.footer.setObjectName('footer');self.footer.setWordWrap(True);root.addWidget(self.footer)
+        footer_host=QWidget();footer_layout=QVBoxLayout(footer_host)
+        footer_layout.setContentsMargins(0,0,0,0);footer_layout.setSpacing(0)
+        self.footer = QLabel();self.footer.setObjectName('footer');self.footer.setWordWrap(True)
+        self.footer_progress=QProgressBar();self.footer_progress.setObjectName('footerProgress')
+        self.footer_progress.setRange(0,0);self.footer_progress.setFixedHeight(8)
+        self.footer_progress.setStyleSheet('QProgressBar{border:0;background:#835b08;} QProgressBar::chunk{background:#ffca2a;}')
+        self.footer_progress.hide()
+        footer_layout.addWidget(self.footer);footer_layout.addWidget(self.footer_progress)
+        root.addWidget(footer_host)
         self.build_home(); self.build_builder(); self.build_optimize(); self.build_analysis()
         self.build_evaluation(); self.build_systems(); self.build_settings();self.build_reductions();self.build_advanced_conditions()
         self.navigation.currentRowChanged.connect(self.pages.setCurrentIndex)
@@ -675,7 +683,7 @@ class MainWindow(QMainWindow):
 
     def _build_count_classic_right_panel(self,filter_panel):
         """Build Cuenta's dense seasonal distribution, filters and legacy summary."""
-        panel=QWidget();panel.setObjectName('countClassicRightPanel');panel.setFixedWidth(250)
+        panel=QWidget();panel.setObjectName('countClassicRightPanel');panel.setFixedWidth(280)
         root=QVBoxLayout(panel);root.setContentsMargins(1,0,1,0);root.setSpacing(2)
         heading=QLabel('Distribución Signos');heading.setAlignment(Qt.AlignmentFlag.AlignCenter)
         heading.setStyleSheet('font-size:11px;font-weight:bold;color:#62e957;padding:0;')
@@ -689,24 +697,23 @@ class MainWindow(QMainWindow):
         self.count_season_table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.count_season_table.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.count_season_table.setFixedHeight(176)
-        for column,width in enumerate((29,29,29,153)):self.count_season_table.setColumnWidth(column,width)
+        for column,width in enumerate((32,32,32,173)):self.count_season_table.setColumnWidth(column,width)
         self.count_season_table.horizontalHeader().setSectionResizeMode(3,QHeaderView.ResizeMode.Fixed)
         self.count_season_table.verticalHeader().setDefaultSectionSize(14)
         self.count_season_table.setStyleSheet('QTableWidget{background:#f7f7f7;color:#173c75;gridline-color:#9eb6cd;border:1px solid #8eb1cd;font-size:8px;} QHeaderView::section{background:#315b80;color:#fff;font-size:8px;padding:0;border:1px solid #7fabc9;} QTableWidget::item{padding:0 2px;}')
         self.count_season_table.itemChanged.connect(self._count_season_table_changed)
         root.addWidget(self.count_season_table)
 
+        root.addSpacing(10)
         filters=QGroupBox('FILTROS');filters.setObjectName('countLegacyFilters')
+        filters.setMinimumHeight(104)
         filters.setStyleSheet('QGroupBox{border:1px solid #9bc9e4;border-radius:0;margin-top:8px;padding:2px;color:#55e6eb;font-weight:bold;} QGroupBox::title{subcontrol-origin:margin;left:4px;padding:0 2px;}')
-        filter_grid=QGridLayout(filters);filter_grid.setContentsMargins(3,3,3,3);filter_grid.setHorizontalSpacing(4);filter_grid.setVerticalSpacing(0)
+        filter_grid=QGridLayout(filters);filter_grid.setContentsMargins(3,12,3,3);filter_grid.setHorizontalSpacing(4);filter_grid.setVerticalSpacing(3)
         self.count_filters_layout=filter_grid
-        self.count_apply_filters=SelectionSquare('Aplicar filtros históricos de Cuenta (no disponible)',size=12);self.count_apply_filters.setEnabled(False)
-        self.count_obtain_percent=QPushButton('Obtener %');self.count_obtain_percent.setEnabled(False);self.count_obtain_percent.setToolTip('El cálculo de reservas y medias de WIN1X2 aún no está definido en el motor.')
-        self.count_legacy_apply=SelectionSquare('Aplicar resumen de sumas (no disponible)',size=12);self.count_legacy_apply.setEnabled(False)
-        filter_grid.addWidget(QLabel('Ap. Filtros'),0,0);filter_grid.addWidget(self.count_apply_filters,0,1)
-        filter_grid.addWidget(self.count_obtain_percent,1,0,1,2)
-        filter_grid.addWidget(QLabel('Aplicar'),2,0);filter_grid.addWidget(self.count_legacy_apply,2,1)
-        filter_grid.addWidget(filter_panel,3,0,1,2)
+        filter_grid.addWidget(filter_panel,0,0)
+        distance_help=QLabel('Al marcar Aplicar, se activa Cuenta. Los límites indican la distancia entre dos X consecutivas; con cero o una X no se descarta.')
+        distance_help.setWordWrap(True);distance_help.setStyleSheet('font-size:9px;color:#b4d8ef;')
+        filter_grid.addWidget(distance_help,1,0)
         root.addWidget(filters)
 
         sums=QTableWidget(10,5);sums.setObjectName('countLegacySums');sums.setHorizontalHeaderLabels(('Condición','Valor','Reserva','Resultado','Media'))
@@ -724,9 +731,10 @@ class MainWindow(QMainWindow):
             reserve=QTableWidgetItem('');reserve.setBackground(QColor('#efc51f'));reserve.setForeground(QColor('#173c75'));sums.setItem(row,2,reserve)
             result=QTableWidgetItem('');result.setBackground(QColor('#244d79'));sums.setItem(row,3,result)
             average=QTableWidgetItem('');average.setBackground(QColor('#2879a4'));sums.setItem(row,4,average)
+        sums.setToolTip('Resumen visual histórico: reservas y medias aún no tienen cálculo definido. No interviene en la reducción.')
         root.addWidget(sums)
         self.count_legacy_sums=sums
-        mark=QLabel('Reservas y medias: sin cálculo disponible');mark.setStyleSheet('font-size:7px;color:#a9cbe4;')
+        mark=QLabel('Reservas y medias: pendiente de definición; no se aplican.');mark.setWordWrap(True);mark.setStyleSheet('font-size:8px;color:#a9cbe4;')
         root.addWidget(mark)
         self._refresh_count_season_table()
         return panel
@@ -770,20 +778,21 @@ class MainWindow(QMainWindow):
 
     def _build_count_filter_panel(self):
         """Expose Cuenta's existing X-distance filter without duplicating its logic."""
-        panel=QGroupBox('Distancia X')
-        panel.setObjectName('countDistanceFilter');panel.setFixedWidth(240)
+        panel=QGroupBox('Distancia entre equis')
+        panel.setObjectName('countDistanceFilter');panel.setFixedSize(266,43)
         panel.setToolTip('Distancia entre equis; el filtro conserva su cálculo existente.')
         row=QHBoxLayout(panel);row.setContentsMargins(4,3,4,3);row.setSpacing(4)
         check=self.filter_checks['x_distance'];check.hide()
         apply=SelectionSquare('Aplicar filtro distancia entre equis',size=14)
         apply.setChecked(check.isChecked());apply.toggled.connect(check.setChecked);check.toggled.connect(apply.setChecked)
+        apply.toggled.connect(lambda checked:self.reduction_activation_buttons[0].setChecked(True) if checked else None)
         self.count_distance_apply=apply
-        row.addWidget(apply)
+        row.addWidget(QLabel('Aplicar'));row.addWidget(apply)
         minimum,maximum=self.filter_ranges['x_distance']
         for widget in (minimum,maximum):
             parent_layout=widget.parentWidget().layout() if widget.parentWidget() else None
             if parent_layout:parent_layout.removeWidget(widget)
-            widget.setParent(panel);row.addWidget(widget)
+            widget.setParent(panel)
         row.addWidget(QLabel('mín.'));row.addWidget(minimum);row.addWidget(QLabel('máx.'));row.addWidget(maximum);row.addStretch(1)
         self.count_distance_filter=panel
         return panel
@@ -1198,9 +1207,7 @@ class MainWindow(QMainWindow):
                     automatic_row.addWidget(season_group,0,Qt.AlignmentFlag.AlignTop)
                     automatic_row.addWidget(auto_panel,0,Qt.AlignmentFlag.AlignTop)
                     automatic_layout.addLayout(automatic_row)
-                    auto_filter_row=QHBoxLayout();auto_filter_row.setContentsMargins(0,0,0,0)
-                    auto_filter_row.addSpacing(312);auto_filter_row.addWidget(filter_panel,0,Qt.AlignmentFlag.AlignTop);auto_filter_row.addStretch(1)
-                    automatic_layout.addLayout(auto_filter_row)
+                    # Distancia X lives inside the shared Cuenta right panel.
                 else:
                     automatic_row.addWidget(season_group,0,Qt.AlignmentFlag.AlignTop);automatic_row.addWidget(auto_panel,0,Qt.AlignmentFlag.AlignTop);automatic_row.addStretch(1);automatic_layout.addLayout(automatic_row)
             if title=='Racha':
@@ -1224,21 +1231,21 @@ class MainWindow(QMainWindow):
                     page.layout().setSpacing(2)
                 count_canvas=self.classic_reduction_canvases[0]
                 def show_count_method(index,mode_widget=methods,shared_board=count_left_panel,shared_profile=profile_panel,
-                                      shared_filter=filter_panel,auto_host_layout=auto_board_layout,
-                                      auto_row=automatic_row,auto_filter_row=auto_filter_row,
+                                      shared_right=right_host,
+                                      auto_host_layout=auto_board_layout,
+                                      auto_row=automatic_row,
                                       manual_row_layout=manual_row_layout,random_row_layout=random_row_layout,
-                                      count_filter_layout=self.count_filters_layout,canvas=count_canvas):
-                    canvas.setFixedWidth(1140 if index==2 else 700)
+                                      canvas=count_canvas):
+                    canvas.setFixedWidth(1330 if index==2 else 750)
                     if index==2:
                         self._move_reduction_widget(shared_board,auto_host_layout)
                         self._move_reduction_widget(shared_profile,auto_row,1)
-                        self._move_reduction_widget(shared_filter,auto_filter_row)
+                        self._move_reduction_widget(shared_right,auto_row,3)
                     else:
                         row_layout=manual_row_layout if index==0 else random_row_layout
-                        target_layout=mode_widget.widget(index).layout()
                         self._move_reduction_widget(shared_board,row_layout,0)
                         self._move_reduction_widget(shared_profile,row_layout,1)
-                        self._move_reduction_widget(shared_filter,count_filter_layout if index==0 else target_layout)
+                        self._move_reduction_widget(shared_right,row_layout,2)
                 methods.currentChanged.connect(show_count_method)
                 original.addWidget(methods)
                 show_count_method(0)
@@ -1261,6 +1268,7 @@ class MainWindow(QMainWindow):
         widget.setParent(None)
         if position is None:target_layout.addWidget(widget,0,Qt.AlignmentFlag.AlignTop)
         else:target_layout.insertWidget(position,widget,0,Qt.AlignmentFlag.AlignTop)
+        widget.show()
 
     def _build_sseguidos_modes(self):
         """Build WIN1X2-like Manual/Azar/Automática pages over one state."""
@@ -3479,6 +3487,15 @@ class MainWindow(QMainWindow):
         self.data_info.setText('Datos guardados: ' + (self.repository.setting('data_directory') or 'todavía no has añadido datos') + '\nWIN1X2 aporta partidos y premios. Quinielista aporta elecciones de otros jugadores y marcadores.')
         self.rule_price.setValue(round_.price_cents)
         busy = bool((self.filter_job and self.filter_job.isRunning()) or (self.worker and self.worker.isRunning()) or (self.data_worker and self.data_worker.isRunning()) or (self.athena_job and self.athena_job.isRunning()))
+        self.footer_progress.setVisible(busy)
+        if busy:
+            if self.worker and self.worker.isRunning():
+                self.footer_progress.setRange(0,100)
+                self.footer_progress.setValue(self.progress.value())
+                self.footer.setText('Generando apuestas… '+self.footer.text())
+            else:
+                self.footer_progress.setRange(0,0)
+                self.footer.setText('Procesando datos… '+self.footer.text())
         for button in self.edit_buttons:
             button.setEnabled(round_.editable and not busy)
         generating=bool(self.worker and self.worker.isRunning())
@@ -3643,16 +3660,32 @@ class MainWindow(QMainWindow):
         self.pleno_selection_info=QLabel();self.pleno_selection_info.setWordWrap(True);layout.addWidget(self.pleno_selection_info)
         left_layout=layout;layout=self.page_layout(1)
         self.normal_generator=NormalGenerator(self)
+        workflow=QLabel('Prepara la quiniela: ① elige o descarga porcentajes → ② configura dobles y triples → ③ rellena la base → ④ genera → ⑤ guarda el TXT.')
+        workflow.setWordWrap(True);workflow.setStyleSheet('color:#ffd04b;font-weight:bold;padding:5px 7px;background:#12385c;border:1px solid #2c6c98;')
+        layout.addWidget(workflow)
+        action_row=QHBoxLayout()
+        self.normal_generator.download_matrix_button.setParent(None)
+        self.normal_generator.download_matrix_button.setText('1 · Descargar porcentajes')
+        self.normal_generator.fill_base_button.setParent(None)
+        self.normal_generator.fill_base_button.setText('3 · Rellenar base')
+        generate_here=QPushButton('4 · Generar apuestas')
+        generate_here.setObjectName('primary')
+        generate_here.clicked.connect(lambda:self.safe(self.start_generation))
+        save_here=QPushButton('5 · Guardar apuestas (TXT)')
+        save_here.clicked.connect(lambda:self.safe(self.export_txt))
+        for button in (self.normal_generator.download_matrix_button,self.normal_generator.fill_base_button,generate_here,save_here):
+            action_row.addWidget(button)
+        layout.addLayout(action_row)
         self.normal_generator.base_group.setParent(None);layout.addWidget(self.normal_generator.base_group)
-        row=QHBoxLayout();row.addWidget(QLabel('Elegir signos según'))
+        row=QHBoxLayout();row.addWidget(QLabel('Fuente para diferenciación del público y Pleno'))
         self.ranking_source=QComboBox();self.ranking_source.addItem('Mercado: casas de apuestas','sport');self.ranking_source.addItem('Popularidad: Quinielista','public');row.addWidget(self.ranking_source,1)
-        self.button('Descargar porcentajes',self.refresh_system_sources,row,editable=True).setToolTip('Descarga los porcentajes de los 14 partidos y del Pleno para la jornada abierta, sin cambiar tus apuestas.');layout.addLayout(row)
+        layout.addLayout(row)
         self.source_status=QLabel();self.source_status.setWordWrap(True);layout.addWidget(self.source_status)
         self.ranking_source.currentIndexChanged.connect(self.ranking_source_changed)
         self.differentiation=QSlider(Qt.Orientation.Horizontal);self.differentiation.setRange(0,10)
         row=QHBoxLayout();row.addWidget(QLabel('Diferenciación del público'));row.addWidget(self.differentiation,1);self.differentiation_label=QLabel('0');row.addWidget(self.differentiation_label);layout.addLayout(row)
         self.differentiation.valueChanged.connect(lambda value:self.differentiation_label.setText(str(value)));self.differentiation.valueChanged.connect(self.schedule_template)
-        note=QLabel('La diferenciación actualiza el boleto automáticamente. Si no hay datos de mercado y público, no altera la selección. Es un criterio de selección, no una predicción ni una garantía. Los triples y dobles se fijan con valores numéricos arriba y se aplican al pulsar «Rellenar quiniela base».')
+        note=QLabel('La fuente de esta fila solo se usa para diferenciación y Pleno. La matriz de arriba determina la base. Las ponderaciones auxiliares se aplican únicamente con «Aplicar ponderaciones a la matriz». La diferenciación actualiza el boleto automáticamente cuando hay datos de mercado y público.')
         note.setWordWrap(True);note.setObjectName('muted');layout.addWidget(note)
         layout=left_layout
         row=QHBoxLayout();self.generate_button=self.button('Generar',self.start_generation,row,primary=True,editable=True)
@@ -3905,9 +3938,16 @@ class MainWindow(QMainWindow):
         self.worker=GenerationTask(version)
         self.worker.completed.connect(lambda bets:self.safe(lambda:self.generation_done(version,bets)))
         self.worker.failed.connect(lambda message:self.statusBar().showMessage(message,12000))
-        self.worker.progress.connect(lambda done,total:self.progress.setValue(int(done/total*100)))
+        self.worker.progress.connect(lambda done,total:self._generation_progress(done,total))
         self.worker.finished.connect(self.generation_finished)
         self.worker.start();self.cancel_button.setEnabled(True);self.refresh()
+
+    def _generation_progress(self, done, total):
+        """Keep the ballot progress and the orange status strip in sync."""
+        value = int(done / total * 100) if total else 0
+        self.progress.setValue(value)
+        self.footer_progress.setRange(0,100)
+        self.footer_progress.setValue(value)
 
     def generation_done(self,version,bets):
         created=self.service.generated(version,bets)

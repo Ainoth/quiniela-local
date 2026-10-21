@@ -1,5 +1,21 @@
 # 12 · Matriz de trazabilidad de requisitos
 
+RF-UX-023 (v1.0.32): Normal muestra el flujo de elección de porcentajes,
+asignación, relleno, generación y exportación. La fuente de la matriz incluye
+solo capturas reales y perfiles locales importados; el usuario puede mantener
+la matriz editable. Las ponderaciones auxiliares actúan solo tras aplicar la
+media ponderada. Pruebas: `test_visible_matrix_source_controls_the_percentages_used_for_base`,
+`test_source_switch_updates_unedited_matrix_but_preserves_manual_edits`.
+
+RF-UX-024 (v1.0.32): Cuenta mantiene Distancia X visible en Manual y
+Automática, con su casilla conectada al filtro existente. Reservas/medias
+no calculadas se indican expresamente como pendientes. Prueba:
+`test_count_distance_controls_share_one_visible_filter_panel`.
+
+RF-UX-025 (v1.0.32): la barra inferior muestra actividad indeterminada
+durante trabajos de datos y progreso real de generación. Prueba:
+`test_footer_progress_follows_generation_progress`.
+
 RF-NOR-005 (v1.0.31): una jornada ya abierta incorpora las instantáneas nuevas
 de mercado/popularidad; la matriz externa se refresca si estaba vacía o seguía
 vinculada a esa fuente. Factores auxiliares sin datos no se ponderan. Prueba:
