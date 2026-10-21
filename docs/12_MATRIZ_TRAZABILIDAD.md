@@ -1,5 +1,9 @@
 # 12 · Matriz de trazabilidad de requisitos
 
+RF-DAT-006 (v1.0.30): porcentajes de Quinielista aceptan los alias explícitos
+PSV / PSV Eindhoven, Shaktar / Shakhtar Donetsk y Leipzig / RB Leipzig; sigue
+rechazando equipos distintos. Prueba: `test_quinielista_market_names_match_win1x2_aliases_for_champions_round`.
+
 RF-ESC-014 (v1.0.29): cambio de sistema oculta las dos tarjetas previas;
 tarjeta compacta de categorías 15–10 con acertantes, premio oficial unitario,
 apuestas propias, subtotal y total. Pruebas:

@@ -9,7 +9,7 @@ import sqlite3
 import tempfile
 import unicodedata
 from dataclasses import dataclass, replace
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from xml.etree import ElementTree
 
@@ -58,6 +58,12 @@ TEAM_ALIASES = {
     # En algunos PRE de WIN1X2 aparece «Madrid CCF» para el mismo equipo
     # que Quinielista publica como «Madrid CFF».
     "MADRIDCCFF": "MADRIDCFFF",
+    # Variantes observadas en el XML de porcentajes de Quinielista frente al
+    # fichero de jornada WIN1X2 (incluye una errata histórica en PSV Eindhoven).
+    "PSV": "PSVEINDHOVEN",
+    "PSVEIDHOVEN": "PSVEINDHOVEN",
+    "SHAKTARDONETSK": "SHAKHTARDONETSK",
+    "RBLEIPZIG": "LEIPZIG",
 }
 
 
@@ -249,7 +255,7 @@ def prepare_data(
                 if path.exists():
                     try:
                         captured = datetime.fromtimestamp(
-                            path.stat().st_mtime, timezone.utc
+                            path.stat().st_mtime, UTC
                         ).isoformat()
                         rounds[i] = probability_snapshots(round_, read_bytes(path), captured)
                     except (

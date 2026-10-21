@@ -1,5 +1,11 @@
 # Cambios
 
+## 1.0.30 — nombres de equipos en porcentajes de Quinielista
+
+- RF-DAT-006: reconoce variantes documentadas de PSV Eindhoven, Shakhtar
+  Donetsk y RB Leipzig entre la jornada WIN1X2 y el XML de Quinielista. La
+  validación sigue rechazando cruces con equipos distintos.
+
 ## 1.0.29 — Escrutinio y desglose por categoría
 
 - RF-ESC-014: al cambiar de quiniela se limpian inmediatamente las tarjetas
