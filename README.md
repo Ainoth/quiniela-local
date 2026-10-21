@@ -6,7 +6,7 @@ Aplicación de Quiniela para escritorio y Android. La versión de escritorio
 puede leer los datos instalados por WIN1X2; ambas versiones descargan datos,
 porcentajes y marcadores directamente de sus proveedores públicos.
 
-## Quiniela AI Studio — v1.0.2
+## Quiniela AI Studio — v1.0.29
 
 Interfaz gráfica en español que conserva la experiencia visual de Quiniela Local:
 fondo azul, boleto fijo en tabla con partido, hora y porcentajes junto a 1/X/2,
@@ -31,6 +31,69 @@ no sube archivos, envía apuestas ni cobra. El Pleno es **Manual** por defecto;
 elige **Automático** explícitamente si quieres que lo modifiquen las barras.
 [Manual y límites v1.0.2](docs/STUDIO_V1_0.md).
 
+La pestaña **Reducciones** usa matrices gráficas 1/X/2 para elegir referencias,
+patrones de 2–5 partidos consecutivos y columnas de frecuencia. No requiere
+escribir los signos en campos de texto. Incluye grupos, frecuencia y
+valoraciones con porcentajes guardados. Su motor propio Hermes/Atenea/Artemisa
+propone una selección por cobertura de aciertos y presupuesto; verifica el
+resultado y guarda una quiniela nueva, sin tocar la original. Las coberturas
+muestreadas se identifican como estimaciones; solo el universo exhaustivo puede
+tener garantía condicional, nunca garantía de premio. [Diseño y alcance](docs/planes/REDUCCIONES_GRECIA.md).
+
+**Cuenta**, **SSeguidos**, **FSSeguidos** e **Interrupciones** ofrecen métodos
+gráficos compactos con cuadrados blancos/verdes; sus filtros quedan
+desactivados hasta encender su pestaña exterior. Cuenta muestra el historial
+conjunto V/X/2 y la distribución observada 1/X/2. En Manual, la matriz,
+Figuras, distribución por temporada, FILTROS y sumas ocupan tres bloques
+compactos; las temporadas se sincronizan con el selector de Automática. La
+distancia entre equis reutiliza la regla existente. Los controles de reservas
+y medias se muestran desactivados hasta que su fórmula esté definida.
+SSeguidos organiza `1`, `X`, `2` y `V` en cuatro paneles compactos, con límites
+de racha máxima, cantidades exactas por longitud y figuras como particiones.
+Los métodos escriben en una misma configuración; Automática usa perfiles
+conjuntos del histórico integrado y Azar guarda su semilla. Los cuadrados
+blancos/verdes activan condiciones sin tics; desactivar la subpestaña conserva
+los ajustes y excluye el filtro. FSSeguidos filtra particiones exactas como
+`3-2-1-1` por signo, total editable y temporada; comparte el cálculo de rachas,
+pero conserva su propio interruptor y configuración. `V` agrupa X y 2; el Pleno
+queda excluido. El campo vacío sigue siendo distinto de 0.
+[Plan Cuenta/Racha](docs/planes/VARIANTES_RACHAS.md) ·
+[Panel Cuenta v1.0.25](docs/planes/CUENTA_PANEL_V1_0_25.md) ·
+[Comparación Cuenta Manual](docs/validacion_visual/cuenta_v1_0_25/comparacion_lado_a_lado.png) ·
+[Panel Cuenta v1.0.24](docs/planes/CUENTA_PANEL_V1_0_24.md) ·
+[SSeguidos v1.0.19](docs/planes/SSeguidos_V1_0_19.md) ·
+[FSSeguidos v1.0.20](docs/planes/FSSeguidos_V1_0_20.md).
+Interrupciones cuenta los 13 cambios entre los primeros 14 partidos; separa la
+matriz total/racha del filtro Distancias por figuras exactas. Su interpretación
+de la matriz es original/provisional donde el manual antiguo no precisa las
+columnas. [Diseño de Interrupciones v1.0.21](docs/planes/Interrupciones_V1_0_21.md).
+La nueva vista **Distancias** permite marcar por separado la separación máxima
+entre dos apariciones de `1`, `X`, `2` o `V`; sus cuatro bloques Aplicar pueden
+apagarse sin perder las elecciones. La distancia es la diferencia de posiciones
+de dos apariciones consecutivas y vale 0 si hay menos de dos. La pestaña
+Interrupciones exterior debe estar activa para que participe en el cálculo.
+[Réplica visual y decisión matemática v1.0.22](docs/planes/REPLICA_VISUAL_REDUCCIONES_V1_0_22.md).
+La selección de temporadas es ahora una cuadrícula compacta con botones Todas/Ninguna;
+los recuentos V/X/2 y 1/X/2/V se muestran en paneles estrechos.
+El histórico se incluye y carga al abrir, sin pedir un fichero. Tiene 2.609
+jornadas desde 1972-73; incluye marcadores de los 15 partidos para 880 jornadas
+verificadas y deja en blanco los marcadores que no están disponibles. En Normal,
+elige asignación automática por probabilidad o Manual por partido para fijar
+qué encuentros serán fijos, dobles o triples.
+
+En **Escrutinio**, un escrutinio definitivo PRE de la jornada guardado en los
+datos se lee automáticamente. Si alguna apuesta tiene premio, aparece una
+tarjeta dorada con el total y el desglose por categoría, copias e importe
+unitario. El importe corresponde a las apuestas guardadas; para cobrar hace
+falta comprobar el boleto validado. Sin reparto publicado solo se muestran
+aciertos y pendientes. Si el PRE sigue provisional y los 15 partidos han
+terminado, la app consulta en segundo plano un espejo público del escrutinio,
+comprueba la jornada y todos los partidos y guarda el reparto validado para
+uso sin conexión. La tarjeta indica la procedencia de los importes.
+Un segundo panel compacto muestra los acertantes y premios oficiales de las
+seis categorías junto a las apuestas premiadas de la quiniela abierta y sus
+subtotales. Al cambiar de quiniela, ambos paneles se actualizan para ella.
+
 La ventana y la barra de tareas recuperan el icono de Quiniela Local; se incluye
 en el paquete instalable. En Linux, el acceso directo debe usar
 `StartupWMClass=quiniela-ai-studio` para asociarse con la ventana.
@@ -47,24 +110,39 @@ funciona sin conexión con la demo y los datos ya importados. Windows:
 
 1. En Inicio, pulsa **Crear quiniela normal** o **Crear reducida**.
 2. Edita signos y Pleno en el boleto; las selecciones parciales se guardan.
-3. En **Normal**, mueve la barra: el boleto se actualiza automáticamente.
-   Genera, revisa hasta 100 filas y exporta TXT/JSON.
-4. Para datos reales, **Descargar datos** o Configuración → importar carpeta/ZIP.
+3. En **Normal**, edita los porcentajes 1/X/2 o conserva la fuente seleccionada.
+   Elige **Manual** para indicar cuántos dobles y triples quieres (el programa
+   decide en qué partidos colocarlos según las probabilidades), o **Automática**
+   para que también elija las cantidades bajo un máximo de columnas configurable;
+   pulsa **Rellenar quiniela base**.
+   La selección se incorpora al boleto; después genera, revisa hasta 100 filas
+   y exporta TXT/JSON. Más abajo, la tabla de acciones crea ficheros ordenados
+   por probabilidad y se puede guardar la configuración por jornada.
+4. En **Condiciones avanzadas**, los grupos aparecen en columnas compactas y
+   muestran solo el número de partido (los equipos están en el boleto base).
+   Marca 1/X/2 (puedes marcar varios); los partidos sin marcas no cuentan. Define cuántos
+   signos de ese grupo deben coincidir. Añade grupos con «Añadir grupo» y, si
+   quieres, limita la suma o diferencia entre dos. La tolerancia indica cuántas
+   reglas puede incumplir una apuesta. Todo se aplica junto con Optimizar.
+5. Para datos reales, **Descargar datos** o Configuración → importar carpeta/ZIP.
    En Crear, **Descargar porcentajes** actualiza realmente por
    Internet las fuentes del sistema abierto, sin cambiar signos ni apuestas.
    **Mercado** son estimaciones publicadas de casas de apuestas; **popularidad**
    son signos jugados en Quinielista. No son equivalentes ni garantizan aciertos.
    La fuente y hora de captura aparecen debajo. Las barras aplican la fuente
    elegida respetando partidos bloqueados; no inventan valores si falta.
-5. En **Aciertos**, el marcador y tus aciertos/fallos se actualizan solos. La demo usa resultados manuales.
-6. Puedes marcar varios goles por equipo en el Pleno; cada pareja aumenta apuestas y coste.
+6. En **Aciertos**, el marcador y tus aciertos/fallos se actualizan solos. Si
+   Dataradar no conecta o deja sin marcador partidos cuyo horario ya pasó, usa
+   como respaldo el marcador público ESPN para Primera, Segunda y Liga F. La fuente consultada se indica en pantalla; los
+   partidos no cubiertos quedan sin marcador. La demo usa resultados manuales.
+7. Puedes marcar varios goles por equipo en el Pleno; cada pareja aumenta apuestas y coste.
    Los porcentajes 0/1/2/M aparecen debajo de sus casillas, en filas separadas, según mercado o
    popularidad. Descarga porcentajes para incorporarlos a la quiniela abierta.
    En modo **Automático**, la barra preselecciona el Pleno: nivel 0 elige un marcador,
    nivel 10 los 16. Puedes ajustar las casillas después. Si faltan datos conserva
    tu Pleno con aviso. El contador muestra columnas × parejas del Pleno y coste;
    generación y TXT incluyen todas las parejas seleccionadas.
-7. **Reducidas** tiene una base independiente de Normal. Elige entre seis tipos
+8. **Reducidas** tiene una base independiente de Normal. Elige entre seis tipos
    de tablas BOE 2009: se proponen fijos/dobles/triples propios por porcentajes,
    se muestran columnas y coste con el Pleno y puedes ajustar las casillas.
    **Generar reducida** produce sus apuestas exactas sin tocar la normal.
@@ -73,7 +151,7 @@ funciona sin conexión con la demo y los datos ya importados. Windows:
    mercado y popularidad de Quinielista: un criterio original de selección,
    no una probabilidad ni cálculo de rentabilidad. Puede reducir aciertos y
    no garantiza premios mayores. Requiere ambas fuentes y seleccionar Mercado.
-8. **Guardar apuestas (TXT)**, en la cabecera, guarda las apuestas de la quiniela
+9. **Guardar apuestas (TXT)**, en la cabecera, guarda las apuestas de la quiniela
    abierta. En Mis Sistemas puedes guardar directamente la fila elegida. Al
    terminar aparecen la ruta, el número de apuestas y los pasos para cargar
    manualmente el TXT en la web. **JSON** conserva el proyecto para recuperarlo.
@@ -91,6 +169,7 @@ RUN_PC_GUI_TESTS=1 python3 -m unittest discover -q
 
 [Instalación, recorrido y aceptación v0.1](docs/STUDIO_V01_ENTREGA.md) ·
 [Funciones de datos integradas](docs/STUDIO_FUSION.md) ·
+[Generadores Normal 1.0.8](docs/planes/GENERADOR_NORMAL_AUTOMATICO.md) ·
 [Índice](docs/00_INDICE.md)
 
 Se conserva `python3 app.py` y el acceso Quiniela Local como respaldo.

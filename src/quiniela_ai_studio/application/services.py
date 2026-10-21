@@ -122,7 +122,7 @@ class SystemService:
         return self.apply_portfolio(system,result)
 
     def optimization_input(self,system,budget_cents,**options):
-        from quiniela_ai_studio.domain.filters import BasicFilters
+        from quiniela_ai_studio.domain.filters import filters_from_parameters
         from quiniela_ai_studio.domain.portfolio import OptimizationConfig
         round_ = self._editable(system)
         if not system.bets:
@@ -131,10 +131,10 @@ class SystemService:
         source,bets=self.origin_bets(system)
         base=tuple(json.loads(source.parameters).get('base',source.base))
         saved=dict(json.loads(system.parameters).get('filter_spec',{}))
-        identity=saved.pop('id',None);version=saved.pop('version',None)
-        if identity not in (None,'basic-local-v1','basic-local-v2') or version not in (None,1,2):
+        identity=saved.get('id');version=saved.get('version')
+        if identity not in (None,'basic-local-v1','basic-local-v2','basic-local-v3','basic-local-v4','basic-local-v5') or version not in (None,1,2,3,4,5):
             raise ValueError('Versión de condiciones no admitida; no se ignoran restricciones desconocidas.')
-        spec=BasicFilters(**saved)
+        spec=filters_from_parameters(saved)
         return bets,base,OptimizationConfig(budget_cents,frozen.price_cents,**options),frozen,spec
 
     def apply_portfolio(self,system,result):
@@ -254,4 +254,27 @@ class SystemService:
                                                 source_revision=system.revision,conditional_minimum_hits=plan.table.minimum_hits,
                                                 table_source='Artículo SELAE: tablas BOE-A-2009-12204')))
         self.repository.save(copy,'reduction_copy')
+        return copy
+
+    def coverage_copy(self, system, bets, report):
+        """Save a verified coverage proposal as a new, independent system."""
+        self._editable(system)
+        if self.repository.load(system.system_id).revision != system.revision:
+            raise ValueError('El boleto cambió durante la reducción; vuelve a intentarlo.')
+        if not bets or any(b.quantity != 1 for b in bets):
+            raise ValueError('La reducción debe contener apuestas distintas y completas.')
+        # Exact key validation includes the Pleno, while the coverage engine is
+        # explicit that its mathematical guarantee only concerns 14 signs.
+        keys=[(bet.column,bet.pleno) for bet in bets]
+        if len(keys)!=len(set(keys)):
+            raise ValueError('La reducción contiene apuestas duplicadas.')
+        source_parameters=json.loads(system.parameters)
+        copy=replace(system,system_id=str(uuid.uuid4()),revision=1,
+                     name=f'{system.name} · {report["method"].split(" · ")[0]}',
+                     bets=tuple(bets),created_at=utcnow(),origin='reducción de cobertura original Quiniela AI Studio',
+                     parameters=json.dumps(dict(construction_mode=source_parameters.get('construction_mode','normal'),kind=source_parameters.get('kind','sport'),
+                         source_system_id=system.system_id,source_revision=system.revision,
+                         reduction_verification=report,plenos=list(dict.fromkeys(b.pleno for b in bets)),
+                         filter_spec=source_parameters.get('filter_spec',{}))))
+        self.repository.save(copy,'coverage_reduction')
         return copy

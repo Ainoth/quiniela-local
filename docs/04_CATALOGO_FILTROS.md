@@ -21,7 +21,7 @@ Para cada filtro: `id`, `version`, `enabled`, `description`, `match_scope`, `par
 | FIL-02 | Variantes | Variante = `X o 2`; rango sobre número total/posiciones | Columna | REQUERIDO |
 | FIL-03 | Secuencias | Coincidencia de patrones ordenados de signos, máximo/mínimo de apariciones, con o sin solape | Columna | REQUERIDO |
 | FIL-04 | Signos seguidos | Longitud máxima/mínima de rachas de 1, X, 2 o variantes | Columna | REQUERIDO |
-| FIL-05 | Interrupciones | Número de transiciones `predicado(si)!=predicado(si+1)` en posiciones consecutivas seleccionadas | Columna | PROPUESTO |
+| FIL-05 | Interrupciones | Número de cambios entre signos adyacentes en los 14 partidos; admite par total/racha máxima y figura exacta | Columna | IMPLEMENTADO v1.0.21 (mapa de matriz provisional) |
 | FIL-06 | Parejas | Conteos de patrones en parejas de índices declaradas (disjuntas o solapadas) | Columna + grupos | REQUERIDO |
 | FIL-07 | Tríos | Igual que parejas, con grupos de 3 índices | Columna + grupos | REQUERIDO |
 | FIL-08 | Cuartetos | Igual, grupos de 4 índices | Columna + grupos | REQUERIDO |

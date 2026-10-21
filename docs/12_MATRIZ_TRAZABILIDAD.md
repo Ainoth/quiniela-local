@@ -1,5 +1,216 @@
 # 12 · Matriz de trazabilidad de requisitos
 
+RF-ESC-014 (v1.0.29): cambio de sistema oculta las dos tarjetas previas;
+tarjeta compacta de categorías 15–10 con acertantes, premio oficial unitario,
+apuestas propias, subtotal y total. Pruebas:
+`test_switching_system_in_mis_sistemas_clears_previous_prize_before_aciertos`,
+`test_cached_scrutiny_shows_prize_breakdown_and_clears_on_round_change` y
+`test_published_page_cache_displays_real_j14_prize_when_pre_is_provisional`.
+
+RF-UX-022 (v1.0.29): la pestaña visible se llama Escrutinio; conserva el
+índice 4 y las rutas existentes. Prueba: `test_switching_system_in_mis_sistemas_clears_previous_prize_before_aciertos`.
+
+RF-ESC-013 (v1.0.28): si el PRE es provisional y los 15 resultados están
+finalizados, Aciertos consulta un espejo público del escrutinio en un hilo,
+comprueba identidad completa y seis categorías, guarda el resultado validado
+y muestra el premio positivo desglosado. Sin datos íntegros no muestra dinero.
+Pruebas: `test_published_scrutiny_reference_j14_and_all_payouts`,
+`test_published_scrutiny_rejects_wrong_round_fixture_score_or_amount`,
+`test_published_page_cache_displays_real_j14_prize_when_pre_is_provisional`.
+
+RF-ESC-012 (v1.0.27): Aciertos muestra importes desglosados solo con reparto
+definitivo publicado en el PRE local de la jornada. Comprueba identidad del
+boleto, copia y categoría; no afirma sellado ni pago. Pruebas:
+`test_cached_scrutiny_shows_prize_breakdown_and_clears_on_round_change`,
+`test_published_scrutiny_with_no_award_stays_neutral`,
+`test_cached_scrutiny_with_wrong_teams_never_announces_a_prize` y `test_T10_accumulated_prizes_and_pending`.
+
+RF-UX-021 (v1.0.26): SSeguidos usa fondo plano oscuro y selector histórico de
+temporadas en dos columnas. No cambia la lógica de rachas. Prueba:
+`test_sseguidos_three_modes_compact_panels_filter_and_share_state`.
+
+RF-UX-015 / RF-FIL-021 (v1.0.19): SSeguidos implementa Manual, Azar y
+Automática sobre estado compartido. Incluye límites opcionales con vacío
+distinto de cero, frecuencias de rachas máximas exactas y figuras como
+particiones; la base actual determina qué valores son posibles. Automática usa
+perfiles conjuntos de resultados históricos, Azar es reproducible por semilla,
+y el Pleno queda excluido. La activación externa conserva condiciones y decide
+si intervienen. Pruebas: `test_sseguidos_three_modes_compact_panels_filter_and_share_state`,
+`test_sseguidos_empty_bound_remains_empty_after_persistence`,
+`test_sseguidos_automatic_keeps_joint_profiles_and_is_not_a_duplicate_filter`,
+`test_attainable_run_frequencies_and_figures_match_exhaustive_small_base`.
+
+RF-UX-016 / RF-FIL-022 (v1.0.20): FSSeguidos agrega un editor compacto de
+particiones exactas por total para `1/X/2/V`, con Manual, Azar y Automática.
+La selección es multivalor; las reglas se limitan a figuras alcanzables con
+la base, usan estadísticas históricas reales, mantienen persistencia propia y
+requieren activar la subpestaña. SSeguidos sigue independiente y no se elimina.
+Pruebas: `test_fsseguidos_filters_exact_partition_separately_and_persists` y
+`test_fsseguidos_automatic_uses_integrated_history_and_azar_repeats_seed`.
+
+RF-UX-017 / RF-FIL-023 (v1.0.21): Interrupciones cuenta cambios en las 13
+transiciones de los primeros 14 signos. Manual/Automática filtran los pares de
+total y racha máxima; Distancias filtra totales y particiones exactas por
+separado. Sus Aplicar internos y activación exterior son independientes.
+Automática usa el histórico integrado por temporadas; Azar conserva semilla.
+La semántica `(total, racha máxima)` de la matriz está documentada como propia
+y provisional por no estar confirmada la columna histórica 0. Pruebas:
+`test_interruption_matrix_and_distances_are_separate_active_filters_and_persist`,
+`test_interruption_random_and_automatic_modes_use_reproducible_and_integrated_data`,
+`test_dynamic_program_matches_exhaustive_reachability_for_restricted_base`.
+
+RF-UX-019 / RF-FIL-025 (v1.0.24): Cuenta coloca la matriz de cantidades junto a
+Figuras (perfiles conjuntos `(V, X, 2)`), Distribución Signos y las temporadas.
+Las frecuencias 1/X/2 salen de jornadas históricas seleccionadas y suman 14
+marcas por jornada. Filtros reutiliza la distancia entre equis existente; al
+estar activa Cuenta participa una sola vez, y la casilla exterior sigue apagada
+por defecto. Pruebas: `test_cuenta_dashboard_shows_joint_figures_distribution_seasons_and_distance_filter`,
+`test_joint_automatic_profile_keeps_categories_dependent` y los casos de
+activación exterior de Cuenta.
+
+RF-UX-014 (v1.0.18): SSeguidos expone únicamente Automática y dispone sus
+controles de temporadas y sus paneles `1`, `X`, `2`, `V` en una cuadrícula
+compacta con frecuencias y figuras agrupadas. Cuenta mantiene sus tres modos y
+su matriz al aislar los controles heredados de Racha. La activación de la
+subpestaña conserva su semántica y sigue apagada por defecto. Pruebas:
+`test_sseguidos_automatic_only_compact_panels_filter_and_share_racha_state`
+y `test_count_and_streak_mode_grids_apply_and_outer_squares_preserve_settings`.
+
+RF-UX-013 (v1.0.17): la pestaña de rachas consecutivas se muestra como
+**SSeguidos** y presenta paneles compactos con límites mínimo/máximo derivados
+de la base y frecuencias dentro de cuadrados blancos/verdes. Mantiene el
+identificador y serialización Racha para no duplicar condiciones ni romper
+sistemas guardados. Pruebas: `test_sseguidos_automatic_only_compact_panels_filter_and_share_racha_state`
+y `test_sseguidos_minmax_choices_follow_current_base`.
+
+RF-ESC-011 (v1.0.16): cuando el marcador principal no conecta, no devuelve una
+jornada interpretable o deja partidos sin marcador tras su horario, un
+adaptador alternativo consulta ESPN para Primera, Segunda y Liga F. Una
+respuesta primaria con equipos distintos se rechaza directamente.
+Solo acepta una fila al coincidir día y equipos local/visitante; los horarios
+sin cobertura quedan en blanco. Los resultados programados 0–0 no cuentan como
+marcador. Los refrescos reutilizan ESPN tras una respuesta válida.
+Si ambas fuentes tienen datos, solo se completan filas vacías del proveedor
+principal. Verificación: `tests/studio/test_espn_live.py` y consulta con J14.
+
+RF-ESC-010 (v1.0.15): sin marcador recibido, Aciertos compara el horario de
+inicio con la hora local para distinguir partidos por comenzar de partidos sin
+resultado disponible. El horario no se interpreta como resultado final. Los
+errores de conexión tampoco describen toda la tabla como pendiente.
+Verificación: `test_waiting_marker_uses_schedule_without_claiming_unknown_result`
+y pruebas de la pantalla Aciertos.
+
+RF-ESC-009 (v1.0.14): el marcador reintenta una vez fallos transitorios y la
+tabla de Aciertos conserva los 15 encuentros en estado pendiente cuando aún no
+hay caché. Una respuesta fallida no sustituye el último marcador válido.
+Verificación: `test_fetch_retries_one_transient_connection_error`,
+`test_fetch_reports_connection_error_after_retry` y suite de Aciertos.
+
+RF-DAT-005 / RF-UX-012 (v1.0.14): el histórico integrado se carga al iniciar;
+la importación adicional queda en Configuración. Reducciones presenta solo las
+pestañas disponibles en esta fase (Cuenta, SSeguidos y Grupo), dejando el código de
+las otras páginas intacto. Normal es la primera entrada en lugar de Inicio.
+Verificación: `test_automatic_season_picker_is_compact_and_has_bulk_selection`
+y `test_group_editor_adds_compact_side_by_side_group_cards`.
+
+RF-EXP-004 (v1.0.13): el TXT clásico es una apuesta por línea, 14 signos 1/X/2
+más los dos signos del Pleno, sin delimitadores; las cantidades se expanden en
+líneas repetidas. Exportación normal y directa usan el mismo serializador.
+Pruebas: `test_T12_roundtrip_quantity_and_full_export` y
+`test_direct_txt_export_reports_written_count_without_changing_draft`.
+
+RF-NOR-004 (v1.0.12): Manual indica cantidades de triples/dobles y el motor
+elige los partidos por masa probabilística; Automática elige además las
+cantidades con programación dinámica exacta y objetivo de probabilidad
+conjunta bajo el máximo configurable. Los bloqueos se preservan y los empates
+se resuelven de forma determinista. Cuenta/Racha integra las frecuencias
+históricas dentro de los botones de valores. Pruebas: `test_automatic_base_selects_quantities_exactly_under_column_limit`, `test_automatic_base_respects_locked_width_and_impossible_limit`, `test_normal_generator_manual_mode_chooses_counts_and_parties_by_probability`, `test_normal_generator_automatic_selects_counts_under_column_limit` y `test_count_and_streak_mode_grids_apply_and_outer_squares_preserve_settings`. RF-FIL-020: activaciones de Reducciones apagadas por defecto;
+solo las pestañas que el usuario active participan. Los ajustes anteriores se
+migran como inactivos hasta que el usuario confirme activaciones. RF-DAT-004:
+histórico CSV incluido, auto-cargado, con `results14` y marcadores opcionales
+`score_01`…`score_15`; los 880 registros enriquecidos se verifican con los
+signos publicados. Las frecuencias compactas se recalculan con las temporadas
+marcadas. Pruebas: `test_manual_base_uses_requested_widths_and_probability_order`,
+`test_bundled_historical_results_load_and_include_verified_scores` y UI.
+
+RF-UX-011 (v1.0.10): compacta las cuadrículas de valores de Cuenta/Racha y
+reemplaza el carril horizontal de temporadas por una cuadrícula compacta de
+selección múltiple, ordenada de más reciente a más antigua, con controles
+Todas/Ninguna y resumen de jornadas. Los cuadrados mantienen estado accesible.
+Verificación: `test_automatic_season_picker_is_compact_and_has_bulk_selection`
+y la suite `test_advanced_conditions_ui.py`.
+
+RF-FIL-018 / RF-FIL-019 / RF-UX-010 (v1.0.9): se amplían Cuenta y Racha
+existentes, sin sustituir Cambio. Cuenta filtra valores permitidos V/X/2
+(V=X+2); Racha admite longitudes máximas y frecuencias de figuras exactas,
+no solapadas, incluyendo la clase mixta V. Manual usa recuadros blancos/verdes;
+Azar selecciona valores observados del desarrollo con semilla reproducible;
+Automática importa resultados finales CSV/JSON y selecciona perfiles conjuntos
+empíricos. Activa/desactiva cada subpestaña sin perder valores; estado, regla,
+fuente, temporada, muestra, riesgo y semilla se serializan en filter_spec.
+El fixture demo sintético se rechaza. No se afirma predicción ni equivalencia
+con el software del manual. Pruebas: `test_streak_statistics.py`,
+`test_reduction_rules.py`, `test_advanced_conditions_ui.py` y `test_ui.py`;
+plan en `docs/planes/VARIANTES_RACHAS.md`.
+
+RF-NOR-001 / RF-NOR-002 / RF-NOR-003 (v1.0.8): generador Normal integrado.
+La base gráfica edita porcentajes 1/X/2, ponderaciones y cantidades T/D; el
+dominio aplica DP exacta para maximizar masa retenida y audita la selección.
+Las filas compactas generan rangos por top-K exacto en log-probabilidad,
+terminaciones desde posición 1, rango C.P. mínimo/máximo, bases triples/dobles y ficheros
+locales; combinan por concatenación, unión o intersección en SQLite temporal.
+Fuentes CSV/TXT/JSON se validan contra jornada y equipos y persisten por jornada.
+Fuentes inexistentes no se simulan. Pruebas:
+`test_normal_generation.py`, `test_normal_generation_files.py` y
+`test_normal_generator_ui.py`; plan y alcance en
+`docs/planes/GENERADOR_NORMAL_AUTOMATICO.md`.
+
+RF-UX-009 (v1.0.7): refuerza la similitud visual con el manual WIN1X2 en
+Reducciones: tablero azul enmarcado, cabeceras destacadas, seis matrices
+compactas 1/X/2 por defecto y etiquetas breves para que las 17 pestañas se
+vean juntas en una ventana de escritorio amplia. Los nombres completos de
+método siguen disponibles como ayuda emergente. Verificación Qt a 1600×950;
+la interfaz se adapta a ventanas más estrechas con desplazamiento.
+
+RF-UX-008 / RF-FIL-017 (v1.0.6): referencias, patrones y selección de columnas
+se realizan con botones 1/X/2 en matrices gráficas; los valores numéricos se
+ajustan con flechas no editables. Columnas suma los aciertos máximos de varios
+grupos; Relacionados conserva la diferencia entre dos; Si… entonces expresa
+una implicación acotada. Frecuencias añade y elimina columnas desde la matriz.
+Pruebas de interacción en `test_advanced_conditions_ui.py` y persistencia en
+`test_advanced_conditions.py`.
+
+RF-FIL-015 / RF-FIL-016 / RF-UX-007 (v1.0.5): reglas de reducción propias
+serializables (esquema basic-local-v5), pestañas Qt compactas antes de
+Optimizar y matriz de grupos visual 1/X/2. Patrones de 2–5 posiciones
+consecutivas, repetición de referencia, frecuencia entre referencias y suma o
+log-probabilidad con snapshot explícito; se combinan con filtros existentes y
+se actualizan en vivo. Cobertura Hermes/Atenea/Artemisa asíncrona, cancelable,
+con selección de candidatas determinista y verificador independiente; copia
+nueva con informe. La garantía solo vale si universo exacto; el Pleno queda
+fuera. Si… entonces añade una implicación tipada entre dos grupos con
+intervalos independientes y comparte la tolerancia de fallos. Columnas informa
+de operaciones que ya resuelven Optimizar/Atenea, para evitar reducciones
+duplicadas; no incorpora suma/diferencia colectiva de apuestas. Pruebas
+`test_reduction_rules.py`, `test_coverage_reducer.py`,
+`test_advanced_conditions_ui.py`, `test_advanced_conditions.py` y
+`test_filters_integration.py`.
+
+RF-FIL-014 / RF-UX-006 (v1.0.4): editor visual de hasta ocho grupos en columnas
+compactas simultáneas, solo con número de partido y botones 1/X/2, relación
+configurable entre pares y explicación breve. La pestaña aparece antes de Optimizar. Lee condiciones del
+esquema v1.0.3 y las migra a máscaras visuales al guardar. Pruebas en
+`test_advanced_conditions.py` y `test_advanced_conditions_ui.py`.
+
+RF-FIL-014 (v1.0.3): pestaña independiente de condiciones avanzadas. Compara
+dos grupos configurables de partidos con signos de referencia, limita la suma
+o diferencia de aciertos y permite tolerar fallos de condiciones. Se evalúa
+junto con los filtros básicos desde el desarrollo de origen; el resultado y
+coste se actualizan automáticamente. Reglas deterministas originales; no
+predicen resultados ni ofrecen garantías. Pruebas en
+`tests/studio/test_advanced_conditions.py`; restauración/compatibilidad con
+filtros anteriores mediante `filters_from_parameters`.
+
 RF-UX-005 (v1.0.2): icono de Quiniela Local en ventanas y diálogos Qt y barra
 de tareas; imagen incluida en la wheel y clase de ventana estable. Verificación
 nativa Linux/X11 de `WM_CLASS` y los 65.536 píxeles de `_NET_WM_ICON`, herencia
@@ -84,6 +295,20 @@ Esta tabla está generada inicialmente a partir de `01_ESPECIFICACION_FUNCIONAL.
 
 | Requisito | Entrega prevista | Estado inicial | Descripción |
 |---|---|---|---|
+| `RF-UX-015` | v1.0.19 | IMPLEMENTADO | Tres métodos compactos SSeguidos, cuadrados accesibles, temporadas reales y persistencia de límites opcionales. |
+| `RF-FIL-021` | v1.0.19 | IMPLEMENTADO | Límites de racha máxima, frecuencias exactas, figuras-partición, perfiles conjuntos y filtro gobernado por la subpestaña activa. |
+| `RF-UX-016` | v1.0.20 | IMPLEMENTADO | FSSeguidos con listas compactas multiselección, total editable y tres métodos que comparten controles. |
+| `RF-FIL-022` | v1.0.20 | IMPLEMENTADO | Filtra particiones exactas por total, signo y alcanzabilidad; conserva regla y activación propias. |
+| `RF-UX-017` | v1.0.21 | IMPLEMENTADO | Interrupciones con matriz compacta, Distancias por figuras, tres métodos y botones cuadrados blanco/verde. |
+| `RF-FIL-023` | v1.0.21 | IMPLEMENTADO | Cuenta las 13 transiciones; filtra total/racha y total/figura por separado. El mapa de columna a racha se identifica como provisional. |
+| `RF-UX-018` | v1.0.22 | IMPLEMENTADO CON DIFERENCIAS | Lienzos compactos de piel clásica y comparaciones visuales para SSeguidos, FSSeguidos, Interrupciones y Distancias; Cuenta/Grupo armonizados sin referencia original. Ornamento y tipografía siguen siendo aproximados. |
+| `RF-ARC-009` | v1.0.23 | CORREGIDO | Mis Sistemas abre informes de cobertura planos o anidados; una copia antigua incompleta conserva el acceso y se rotula sin cobertura verificada. Prueba Qt sobre reducción persistida. |
+| `RF-FIL-024` | v1.0.22 | IMPLEMENTADO | Distancias de 1/X/2/V independientes, alcanzabilidad exacta, activación propia y persistencia bajo la pestaña Interrupciones. |
+| `RF-UX-019` | v1.0.24 | IMPLEMENTADO | Cuenta compacta integra matriz, Figuras, distribución histórica, temporadas y filtros; fondo ornamental retirado solo aquí. |
+| `RF-FIL-025` | v1.0.24 | IMPLEMENTADO | Perfiles conjuntos matemáticamente válidos V/X/2 y distancia entre equis desde Cuenta; ambas condiciones respetan activación de la pestaña. |
+| `RF-UX-020` | v1.0.25 | IMPLEMENTADO CON DIFERENCIAS | Cuenta > Manual recrea la composición compacta de tres bloques; cifras por temporada usan resultados reales, controles de reserva/media siguen vacíos e inhabilitados mientras su fórmula no esté definida. Evidencia y checklist en `docs/planes/CUENTA_PANEL_V1_0_25.md` y `docs/validacion_visual/cuenta_v1_0_25/`. |
+| `RF-UX-021` | v1.0.26 | IMPLEMENTADO | SSeguidos mantiene sus tres métodos y reglas; el panel automático usa fondo plano y temporadas en dos columnas. Evidencia en `docs/planes/SSeguidos_PANEL_V1_0_26.md` y `docs/validacion_visual/sseguidos_v1_0_26/`. |
+| `RF-ESC-012` | v1.0.27 | IMPLEMENTADO | Premio positivo destacado en Aciertos, desglose definitivo 10–15 y carga automática del PRE local válido; sin premio o sin escrutinio no hay anuncio de dinero. |
 | `RF-UX-005` | v1.0.2 | IMPLEMENTADO | Icono de ventana/barra de tareas, recurso empaquetado y asociación estable del acceso directo. Windows pendiente de validación nativa. |
 | `RF-UX-004` | v1.0.1 | IMPLEMENTADO | Tabla clásica con horario y porcentajes de la fuente elegida; Pleno compacto y datos ausentes explícitos. |
 | `RF-UX-003` | v1.0.1 | IMPLEMENTADO | Inicio sin botón ni instrucciones para crear ejemplos. |
@@ -137,6 +362,7 @@ Esta tabla está generada inicialmente a partir de `01_ESPECIFICACION_FUNCIONAL.
 | `RF-FIL-011` | v0.2/v0.7 | PENDIENTE | Informe de fallo: qué condición descartó una columna/resultado ganador y por qué. |
 | `RF-FIL-012` | v0.2/v0.7 | PENDIENTE | Guardar opcionalmente descartes por filtro, en modo streaming. |
 | `RF-FIL-013` | v0.2/v0.7 | PENDIENTE | Filtros de rentabilidad y probabilidad solo cuando existan datos válidos. |
+| `RF-FIL-014` | v1.0.3 | IMPLEMENTADO | Grupos de aciertos de partidos, relación suma/diferencia y tolerancia a condiciones incumplidas; pestaña separada y aplicación conjunta con Optimizar. |
 | `RF-RED-001` | v0.3/v0.7 | PENDIENTE | Reducir sobre conjunto base ya filtrado con presupuesto o número objetivo de columnas. |
 | `RF-RED-002` | v0.3/v0.7 | PENDIENTE | Modos de optimización: cobertura, probabilidad o combinación ponderada; explicar los compromisos. |
 | `RF-RED-003` | v0.3/v0.7 | PARCIAL | Objetivos de 14 a 9 aciertos y objetivos de N premios si son matemáticamente interpretables. |

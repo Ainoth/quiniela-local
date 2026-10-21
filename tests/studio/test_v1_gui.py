@@ -62,7 +62,8 @@ def test_manual_pleno_does_not_change_with_slider(window):
     window.repository.save_round(with_goals());window.load_rounds('DEMO/J01');window.new_system()
     assert window.pleno_mode.currentData()=='manual'
     window.toggle_goal(0,'M');window.toggle_goal(1,'2')
-    window.coverage.setValue(5);QTest.qWait(250)
+    window.normal_generator.triples.setValue(2);window.normal_generator.doubles.setValue(2)
+    window.apply_template();QTest.qWait(50)
     assert window.system.plenos==('M2',)
     window.pleno_mode.setCurrentIndex(1);QTest.qWait(250)
     assert window.system.plenos!=('M2',)

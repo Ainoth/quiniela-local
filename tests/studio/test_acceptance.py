@@ -120,8 +120,11 @@ def test_T10_accumulated_prizes_and_pending():
     result=evaluate(bets,'1'*14,'2M',(True,)*14,{14:10000,15:100000,13:1000},True)
     assert result['counts'][14]==3 and result['counts'][15]==2 and result['counts'][13]==1
     assert result['prize_cents']==231000
+    assert result['payouts'][0]=={'category':15,'bets':2,'unit_cents':100000,'subtotal_cents':200000}
+    assert result['payouts'][1]=={'category':14,'bets':3,'unit_cents':10000,'subtotal_cents':30000}
     pending=evaluate(bets,'1'+'-'*13)
     assert pending['known']==1 and pending['prize_cents'] is None
+    assert pending['payouts'] is None
     assert pending['rows'][0]['confirmed']==0 and pending['rows'][0]['maximum']==14
     with pytest.raises(ValueError):evaluate(bets,'-'*14,prizes={14:10000},official=True)
 
@@ -129,7 +132,9 @@ def test_T10_accumulated_prizes_and_pending():
 def test_T12_roundtrip_quantity_and_full_export(repo,tmp_path):
     bets=tuple(Bet(('1X'*7 if i%2 else '2'*14),'M0') for i in range(150))
     txt=tmp_path/'bets.txt';write_txt(txt,bets)
-    assert len(txt.read_text().splitlines())==150
+    lines=txt.read_text().splitlines()
+    assert len(lines)==150
+    assert all(len(line)==16 and line[:14] in {b.column for b in bets} and line[14:]=='M0' for line in lines)
     imported=read_txt(txt);assert sum(b.quantity for b in imported)==150 and len(imported)==2
     assert sum(b.quantity for b in read_txt(txt,False))==2
     service=SystemService(repo);round_=repo.round('DEMO/J01')

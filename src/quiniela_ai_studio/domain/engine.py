@@ -141,6 +141,19 @@ def union_base(bets, fallback):
     return tuple("".join(s for s in SIGNS if any(b.column[i] == s for b in bets)) for i in range(14)) if bets else normalize_base(fallback)
 
 
+def prize_breakdown(counts: dict[int,int], prizes: dict[int,int]) -> tuple[dict[str,int],...]:
+    """Multiply published unit amounts by stored copies, in integer cents.
+
+    Category 15 is an additional payout for bets also counted in category 14.
+    """
+    return tuple(
+        {'category':category,'bets':counts[category],
+         'unit_cents':prizes.get(category,0),
+         'subtotal_cents':counts[category]*prizes.get(category,0)}
+        for category in (15,14,13,12,11,10)
+    )
+
+
 def evaluate(bets, result, pleno="", finalized=None, prizes=None, official=False, pleno_final=None):
     if len(result) != 14 or set(result) - set("1X2-"):
         raise ValueError("Introduce 14 signos 1/X/2; usa - para resultados pendientes.")
@@ -170,6 +183,8 @@ def evaluate(bets, result, pleno="", finalized=None, prizes=None, official=False
         rows.append(dict(column=bet.column, pleno=bet.pleno, quantity=bet.quantity, hits=hits,
                          confirmed=fixed, maximum=maximum, misses=sum(r!="-" for r in result)-hits, pending=result.count("-"),
                          pleno_hit=pleno_hit,full15_hit=bool(definitive and hits==14 and pleno_hit and pleno_final)))
+    payouts=prize_breakdown(counts,prizes) if prizes is not None else None
     return dict(rows=sorted(rows, key=lambda r: (-r['hits'], -r['maximum'], r['column'])), counts=counts,
                 known=sum(s != '-' for s in result), definitive=definitive,
-                prize_cents=sum(counts[k] * v for k, v in (prizes or {}).items()) if prizes is not None else None)
+                payouts=payouts,
+                prize_cents=sum(row['subtotal_cents'] for row in payouts) if payouts is not None else None)

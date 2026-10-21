@@ -15,7 +15,7 @@ def test_strict_preset_reference_and_neutral_maximum():
     assert spec.changes == (5, 10)
     assert (spec.max_one_run, spec.max_x_run, spec.max_two_run) == (4, 2, 2)
     assert quick_conditions(10) == BasicFilters()
-    assert spec.parameters()['version'] == 2
+    assert spec.parameters()['version'] == 5
 
 
 def test_relaxing_levels_keeps_more_exact_bets_and_matches_independent_oracle():

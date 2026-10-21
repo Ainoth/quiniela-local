@@ -4,6 +4,20 @@
 
 Cada versión debe ser instalable y usable antes de continuar. **Prohibido marcar como terminada una funcionalidad que solo tenga botón, placeholder o pseudocódigo.** Cada hito entrega código, tests, manual corto, log de cambios y actualización de requisitos.
 
+**Corrección activa v1.0.23:** Mis Sistemas lee los formatos plano y anidado de
+los informes de cobertura; las reducciones guardadas vuelven a abrirse y los
+informes incompletos se muestran sin garantía inventada.
+
+**Entrega v1.0.22:** réplica visual compacta de Reducciones y filtro
+propio de Distancias por signo, con decisión matemática documentada y
+capturas de comparación. Consulta
+`docs/planes/REPLICA_VISUAL_REDUCCIONES_V1_0_22.md`.
+
+**Entrega v1.0.21:** Interrupciones añade la matriz de cambios y
+Distancias como filtros independientes, sin sustituir SSeguidos ni FSSeguidos.
+Las transiciones son los 13 pares consecutivos de los primeros 14 signos.
+Consulta `docs/planes/Interrupciones_V1_0_21.md` y `docs/STUDIO_V1_0.md`.
+
 ## v0.1 · Núcleo ejecutable offline — PRIMERA SESIÓN
 
 **Depende de:** nada.

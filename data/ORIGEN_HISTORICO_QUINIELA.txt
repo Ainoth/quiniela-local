@@ -1,0 +1,26 @@
+Histórico de resultados de La Quiniela — integrado en Quiniela AI Studio
+
+Archivo: historico_resultados_quiniela.csv
+Formato: CSV UTF-8 con season, round, results14 y marcadores opcionales
+score_01…score_15. results14 contiene los 14 signos principales; score_15 es
+el marcador del Pleno al 15 cuando se publica.
+
+Fuentes consultadas el 16/10/2026:
+https://www.quinielafutbol.info/historico/temporadas.html
+https://www.historicoquiniela.com/historico/
+El índice de quinielafutbol.info aporta las combinaciones históricas. Para
+880 jornadas con ficha pública de marcador se añadieron los 15 marcadores desde
+HistóricoQuiniela, solo después de comprobar que los marcadores 1–14 producen
+exactamente los 14 signos ya publicados. Las jornadas sin ficha accesible o sin
+coincidencia exacta mantienen los signos y dejan vacíos los campos de goles.
+No se estiman marcadores ausentes.
+
+Cobertura: 55 temporadas y 2.609 jornadas, de 1972-1973 a 2026-2027. Solo se
+conservaron jornadas con 14 signos válidos 1/X/2. En tablas antiguas, la jornada
+se tomó de la tabla; cuando no se publicaba número, se numeraron filas en orden.
+
+HistóricoQuiniela se declara informativo y no afiliado a SELAE; esta copia no es
+una publicación oficial ni tiene valor probatorio. Contrasta con SELAE cualquier
+dato que necesites como oficial. Los marcadores mejoran el detalle histórico,
+pero no predicen ni garantizan premios. El CSV también está empaquetado en
+src/quiniela_ai_studio/data/ y se carga automáticamente al iniciar la app.

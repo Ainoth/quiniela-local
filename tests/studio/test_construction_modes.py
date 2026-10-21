@@ -70,24 +70,30 @@ def test_reduced_template_preserves_locks_and_rejects_incompatible():
         reduction_template(('1X2',)*5+('1',)*9,(True,)*5+(False,)*9,1,weights)
 
 
-def test_live_normal_slider_and_stale_navigation(window):
+def test_numeric_normal_counts_fill_base_and_stale_navigation(window):
     window.repository.save_round(with_goals());window.load_rounds('DEMO/J01');window.new_system()
     window.pleno_mode.setCurrentIndex(1)
-    before=window.system
-    window.coverage.setValue(5);QTest.qWait(250)
-    assert window.system.base!=before.base and window.system.revision==before.revision+1
-    assert window.system.plenos
-    window.coverage.setValue(6);window.coverage.setValue(7);window.coverage.setValue(8);QTest.qWait(250)
-    assert window.system.revision==before.revision+2
+    window.normal_generator.assignment_mode.setCurrentIndex(
+        window.normal_generator.assignment_mode.findData('manual'))
+    window.normal_generator.triples.setValue(2);window.normal_generator.doubles.setValue(3)
+    window.normal_generator.fill_base_button.click();QTest.qWait(50)
+    assert sum(len(signs)==3 for signs in window.system.base)==2
+    assert sum(len(signs)==2 for signs in window.system.base)==3
+    revision=window.system.revision
+    window.normal_generator.triples.setValue(3);window.normal_generator.doubles.setValue(4)
+    window.apply_template();QTest.qWait(50)
+    assert window.system.revision==revision+1
     last=window.system
-    window.coverage.setValue(9);window.navigation.setCurrentRow(3);QTest.qWait(250)
+    window.normal_generator.triples.setValue(5);window.navigation.setCurrentRow(3);QTest.qWait(250)
     assert window.system==last
 
 
 def test_normal_and_reduced_independent_with_all_choices(window,tmp_path):
     window.repository.save_round(with_goals());window.load_rounds('DEMO/J01');window.new_system()
     window.pleno_mode.setCurrentIndex(1)
-    window.coverage.setValue(2);QTest.qWait(250)
+    window.normal_generator.triples.setValue(1);window.normal_generator.doubles.setValue(2)
+    window.normal_generator.fill_base_button.click();QTest.qWait(50)
+    window.apply_template()
     window.start_generation();wait_for_generation(window)
     normal=window.system
     window.navigation.setCurrentRow(7)
@@ -159,12 +165,12 @@ def test_builder_choices_survive_gui_restart(window):
 
 def test_pending_slider_cannot_edit_another_round_or_manual_revision(window):
     window.new_system()
-    window.coverage.setValue(5)
+    window.normal_generator.triples.setValue(5)
     window.toggle_goal(0,'M')
     manual=window.system
     QTest.qWait(250)
     assert window.system==manual
-    window.coverage.setValue(6)
+    window.normal_generator.triples.setValue(6)
     past=replace(window.round,number=2,mode='past')
     window.repository.save_round(past);window.load_rounds(past.key);QTest.qWait(250)
     assert window.system is None

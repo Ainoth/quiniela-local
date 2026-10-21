@@ -55,6 +55,9 @@ TEAM_ALIASES = {
     "MANCHESTCITY": "MANCITY",
     "MANCHESTERCITY": "MANCITY",
     "CSUCRAIOVA": "UCRAIOVA",
+    # En algunos PRE de WIN1X2 aparece «Madrid CCF» para el mismo equipo
+    # que Quinielista publica como «Madrid CFF».
+    "MADRIDCCFF": "MADRIDCFFF",
 }
 
 
@@ -330,12 +333,87 @@ def scrutiny_from_cache(directory: Path, round_: Round):
     return scrutiny_record(line)
 
 
-def live_for_round(round_: Round) -> tuple[LiveMatch, ...]:
+def live_for_round(round_: Round, preferred_source: str = "") -> tuple[LiveMatch, ...]:
     if round_.season == "DEMO":
         raise ValueError("La jornada de demostración no tiene marcador real.")
-    matches = fetch_live_results(round_.season, round_.number)
+
+    from quiniela_ai_studio.infrastructure.espn_live import fetch_espn_live_scores
+
+    def fetch_espn():
+        matches = fetch_espn_live_scores(round_.matches)
+        validate_teams(round_, [(m.home, m.away) for m in matches])
+        return matches
+
+    # Una vez que ESPN resuelve una jornada, usarlo primero en sus refrescos para
+    # no esperar cada vez a que falle la fuente primaria; si ESPN cae, se prueba Dataradar.
+    if preferred_source == "ESPN (alternativa)":
+        try:
+            matches = fetch_espn()
+            if any(match.status != "Sin cobertura de ESPN" for match in matches):
+                return matches
+        except (ConnectionError, ValueError):
+            pass
+
+    try:
+        matches = fetch_live_results(round_.season, round_.number)
+    except (ConnectionError, ValueError) as primary_error:
+        # Dataradar es la fuente principal. Si falla la conexión o no puede
+        # interpretarse la respuesta, se prueba ESPN. La identidad de equipos
+        # se valida después, fuera de este bloque, sin ocultar cruces.
+        try:
+            return fetch_espn()
+        except (ConnectionError, ValueError) as fallback_error:
+            raise ConnectionError(
+                "No se pudo conectar con el marcador público ni con ESPN: "
+                f"{primary_error}; {fallback_error}"
+            ) from fallback_error
+    # Una respuesta estructurada con equipos distintos se rechaza directamente;
+    # no se oculta como un simple fallo de red ni se cambia de jornada.
     validate_teams(round_, [(m.home, m.away) for m in matches])
+
+    # Algunos proveedores contestan correctamente, pero aún dejan vacíos los
+    # partidos cuyo horario ya pasó. En ese caso consultar ESPN evita mantener
+    # esos encuentros como pendientes hasta la siguiente jornada. Solo se
+    # sustituyen filas sin signo por resultados alternativos confirmados.
+    now = datetime.now().astimezone()
+    primary_by_number = {match.number: match for match in matches}
+    has_missing_started_match = any(
+        (fixture.number not in primary_by_number or not primary_by_number[fixture.number].sign)
+        and _kickoff_has_passed(fixture.kickoff, now)
+        for fixture in round_.matches[:14]
+    )
+    if has_missing_started_match:
+        try:
+            alternate = fetch_espn()
+        except (ConnectionError, ValueError):
+            return tuple(matches)
+        alternate_by_number = {match.number: match for match in alternate}
+        return tuple(
+            alternate_by_number.get(match.number, match)
+            if not match.sign and alternate_by_number.get(match.number, match).sign
+            else match
+            for match in matches
+        )
     return tuple(matches)
+
+
+def _kickoff_has_passed(value: str, now: datetime) -> bool:
+    """Return whether a supported local fixture kickoff is earlier than now."""
+    scheduled = None
+    for pattern in ("%d/%m/%Y%H:%M", "%d/%m/%Y %H:%M"):
+        try:
+            scheduled = datetime.strptime(value, pattern).astimezone()
+            break
+        except ValueError:
+            continue
+    if scheduled is None:
+        try:
+            scheduled = datetime.fromisoformat(value)
+        except ValueError:
+            return False
+        if scheduled.tzinfo is None:
+            scheduled = scheduled.astimezone()
+    return scheduled <= now
 
 
 def read_legacy_systems(

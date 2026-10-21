@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 
 from quiniela_ai_studio.domain.models import validate_column
 from quiniela_engine import FilterConfig
 
+from .advanced_conditions import AdvancedConditions, advanced_from_parameters
 from .engine import Cancelled
+from .reduction_rules import ReductionRule, rules_from_parameters
 
 
 @dataclass(frozen=True)
@@ -23,6 +25,10 @@ class BasicFilters:
     x_distance: tuple[int, int] = (1, 13)
     reference: str = ""
     coincidences: tuple[int, int] = (0, 14)
+    advanced: AdvancedConditions = field(default_factory=AdvancedConditions)
+    reduction_rules: tuple[ReductionRule, ...] = ()
+    reduction_tabs_enabled: tuple[int, ...] = tuple(range(17))
+    quick_conditions_active: bool = False
 
     def __post_init__(self):
         for limits, lower, upper in (
@@ -46,31 +52,61 @@ class BasicFilters:
             raise ValueError("La racha máxima debe estar entre 1 y 14.")
         if self.reference:
             validate_column(self.reference)
+        if (len(set(self.reduction_tabs_enabled)) != len(self.reduction_tabs_enabled)
+                or any(type(index) is not int or not 0 <= index < 19 for index in self.reduction_tabs_enabled)):
+            raise ValueError('La activación de pestañas de reducción no es válida.')
 
     def apply(self, bets, cancelled: Callable[[], bool] = lambda: False):
         """Subconjunto de apuestas exactas; conserva Plenos y cantidades sin expansión."""
+        enabled_tabs=set(self.reduction_tabs_enabled)
+        variants=self.variants if 0 in enabled_tabs or self.quick_conditions_active else (0,14)
+        x_count=self.x_count if 0 in enabled_tabs or self.quick_conditions_active else (0,14)
+        two_count=self.two_count if 0 in enabled_tabs or self.quick_conditions_active else (0,14)
+        max_runs={sign:(value if 1 in enabled_tabs or self.quick_conditions_active else 14) for sign,value in
+                  (('1',self.max_one_run),('X',self.max_x_run),('2',self.max_two_run))}
+        changes=self.changes if 2 in enabled_tabs or self.quick_conditions_active else (0,13)
+        # Cuenta exposes this existing filter next to its count matrix while
+        # Cambio remains an independent owner for the same single condition.
+        distance=self.x_distance if (0 in enabled_tabs or 2 in enabled_tabs or self.quick_conditions_active) else (1,13)
+        reference=self.reference if 8 in enabled_tabs else ''
         config = FilterConfig(
-            variants=self.variants,
-            x_count=self.x_count,
-            two_count=self.two_count,
-            max_runs={"1": self.max_one_run, "X": self.max_x_run, "2": self.max_two_run},
-            interruption_range=self.changes,
-            distance_ranges={"X": self.x_distance},
-            reference=tuple(self.reference) if self.reference else None,
-            repetition_range=self.coincidences if self.reference else None,
+            variants=variants,
+            x_count=x_count,
+            two_count=two_count,
+            max_runs=max_runs,
+            interruption_range=changes,
+            distance_ranges={"X": distance},
+            reference=tuple(reference) if reference else None,
+            repetition_range=self.coincidences if reference else None,
         )
         result = []
         for index, bet in enumerate(bets):
             if index % 256 == 0 and cancelled():
                 raise Cancelled("Cálculo de condiciones cancelado.")
-            if config.accepts(tuple(bet.column)):
+            if (config.accepts(tuple(bet.column)) and self.advanced.accepts(bet.column)
+                    and all(not rule.active or (rule.tab_index>=0 and rule.tab_index not in enabled_tabs) or rule.accepts(bet.column)
+                            for rule in self.reduction_rules)):
                 result.append(bet)
         if cancelled():
             raise Cancelled("Cálculo de condiciones cancelado.")
         return tuple(result)
 
     def parameters(self):
-        return dict(id="basic-local-v2", version=2, **asdict(self))
+        parameters = asdict(self)
+        parameters["advanced"] = self.advanced.parameters()
+        parameters["reduction_rules"] = [rule.parameters() for rule in self.reduction_rules]
+        return dict(id="basic-local-v5", version=5, **parameters)
+
+
+def filters_from_parameters(parameters: dict) -> BasicFilters:
+    """Read old filter versions and the current optional advanced conditions."""
+    values = dict(parameters)
+    values.pop("id", None)
+    values.pop("version", None)
+    values['reduction_tabs_enabled'] = tuple(values.get('reduction_tabs_enabled', range(17)))
+    values["advanced"] = advanced_from_parameters(values.get("advanced"))
+    values["reduction_rules"] = rules_from_parameters(values.get("reduction_rules"))
+    return BasicFilters(**values)
 
 
 def quick_conditions(level: int) -> BasicFilters:

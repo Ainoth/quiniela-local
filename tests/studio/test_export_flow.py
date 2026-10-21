@@ -113,6 +113,11 @@ def test_direct_txt_export_reports_written_count_without_changing_draft(window, 
             QTest.qWait(20)
             break
     assert len(path.read_text().splitlines()) == 6
+    assert path.read_text().splitlines() == [
+        '11' + '1' * 12 + 'M1', '1X' + '1' * 12 + 'M1',
+        '12' + '1' * 12 + 'M1', 'X1' + '1' * 12 + 'M1',
+        'XX' + '1' * 12 + 'M1', 'X2' + '1' * 12 + 'M1',
+    ]
     assert result[0][3] == 6 and result[0][1].bets == ()
     assert window.system == draft
 

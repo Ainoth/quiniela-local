@@ -1,4 +1,4 @@
-"""Marcador público usado por Quinielista; resultados siempre provisionales.
+"""Marcador público primario usado por Quinielista / Dataradar.
 
 Fuente y esquema: https://static.quinielista.es/marcador/horizontal/foro/iframeQuinielista.html
 """
@@ -7,10 +7,15 @@ from __future__ import annotations
 import json
 import re
 import time
+import urllib.error
 import urllib.request
 from dataclasses import dataclass
 
 LIVE_URL = 'https://static.dataradar.es/marcador/json/partidos.json'
+# El feed primario puede quedarse esperando incluso cuando está caído. Como
+# ahora existe un proveedor alternativo, limitar cada intento evita que Aciertos
+# permanezca demasiado tiempo sin mostrar los resultados disponibles.
+REQUEST_TIMEOUT_SECONDS = 3
 
 
 @dataclass(frozen=True)
@@ -24,6 +29,7 @@ class LiveMatch:
     status: str
     final: bool
     updated: int
+    source: str = "Quinielista / Dataradar"
 
 
 def parse_live_results(payload: bytes, season: str, round_no: int) -> list[LiveMatch]:
@@ -68,12 +74,25 @@ def parse_live_results(payload: bytes, season: str, round_no: int) -> list[LiveM
 
 
 def fetch_live_results(season: str, round_no: int) -> list[LiveMatch]:
-    request = urllib.request.Request(f'{LIVE_URL}?r={time.time_ns()}', headers={
-        'User-Agent': 'Mozilla/5.0', 'Referer': 'https://www.eduardolosilla.es/',
-        'Cache-Control': 'no-cache',
-    })
-    with urllib.request.urlopen(request, timeout=20) as response:
-        payload = response.read(1024 * 1024 + 1)
+    """Fetch the public live feed, retrying one transient connection failure."""
+    payload = None
+    last_error = None
+    for attempt in range(2):
+        request = urllib.request.Request(f'{LIVE_URL}?r={time.time_ns()}', headers={
+            'User-Agent': 'Mozilla/5.0', 'Referer': 'https://www.eduardolosilla.es/',
+            'Cache-Control': 'no-cache',
+        })
+        try:
+            with urllib.request.urlopen(request, timeout=REQUEST_TIMEOUT_SECONDS) as response:
+                payload = response.read(1024 * 1024 + 1)
+            break
+        except (urllib.error.URLError, TimeoutError, OSError) as exc:
+            last_error = exc
+            if attempt == 0:
+                time.sleep(0.35)
+    if payload is None:
+        reason = getattr(last_error, 'reason', last_error)
+        raise ConnectionError(f'No se pudo conectar con el marcador público: {reason}') from last_error
     if len(payload) > 1024 * 1024:
         raise ValueError('Respuesta del marcador demasiado grande.')
     return parse_live_results(payload, season, round_no)

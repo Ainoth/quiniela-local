@@ -44,6 +44,13 @@ def read_txt(path, preserve_quantity=True):
     return tuple(Bet(*key, count if preserve_quantity else 1) for key, count in counts.items())
 
 
+def classic_txt_line(bet):
+    """Serializa una apuesta como 14 signos 1/X/2 + 2 signos del Pleno."""
+    if len(bet.column) != 14 or len(bet.pleno) != 2:
+        raise ValueError('El TXT clásico requiere 14 signos y la pareja completa del Pleno.')
+    return bet.column + bet.pleno
+
+
 def write_txt(path, bets):
     if not bets:
         raise ValueError('No hay apuestas para exportar.')
@@ -51,7 +58,7 @@ def write_txt(path, bets):
         raise ValueError('Completa el Pleno de todas las apuestas antes de exportar TXT.')
     if sum(b.quantity for b in bets) * 17 > MAX_FILE_BYTES:
         raise ValueError('La exportación TXT excede el límite de 20 MiB; utiliza JSON.')
-    atomic_text(path, ''.join((b.column + b.pleno + '\n') * b.quantity for b in bets))
+    atomic_text(path, ''.join((classic_txt_line(b) + '\n') * b.quantity for b in bets))
 
 
 def write_system(path, system, round_):
@@ -116,7 +123,8 @@ def write_development(path, system, round_, *, format='txt', cancelled=lambda:Fa
                     progress(count,total)
                 if format=='txt':
                     if not bet.pleno:raise ValueError('Completa el Pleno antes de exportar TXT.')
-                    for _ in range(bet.quantity):output.write(bet.column+bet.pleno+'\n')
+                    line=classic_txt_line(bet)
+                    for _ in range(bet.quantity):output.write(line+'\n')
                 else:
                     if not first:output.write(',')
                     output.write(json.dumps(dict(column=bet.column,pleno=bet.pleno,quantity=bet.quantity)))

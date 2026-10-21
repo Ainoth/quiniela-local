@@ -1,5 +1,8 @@
 import json
 import unittest
+import urllib.error
+from io import BytesIO
+from unittest.mock import patch
 from live_results import parse_live_results, evaluate_live_bets
 
 
@@ -54,6 +57,23 @@ class LiveTests(unittest.TestCase):
         self.assertEqual((score['hits'], score['fixed'], score['maximum'], score['pleno']), (14, 14, 14, 'Sí'))
         rows[0].update(estado='Suspendido', sorteado=1, signo='2')
         self.assertEqual(self.parse(rows)[0].sign, '2')
+
+    def test_fetch_retries_one_transient_connection_error(self):
+        from live_results import fetch_live_results
+
+        payload=json.dumps(self.rows()).encode()
+        with patch('live_results.urllib.request.urlopen',side_effect=[urllib.error.URLError('temporal'),BytesIO(payload)]) as open_url:
+            matches=fetch_live_results('26-27',10)
+        self.assertEqual(len(matches),15)
+        self.assertEqual(open_url.call_count,2)
+
+    def test_fetch_reports_connection_error_after_retry(self):
+        from live_results import fetch_live_results
+
+        with patch('live_results.urllib.request.urlopen',side_effect=OSError('sin ruta')) as open_url:
+            with self.assertRaisesRegex(ConnectionError,'marcador público'):
+                fetch_live_results('26-27',10)
+        self.assertEqual(open_url.call_count,2)
 
 
 if __name__ == '__main__':

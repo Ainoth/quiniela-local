@@ -230,3 +230,13 @@ El usuario debe poder pasar de «quiero gastar como máximo X euros» a un conju
 ## 5. Fuera de alcance de la primera entrega
 
 No se implementan en v0.1: IA entrenada, REDWIN, CR propietario, integración con pago, envío de apuestas, QR SELAE, Elige8 completo, un motor de 40 filtros, peñas, ni escrutinio monetario en directo. Estos componentes siguen en el roadmap, con criterios de aceptación propios.
+
+## 6. Ampliación Reducciones v1.0.21
+
+- **RF-UX-017** Mostrar una pestaña compacta Interrupciones con métodos Manual,
+  Azar y Automática, matriz de selección y panel Distancias; usar cuadrados
+  blanco/verde/gris sin tics y conservar controles Aplicar independientes.
+- **RF-FIL-023** Filtrar los 13 cambios entre 14 signos por total/racha
+  consecutiva y por total/figura exacta. Las dos reglas son independientes,
+  persistentes y solo intervienen con activación exterior explícita. La regla
+  de matriz `(total, racha máxima)` se clasifica como original/provisional.

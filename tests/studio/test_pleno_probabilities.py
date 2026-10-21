@@ -83,7 +83,8 @@ def test_ui_autoselection_multiple_price_and_exports(window, tmp_path):
     window.repository.save_round(round_)
     window.load_rounds(round_.key)
     window.new_system()
-    window.coverage.setValue(4)
+    window.normal_generator.doubles.setValue(4)
+    window.pleno_auto_level.setValue(4)
     window.pleno_mode.setCurrentIndex(1)  # Automático solicitado explícitamente.
     window.apply_template()
     assert window.system.goal_masks == ('12', '0M')
@@ -104,7 +105,8 @@ def test_ui_autoselection_multiple_price_and_exports(window, tmp_path):
     assert read_system(target)[1].bets == window.system.bets
     assert window.repository.load(window.system.system_id).goal_masks == ('12', '0M')
     window.ranking_source.setCurrentIndex(1)
-    window.coverage.setValue(0)
+    window.normal_generator.doubles.setValue(0)
+    window.pleno_auto_level.setValue(0)
     window.apply_template()
     assert window.system.plenos == ('01',)
     assert window.goal_percentages[0]['0'].text() == '70.0%'
@@ -131,7 +133,8 @@ def test_undo_restores_manual_pleno_after_template(window):
     window.toggle_goal(1, '2')
     original = window.system
     window.pleno_mode.setCurrentIndex(1)
-    window.coverage.setValue(4)
+    window.normal_generator.doubles.setValue(4)
+    window.pleno_auto_level.setValue(4)
     window.apply_template()
     assert window.system.plenos != original.plenos
     window.undo()
@@ -144,7 +147,9 @@ def test_maximum_includes_full_fifteen(window):
     window.repository.save_round(round_)
     window.load_rounds(round_.key)
     window.new_system()
-    window.coverage.setValue(10)
+    window.normal_generator.triples.setValue(3)
+    window.normal_generator.doubles.setValue(7)
+    window.pleno_auto_level.setValue(10)
     window.pleno_mode.setCurrentIndex(1)
     window.apply_template()
     assert size(window.system.base) * len(window.system.plenos) == 55296

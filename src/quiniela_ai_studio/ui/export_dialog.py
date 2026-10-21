@@ -87,6 +87,7 @@ def build_export_dialog(
         f"Temporada: {round_.season} · Jornada: {round_.number}\n"
         f"Apuestas del TXT: {_count(quantity)} "
         "(incluye las copias y los Plenos de las apuestas guardadas)\n"
+        "Formato: una línea por apuesta, 14 signos 1/X/2 seguidos de los 2 goles del Pleno, sin separadores.\n"
         f"{pleno_text}\n"
         f"Coste según tu quiniela: {_money(quantity * round_.price_cents)} "
         f"({_money(round_.price_cents)} por apuesta).",

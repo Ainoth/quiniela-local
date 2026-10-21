@@ -6,7 +6,7 @@ from dataclasses import replace
 import pytest
 from PySide6.QtCore import Qt
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication, QFileDialog
+from PySide6.QtWidgets import QApplication, QBoxLayout, QFileDialog
 
 from quiniela_studio.demo import demo_round
 from quiniela_studio.storage import Repository
@@ -62,6 +62,42 @@ def test_T15_six_columns_real_gui_flow(window,tmp_path,monkeypatch):
     assert window.generate_button.mapTo(window,window.generate_button.rect().topLeft()).y()<window.height()
 
 
+def test_open_saved_coverage_reduction_from_mis_sistemas(window):
+    """A saved Hermes report has its verifier nested under ``coverage``."""
+    from quiniela_ai_studio.domain.coverage_reducer import (
+        CoverageReductionConfig,
+        reduce_coverage,
+    )
+    from quiniela_ai_studio.domain.models import Bet
+
+    bets=(Bet('1'*14,'M0'),Bet('X'+'1'*13,'M0'))
+    source=window.service.imported(window.round,'Origen',bets)
+    result=reduce_coverage(
+        bets,source.base,CoverageReductionConfig(14,150,75,'hermes',scenario_limit=20)
+    )
+    saved=window.service.coverage_copy(source,result.bets,result.report)
+    window.navigation.setCurrentRow(5)
+    window.update_system_list()
+    row=next(i for i,system in enumerate(window.listed_systems)
+             if system.system_id==saved.system_id)
+    window.system_view.selectRow(row)
+    window.open_selected()
+    assert window.system.system_id==saved.system_id
+    assert 'cobertura exacta, mínimo 14' in window.footer.text()
+
+
+def test_coverage_footer_handles_previous_and_incomplete_schemas():
+    from quiniela_ai_studio.ui.window import coverage_footer
+
+    assert 'cobertura exacta, mínimo 13' in coverage_footer(
+        {'status':'exacta','minimum_hits':13}
+    )
+    assert 'cobertura estimada por muestreo, mínimo NO VERIFICADO' in coverage_footer(
+        {'coverage':{'status':'estimada por muestreo','minimum_hits':None}}
+    )
+    assert coverage_footer({'method':'Hermes'})==' · cobertura aún no verificada'
+
+
 def test_round_switch_clears_active_and_results(window):
     window.example_system();wait_for_generation(window)
     other=replace(window.round,number=2,mode='past');window.repository.save_round(other)
@@ -78,7 +114,7 @@ def test_locks_and_template_ui(window):
     QTest.mouseClick(window.lock_buttons[0],Qt.MouseButton.LeftButton)
     assert window.system.locks[0] and not window.sign_buttons[0]['1'].isEnabled()
     original=window.system.base[0]
-    window.coverage.setValue(10);window.apply_template()
+    window.normal_generator.triples.setValue(4);window.normal_generator.doubles.setValue(6);window.apply_template()
     assert window.system.base[0]==original and window.system.locks[0]
 
 
@@ -143,16 +179,196 @@ def test_live_partial_and_cached_result_respects_quantities(window,monkeypatch):
     row=window.eval_model.rows[0]
     assert row[2:]==(3,1,1,12,13,'Pendiente')
     assert 'sin premios' in window.eval_summary.text()
+    assert not window.prize_card.isVisible()
     window.load_rounds('DEMO/J01')
-    assert window.live_matches is None and window.live_model.rowCount()==0
+    assert window.live_matches is None and window.live_model.rowCount()==15
+    assert all(row[5]!='Esperando marcador' for row in window.live_model.rows)
+
+
+def test_cached_scrutiny_shows_prize_breakdown_and_clears_on_round_change(window,tmp_path,application):
+    from quiniela_ai_studio.domain.models import Bet
+    from quiniela_ai_studio.infrastructure.providers import load_win1x2
+    from tests.studio.test_integration import data_folder
+
+    folder=data_folder(tmp_path/'premios')
+    historical=load_win1x2(folder)[0]
+    window.repository.save_round(historical)
+    window.load_rounds(historical.key)
+    window.repository.set_setting('data_directory',str(folder))
+    bets=(Bet('1'*14,'00',2),Bet('2'+'1'*13,'00',3))
+    winning_system=window.service.imported(historical,'Premiada',bets)
+    window.set_system(winning_system)
+    window.auto_live.setChecked(False)
+    window.navigation.setCurrentRow(4)
+    application.processEvents()
+
+    assert window.prize_card.isVisible()
+    assert window.prize_layout.direction()==QBoxLayout.Direction.TopToBottom
+    assert window.prize_total.text()=='14,00 €'
+    assert window.prize_category_rows[15][1].text()=='2'
+    assert window.prize_category_rows[14][3].text()=='4,00 €'
+    assert window.prize_category_rows[13][3].text()=='6,00 €'
+    assert window.prize_detail_card.isVisible()
+    assert window.prize_detail_rows[15][1].text()=='1'
+    assert window.prize_detail_rows[14][2].text()=='2,00 €'
+    assert window.prize_detail_rows[14][3].text()=='2'
+    assert window.prize_detail_total.text()=='14,00 €'
+    assert window.live_model.rows[0][5]=='Escrutinio publicado'
+    assert 'boleto validado' in window.prize_fine_print.text()
+
+    from live_results import LiveMatch
+    incomplete=[LiveMatch(m.number,m.home,m.away,'—','','','Pendiente',False,0) for m in historical.matches]
+    window.display_live(incomplete,'2026-10-20T12:00:00+00:00',cached=False)
+    assert window.prize_card.isVisible()
+    assert window.live_model.rows[0][5]=='Escrutinio publicado'
+
+    window.set_system(window.service.imported(historical,'Sin aciertos',(Bet('2'*14,'00'),)))
+    assert not window.prize_card.isVisible()
+    window.set_system(winning_system)
+    assert window.prize_card.isVisible()
+
+    window.repository.set_setting('data_directory',None)
+    window.evaluate_live()
+    assert not window.prize_card.isVisible()
+    window.repository.set_setting('data_directory',str(folder))
+    assert window.show_cached_scrutiny()
+    assert window.prize_card.isVisible()
+    window.read_cached_scrutiny()
+    assert window.manual_mode.isChecked()
+    assert window.prize_total.text()=='14,00 €'
+    window.manual_mode.setChecked(False)
+    assert window.prize_card.isVisible()
+
+    window.load_rounds('DEMO/J01')
+    assert not window.prize_card.isVisible()
+    assert not window.prize_detail_card.isVisible()
+
+
+def test_switching_system_in_mis_sistemas_clears_previous_prize_before_aciertos(window,tmp_path,application):
+    from quiniela_ai_studio.domain.models import Bet
+    from quiniela_ai_studio.infrastructure.providers import load_win1x2
+    from tests.studio.test_integration import data_folder
+
+    folder=data_folder(tmp_path/'cambio_sistema_premios')
+    round_=load_win1x2(folder)[0]
+    window.repository.save_round(round_)
+    window.load_rounds(round_.key)
+    window.repository.set_setting('data_directory',str(folder))
+    assert window.tabs.tabText(4)=='Escrutinio'
+    assert window.navigation.item(4).text()=='Escrutinio'
+    winner=window.service.imported(round_,'Premiada',(Bet('1'*14,'00'),))
+    loser=window.service.imported(round_,'Sin aciertos',(Bet('2'*14,'00'),))
+    window.set_system(winner)
+    window.auto_live.setChecked(False)
+    window.navigation.setCurrentRow(4);application.processEvents()
+    assert window.prize_card.isVisible()
+    assert window.prize_detail_card.isVisible()
+
+    window.navigation.setCurrentRow(5)
+    window.set_system(loser)
+    assert not window.prize_card.isVisible()
+    assert not window.prize_detail_card.isVisible()
+    window.navigation.setCurrentRow(4);application.processEvents()
+    assert not window.prize_card.isVisible()
+    assert window.prize_detail_card.isVisible()
+    assert window.prize_detail_total.text()=='0,00 €'
+
+
+def test_published_scrutiny_with_no_award_stays_neutral(window,tmp_path,application):
+    from quiniela_ai_studio.domain.models import Bet
+    from quiniela_ai_studio.infrastructure.providers import load_win1x2
+    from tests.studio.test_integration import data_folder
+
+    folder=data_folder(tmp_path/'sin_premio')
+    historical=load_win1x2(folder)[0]
+    window.repository.save_round(historical)
+    window.load_rounds(historical.key)
+    window.repository.set_setting('data_directory',str(folder))
+    window.set_system(window.service.imported(historical,'Sin premio',(Bet('2'*14,'00'),)))
+    window.auto_live.setChecked(False)
+    window.navigation.setCurrentRow(4)
+    application.processEvents()
+
+    assert not window.prize_card.isVisible()
+    assert 'sin premios' in window.prize_notice.text()
+    assert window.eval_model.rowCount()==1
+
+
+def test_published_page_cache_displays_real_j14_prize_when_pre_is_provisional(window, application):
+    from quiniela_ai_studio.domain.models import Bet
+    from quiniela_ai_studio.infrastructure.published_scrutiny import (
+        parse_published_scrutiny,
+    )
+    from tests.studio.test_published_scrutiny import reference_page, reference_round
+
+    round_ = reference_round()
+    scrutiny = parse_published_scrutiny(reference_page(), round_)
+    window.repository.save_round(round_)
+    window.load_rounds(round_.key)
+    window.repository.set_setting('published_scrutiny:'+round_.key, {
+        'fixture':[[match.home_id,match.away_id] for match in round_.matches],
+        'nominal_date':round_.nominal_date,'scrutiny':scrutiny})
+    bet = Bet('111'+scrutiny['result'][3:], '11')
+    window.set_system(window.service.imported(round_,'Premio de J14',(bet,)))
+    window.auto_live.setChecked(False)
+    window.navigation.setCurrentRow(4)
+    application.processEvents()
+
+    assert window.prize_card.isVisible()
+    assert window.prize_total.text() == '2,22 €'
+    assert window.prize_detail_card.isVisible()
+    assert window.prize_category_rows[11][1].text() == '1'
+    assert window.prize_detail_rows[11][2].text() == '2,22 €'
+    assert window.prize_detail_rows[11][3].text() == '1'
+    assert window.prize_detail_rows[11][4].text() == '2,22 €'
+    assert window.prize_detail_rows[10][2].text() == '0,00 €'
+    assert window.prize_detail_total.text() == '2,22 €'
+    assert 'Comprobar Lotería' in window.prize_fine_print.text()
+    assert window.eval_model.rows[0][3] == 11
+
+
+def test_cached_scrutiny_with_wrong_teams_never_announces_a_prize(window,tmp_path,application):
+    from quiniela_ai_studio.domain.models import Bet
+    from quiniela_ai_studio.infrastructure.providers import load_win1x2
+    from tests.studio.test_integration import data_folder
+
+    folder=data_folder(tmp_path/'equipos_distintos')
+    historical=load_win1x2(folder)[0]
+    wrong=replace(historical,matches=(replace(historical.matches[0],home_id='otro:ZZZ'),)+historical.matches[1:])
+    window.repository.save_round(wrong)
+    window.load_rounds(wrong.key)
+    window.repository.set_setting('data_directory',str(folder))
+    window.set_system(window.service.imported(wrong,'PRE no coincidente',(Bet('1'*14,'00'),)))
+    window.auto_live.setChecked(False)
+    window.navigation.setCurrentRow(4)
+    application.processEvents()
+
+    assert not window.prize_card.isVisible()
+    assert 'equipos' in window.prize_notice.text()
+
+
+def test_waiting_marker_uses_schedule_without_claiming_unknown_result(window):
+    from datetime import UTC, datetime
+
+    now=datetime(2026,10,17,18,30,tzinfo=UTC)
+    assert window.waiting_marker_status('2026-10-17T16:00:00+00:00',now).startswith('Sin resultado · horario 17/10 ')
+    assert window.waiting_marker_status('2026-10-18T16:00:00+00:00',now).startswith('Por comenzar · 18/10 ')
+    assert window.waiting_marker_status('',now)=='Sin datos del marcador'
+
+
+def test_live_error_does_not_describe_all_fixtures_as_pending(window):
+    window.live_error(window.frozen_round(),'No se pudo conectar con el marcador público: sin conexión')
+    assert 'No se ha recibido ningún resultado' in window.live_status.text()
+    assert 'pendiente' not in window.live_status.text().casefold()
 
 
 def test_filters_and_restore_origin_ui(window):
     window.example_system();wait_for_generation(window)
-    window.navigation.setCurrentRow(2);QTest.qWait(10)
+    window.navigation.setCurrentRow(8);QTest.qWait(10)
     original=window.system.bets
-    QTest.mouseClick(window.filter_checks['x_count'],Qt.MouseButton.LeftButton)
-    window.filter_ranges['x_count'][0].setValue(1)
+    window.reduction_activation_buttons[0].setChecked(True)
+    window.count_apply['X'].setChecked(True)
+    for value in range(1,15):window.count_squares[('X',value)].setChecked(True)
     window.apply_filters()
     assert 0<window.system.quantity<6
     assert all(b.column.count('X')>=1 for b in window.system.bets)
@@ -202,16 +418,17 @@ def test_sqlite_pc_copies_in_qt(window,tmp_path,monkeypatch):
 
 def test_local_ballot_remains_visible_in_all_sections(window):
     window.new_system()
-    for index in range(7):
+    for index in range(len(window.TAB_ORDER)):
         window.tabs.setCurrentIndex(index);QTest.qWait(5)
         assert window.sign_buttons[0]['1'].isVisible()
         assert window.goal_buttons[0]['M'].isVisible()
-        assert window.pages.currentIndex()==index
+        expected=window.SECTIONS.index(window.TAB_ORDER[index])
+        assert window.pages.currentIndex()==expected
     window.tabs.setCurrentIndex(1)
     QTest.mouseClick(window.goal_buttons[0]['M'],Qt.MouseButton.LeftButton)
     QTest.mouseClick(window.goal_buttons[1]['0'],Qt.MouseButton.LeftButton)
     assert window.system.pleno=='M0'
-    assert 'fijos' in window.builder_info.text() and '0,75' in window.builder_info.text()
+    assert 'fijos' in window.builder_info.text() and '6,75' in window.builder_info.text()
 
 
 def test_partial_pleno_survives_restart(window,application):
@@ -239,34 +456,39 @@ def test_direct_export_qt_preserves_system_and_records_audit(window,tmp_path,mon
 
 def test_filter_activation_is_independent_and_inactive_values_are_ignored(window):
     window.example_system();wait_for_generation(window)
-    window.navigation.setCurrentRow(2);QTest.qWait(10)
+    window.navigation.setCurrentRow(8);QTest.qWait(10)
     original=window.system.bets
-    assert not window.filter_ranges['x_count'][0].isEnabled()
-    # Click the visible checkbox exactly as a user would.
-    QTest.mouseClick(window.filter_checks['x_count'],Qt.MouseButton.LeftButton)
-    assert window.filter_checks['x_count'].text().startswith('✓')
-    assert window.filter_ranges['x_count'][0].isEnabled()
-    window.filter_ranges['x_count'][0].setValue(14)
-    QTest.mouseClick(window.filter_checks['x_count'],Qt.MouseButton.LeftButton)
-    QTest.mouseClick(window.filter_checks['two_count'],Qt.MouseButton.LeftButton)
-    window.filter_ranges['two_count'][1].setValue(0)
-    window.filter_reference.setText('INVALIDA')
+    window.reduction_activation_buttons[0].setChecked(True)
+    # The graphical square applies the exact count; the outer square can
+    # suspend the whole set while preserving its values.
+    window.count_apply['2'].setChecked(True)
+    window.count_squares[('2',0)].setChecked(True)
+    window.filter_reference.set_column('')
     window.apply_filters()
     assert window.system.bets==tuple(b for b in original if '2' not in b.column)
     assert window.system.quantity>0
-    assert not window.filter_ranges['x_count'][0].isEnabled()
+    active=window.reduction_activation_buttons[0]
+    active.setChecked(False)
+    assert not active.text() and not active.isChecked()
+    window.apply_filters()
+    assert window.system.bets==original
+    assert window.count_squares[('2',0)].isChecked()
+    active.setChecked(True);window.apply_filters()
+    assert window.system.bets==tuple(b for b in original if '2' not in b.column)
     assert 'garantía combinatoria' in window.methods_status.text()
     assert 'pendiente' in window.ai_status.text()
 
 
-def test_reference_filter_requires_reference_without_creating_revision(window):
+def test_hidden_reference_filter_is_not_applied_while_its_tab_is_unpublished(window):
     window.example_system();wait_for_generation(window)
     revision=window.system.revision
     window.filter_checks['coincidences'].setChecked(True)
     assert window.filter_reference.isEnabled()
-    with pytest.raises(ValueError,match='otra quiniela con 14 signos'):
-        window.apply_filters()
-    assert window.system.revision==revision
+    # Coincidencias sigue reservada para una futura pestaña, no se aplica oculta.
+    assert 8 not in window.filter_spec().reduction_tabs_enabled
+    bets=window.system.bets
+    window.apply_filters()
+    assert window.system.bets==bets
     window.filter_checks['coincidences'].setChecked(False)
     window.apply_filters()
     assert window.system.revision==revision
@@ -275,15 +497,16 @@ def test_reference_filter_requires_reference_without_creating_revision(window):
 def test_filter_validation_does_not_block_unchecking(window,application):
     from PySide6.QtCore import QPoint
     window.example_system();wait_for_generation(window)
-    window.navigation.setCurrentRow(2);QTest.qWait(10)
+    window.navigation.setCurrentRow(8);QTest.qWait(10)
+    window.reduction_activation_buttons[0].setChecked(True)
     original=window.system
     check=window.filter_checks['coincidences']
     QTest.mouseClick(check,Qt.MouseButton.LeftButton,pos=QPoint(9,check.height()//2))
     assert check.isChecked()
     wait_for_optimization(window);application.processEvents()
     assert QApplication.activeModalWidget() is None
-    assert 'otra quiniela con 14 signos' in window.filter_feedback.text()
-    assert window.system==original
+    assert window.filter_feedback.text() in ('','No se ha aplicado ninguna condición.')
+    assert window.system.bets==original.bets
     QTest.mouseClick(check,Qt.MouseButton.LeftButton,pos=QPoint(9,check.height()//2))
     assert not check.isChecked()
     for control in window.filter_checks.values():control.setChecked(True)
@@ -313,10 +536,11 @@ def test_quick_condition_slider_populates_filters_and_recovers_original_bets(win
     window.set_system(window.service.generated(window.system,engine.generate(base,'M1')))
     original=window.system
     window.navigation.setCurrentRow(2);QTest.qWait(10)
+    window.reduction_activation_buttons[0].setChecked(True)
     assert window.quick_conditions_slider.isVisible()
     window.quick_conditions_slider.setValue(0)
     assert window.system==original
-    assert window.coverage.value()==0  # The creation slider is independent.
+    assert (window.normal_generator.triples.value(),window.normal_generator.doubles.value())==(0,0)
     assert tuple(control.value() for control in window.filter_ranges['variants'])==(5,8)
     assert tuple(control.value() for control in window.filter_ranges['x_count'])==(2,6)
     assert tuple(control.value() for control in window.filter_ranges['changes'])==(5,10)
@@ -350,18 +574,19 @@ def test_live_optimization_latest_request_empty_recovery_and_budget_last(window)
     window.set_system(window.service.generated(window.system,engine.generate(base,'M1')))
     original=window.system
     window.navigation.setCurrentRow(2)
-    window.coverage.setValue(7)
+    window.reduction_activation_buttons[0].setChecked(True)
+    normal_counts=(window.normal_generator.triples.value(),window.normal_generator.doubles.value())
     window.quick_conditions_slider.setValue(0);window.quick_conditions_slider.setValue(8);window.quick_conditions_slider.setValue(1)
     wait_for_optimization(window)
     from quiniela_ai_studio.domain.filters import quick_conditions
     assert window.system.bets==quick_conditions(1).apply(original.bets)
-    assert window.coverage.value()==7
+    assert (window.normal_generator.triples.value(),window.normal_generator.doubles.value())==normal_counts
     assert str(window.system.quantity) in window.optimize_info.text()
     assert window.budget_apply.isEnabled()
     assert window.budget_group.mapTo(window,window.budget_group.rect().topLeft()).y()>window.filter_group.mapTo(window,window.filter_group.rect().topLeft()).y()
     window.quick_conditions_slider.setValue(10);wait_for_optimization(window)
-    window.filter_checks['x_count'].setChecked(True)
-    window.filter_ranges['x_count'][0].setValue(14)
+    window.count_apply['X'].setChecked(True)
+    window.count_squares[('X',14)].setChecked(True)
     wait_for_optimization(window)
     assert window.system.quantity==0 and window.system.cost(window.round)==0
     assert not window.budget_apply.isEnabled()
@@ -406,7 +631,7 @@ def test_live_worker_superseded_request_and_close_are_safe(window,monkeypatch,ap
     window.quick_conditions_slider.setValue(10)
     wait_for_optimization(window)
     assert window.system.bets==original
-    started.clear();revision=window.system.revision
+    started.clear()
     window.quick_conditions_slider.setValue(0)
     for _ in range(100):
         QTest.qWait(10)
@@ -417,7 +642,7 @@ def test_live_worker_superseded_request_and_close_are_safe(window,monkeypatch,ap
         QTest.qWait(10)
         if not window.isVisible():break
     assert not window.isVisible()
-    assert window.system.revision==revision
+    assert window.system.bets==original
     application.processEvents()
 
 
@@ -428,7 +653,7 @@ def test_saved_optimization_controls_survive_restart(window):
     window.close()
     repo=Repository(path);reopened=MainWindow(repo)
     assert reopened.quick_conditions_slider.value()==4
-    assert reopened.quick_level==4
+    assert reopened.quick_level==4, (saved.parameters,reopened.system.parameters,reopened.quick_level)
     assert reopened.system.bets==saved.bets
     assert not reopened.filter_timer.isActive()
     reopened.close()
@@ -437,8 +662,10 @@ def test_saved_optimization_controls_survive_restart(window):
 def test_empty_filtered_result_cannot_export_the_unfiltered_base(window,tmp_path):
     from quiniela_ai_studio.infrastructure.files import write_development
     window.example_system();wait_for_generation(window)
-    window.filter_checks['x_count'].setChecked(True)
-    window.filter_ranges['x_count'][0].setValue(14);wait_for_optimization(window)
+    window.reduction_activation_buttons[0].setChecked(True)
+    window.count_apply['X'].setChecked(True)
+    for value in range(15):window.count_squares[('X',value)].setChecked(value==14)
+    wait_for_optimization(window)
     assert window.system.quantity==0
     path=tmp_path/'previous.txt';path.write_text('anterior')
     with pytest.raises(ValueError,match='No hay apuestas'):
@@ -485,10 +712,12 @@ def test_automatic_marker_refresh_updates_hits_misses_and_pleno(window,monkeypat
     window.repository.save_round(round_);window.load_rounds(round_.key)
     system=window.service.imported(round_,'Seguimiento',(Bet('1'*14,'01'),Bet('1'*13+'X','01')));window.set_system(system)
     counter=0
-    def provider(context):
+    preferred_sources=[]
+    def provider(context, preferred_source=''):
         nonlocal counter
         counter+=1
-        matches=[LiveMatch(m.number,m.home,m.away,'1 - 0','1','10','Finalizado',True,0) for m in context.matches]
+        preferred_sources.append(preferred_source)
+        matches=[LiveMatch(m.number,m.home,m.away,'1 - 0','1','10','Finalizado',True,0,'ESPN (alternativa)') for m in context.matches]
         matches[14]=replace(matches[14],score='0 - 1',sign='2',pleno='01',final=counter>=2,status='Finalizado' if counter>=2 else 'En juego')
         return tuple(matches)
     monkeypatch.setattr(ui,'live_for_round',provider)
@@ -503,15 +732,16 @@ def test_automatic_marker_refresh_updates_hits_misses_and_pleno(window,monkeypat
         if counter>=2 and window.live_worker is None:break
     window.live_timer.stop()
     assert counter>=2
+    assert preferred_sources[:2]==['','ESPN (alternativa)']
     assert window.eval_model.rows[0][7]=='Pleno acertado'
     assert window.eval_model.rows[1][7]=='Goles sí; faltan 14'
     assert window.repository.setting('live:'+round_.key)['matches'][14]['pleno']=='01'
     cached=window.repository.setting('live:'+round_.key)
-    monkeypatch.setattr(ui,'live_for_round',lambda context:(_ for _ in ()).throw(OSError('Sin red')))
+    monkeypatch.setattr(ui,'live_for_round',lambda context,preferred_source='':(_ for _ in ()).throw(OSError('Sin red')))
     window.fetch_live();wait_for_live(window)
     assert window.repository.setting('live:'+round_.key)==cached
     assert window.eval_model.rows[0][7]=='Pleno acertado'
-    assert 'No se pudo actualizar' in window.live_status.text()
+    assert 'Se conserva el marcador guardado' in window.live_status.text()
     assert QApplication.activeModalWidget() is None
     window.navigation.setCurrentRow(0)
     assert not window.live_timer.isActive()
@@ -538,12 +768,12 @@ def test_live_bad_identity_and_close_do_not_corrupt_cache(window,monkeypatch,app
     window.repository.save_round(round_);window.load_rounds(round_.key)
     def matches(context):
         return tuple(LiveMatch(m.number,m.home,m.away,'—','','','Pendiente',False,0) for m in context.matches)
-    monkeypatch.setattr(ui,'live_for_round',lambda context:tuple(replace(m,home='Equipo incorrecto') for m in matches(context)))
+    monkeypatch.setattr(ui,'live_for_round',lambda context,preferred_source='':tuple(replace(m,home='Equipo incorrecto') for m in matches(context)))
     window.navigation.setCurrentRow(4);wait_for_live(window)
     assert window.repository.setting('live:'+round_.key) is None
     assert QApplication.activeModalWidget() is None
     started=threading.Event();release=threading.Event()
-    def slow_provider(context):
+    def slow_provider(context,preferred_source=''):
         started.set();release.wait(2);return matches(context)
     monkeypatch.setattr(ui,'live_for_round',slow_provider)
     window.fetch_live()

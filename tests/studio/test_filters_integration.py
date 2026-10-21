@@ -61,6 +61,28 @@ def test_filter_versions_restore_initial_origin_and_reject_empty(tmp_path):
     repo.close()
 
 
+def test_greek_coverage_saves_as_a_new_system_and_preserves_source(tmp_path):
+    repo = Repository(tmp_path / "studio.sqlite3")
+    round_ = demo_round()
+    repo.save_round(round_)
+    service = SystemService(repo)
+    bets = tuple(Bet("".join(p) + "1" * 12, "00") for p in product("1X", repeat=2))
+    source = service.imported(round_, "Base", bets)
+    from quiniela_ai_studio.domain.coverage_reducer import (
+        CoverageReductionConfig,
+        reduce_coverage,
+    )
+    result = reduce_coverage(bets, ("1X", "1X") + ("1",) * 12,
+        CoverageReductionConfig(13, 150, 75, "athena", scenario_limit=20))
+    reduced = service.coverage_copy(source, result.bets, result.report)
+    assert reduced.system_id != source.system_id
+    assert reduced.quantity == 2
+    assert reduced.name.endswith("Atenea")
+    assert repo.load(source.system_id) == source
+    assert 'athena-cover-1.0.0' in reduced.parameters
+    repo.close()
+
+
 @pytest.mark.parametrize(
     "params",
     [
