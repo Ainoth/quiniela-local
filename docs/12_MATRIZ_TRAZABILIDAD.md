@@ -1,5 +1,10 @@
 # 12 · Matriz de trazabilidad de requisitos
 
+RF-NOR-005 (v1.0.31): una jornada ya abierta incorpora las instantáneas nuevas
+de mercado/popularidad; la matriz externa se refresca si estaba vacía o seguía
+vinculada a esa fuente. Factores auxiliares sin datos no se ponderan. Prueba:
+`test_same_round_source_refresh_populates_matrix_and_disables_missing_factors`.
+
 RF-DAT-006 (v1.0.30): porcentajes de Quinielista aceptan los alias explícitos
 PSV / PSV Eindhoven, Shaktar / Shakhtar Donetsk y Leipzig / RB Leipzig; sigue
 rechazando equipos distintos. Prueba: `test_quinielista_market_names_match_win1x2_aliases_for_champions_round`.

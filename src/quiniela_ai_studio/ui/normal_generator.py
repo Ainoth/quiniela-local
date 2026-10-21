@@ -256,6 +256,44 @@ class NormalGenerator(QWidget):
     def load_round(self, round_, system):
         """Carga o conserva perfiles por jornada; nunca comparte matrices entre rondas."""
         if self.current_round and self.current_round.key == round_.key:
+            previous_snapshots = {
+                key: value for key, value in self.probability_sources.items()
+                if key.startswith("snapshot:")
+            }
+            updated_snapshots = {}
+            for snapshot in round_.snapshots:
+                kind = "market" if snapshot.kind == "sport" else "public"
+                key = f"snapshot:{snapshot.kind}"
+                updated_snapshots[key] = ProbabilitySource(
+                    round_.key, snapshot.source, snapshot.captured_at,
+                    snapshot.values, kind,
+                    tuple((match.home, match.away) for match in round_.matches[:14]),
+                )
+            snapshots_changed = previous_snapshots != updated_snapshots
+            self.probability_sources = {
+                key: source for key, source in self.probability_sources.items()
+                if not key.startswith("snapshot:")
+            }
+            self.probability_sources.update(updated_snapshots)
+            self.current_round = round_
+            if snapshots_changed:
+                source_key = self.matrix_origin if self.matrix_origin.startswith("snapshot:") else None
+                try:
+                    self._matrix_values()
+                    matrix_is_valid = True
+                except ValueError:
+                    matrix_is_valid = False
+                if source_key is None and not matrix_is_valid:
+                    preferred = self.window.ranking_source.currentData()
+                    source_key = f"snapshot:{preferred}"
+                source = self.probability_sources.get(source_key or "")
+                if source is not None:
+                    self._populate_probability_table(source.values)
+                    self.matrix_origin = source_key
+                    self.base_status.setText(
+                        f"Matriz desde {source.source} · captura {source.captured_at}."
+                    )
+                    self._matrix_edited()
             self._refresh_availability(system)
             return
         self._loading = True
@@ -448,12 +486,27 @@ class NormalGenerator(QWidget):
                 source = sources[-1]
                 self.weight_status[kind].setText(f"{source.source} · importado")
                 self.weight_status[kind].setToolTip(source.captured_at)
+                self.weight_spin[kind].setEnabled(True)
             else:
                 self.weight_status[kind].setText("Sin datos importados")
                 self.weight_status[kind].setToolTip("Esta fuente no existe en la jornada. No se sustituye por porcentajes inventados.")
-        # Los pesos siguen editables para que el usuario pueda excluir (0%) un
-        # factor ausente; Recalcular exige que todo peso positivo tenga datos.
-        for spin in self.weight_spin.values(): spin.setEnabled(True)
+                spin = self.weight_spin[kind]
+                spin.blockSignals(True)
+                spin.setValue(0)
+                spin.setEnabled(False)
+                spin.blockSignals(False)
+        weighted_sources = any(
+            spin.value() > 0 and self._sources_for_kind(kind)
+            for kind, spin in self.weight_spin.items()
+        )
+        missing_sources = any(
+            spin.value() > 0 and not self._sources_for_kind(kind)
+            for kind, spin in self.weight_spin.items()
+        )
+        self.recalculate_button.setEnabled(weighted_sources and not missing_sources)
+        self.recalculate_button.setToolTip(
+            "Combina clasificación, forma e historial importados. Para usar los porcentajes de mercado o popularidad, elige esa fuente y pulsa Rellenar quiniela base."
+        )
         self.fill_base_button.setEnabled(bool(system and self.window.round.editable and self.window.system_mode(system) == "normal"))
         self._update_source_combos()
 
@@ -597,6 +650,8 @@ class NormalGenerator(QWidget):
                 raise ValueError(f"No hay datos importados para {self.weight_status[kind].text().split(' · ')[0]}. Importa esa fuente o pon su peso a 0%.")
             if weight:
                 sources.append((available[-1][1], weight))
+        if not sources:
+            raise ValueError("No hay fuentes auxiliares importadas. Elige Mercado o Popularidad en la fuente de porcentajes y pulsa Rellenar quiniela base.")
         values = weighted_probabilities(sources)
         self._populate_probability_table(values); self.matrix_origin = "weighted"; self._matrix_edited()
         self.base_status.setText("Porcentajes recalculados como media ponderada de las fuentes importadas. Se normalizó cada fila a 100%.")

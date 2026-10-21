@@ -11,7 +11,7 @@ validado o pagado. Véase [plan y pruebas](planes/ESCRUTINIO_PREMIOS_V1_0_27.md)
 
 Cuenta conserva Manual/Azar/Automática. Manual reconstruye la distribución clásica de matriz V/X/2, Figuras, distribución histórica por temporada, FILTROS y cuadro de sumas en tres bloques compactos. Los porcentajes por temporada son observados; la selección está sincronizada con Automática. El filtro de distancia entre equis reutiliza la regla existente. Las casillas de reserva/media quedan inhabilitadas mientras su semántica no esté definida. Véase [plan y decisiones](planes/CUENTA_PANEL_V1_0_25.md) y [captura comparativa](validacion_visual/cuenta_v1_0_25/comparacion_lado_a_lado.png).
 
-# Quiniela AI Studio v1.0.30
+# Quiniela AI Studio v1.0.31
 
 ## Mis Sistemas v1.0.23
 

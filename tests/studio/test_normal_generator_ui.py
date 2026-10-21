@@ -1,6 +1,7 @@
 pytest_plugins = ("test_ui",)
 
 import json
+from dataclasses import replace
 
 from PySide6.QtTest import QTest
 from test_pleno_probabilities import with_goals
@@ -100,6 +101,35 @@ def test_source_switch_updates_unedited_matrix_but_preserves_manual_edits(window
     window.ranking_source.setCurrentIndex(window.ranking_source.findData("sport"))
     assert panel.matrix_origin == "manual"
     assert panel._matrix_values() == edited
+
+
+def test_same_round_source_refresh_populates_matrix_and_disables_missing_factors(window):
+    round_ = replace(
+        with_goals(), season="26-27", number=15, mode="current", snapshots=(),
+        nominal_date="2026-10-21", editable_until="2026-10-22",
+    )
+    window.repository.save_round(round_)
+    window.load_rounds(round_.key)
+    system = window.service.new(round_, "Fuentes recién descargadas")
+    window.set_system(system)
+    panel = window.normal_generator
+    assert panel.matrix_origin == "manual"
+    assert panel.recalculate_button.isEnabled() is False
+    assert all(spin.value() == 0 and not spin.isEnabled() for spin in panel.weight_spin.values())
+
+    updated_round = replace(round_, snapshots=with_goals().snapshots)
+    window.repository.save_round(updated_round)
+    refreshed_system = window.service.refresh_sources(system)
+    window.set_system(refreshed_system)
+
+    market = updated_round.snapshot("sport")
+    assert panel.matrix_origin == "snapshot:sport"  # Mercado es la selección inicial.
+    assert panel._matrix_values() == market.values
+    assert panel.recalculate_button.isEnabled() is False
+    window.ranking_source.setCurrentIndex(window.ranking_source.findData("public"))
+    public = updated_round.snapshot("public")
+    assert panel.matrix_origin == "snapshot:public"
+    assert panel._matrix_values() == public.values
 
 
 def test_normal_configuration_is_saved_per_round_and_restored(window):

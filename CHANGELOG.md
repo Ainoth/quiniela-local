@@ -1,5 +1,12 @@
 # Cambios
 
+## 1.0.31 — refresco de porcentajes en la misma jornada
+
+- RF-NOR-005: al descargar o cambiar las fuentes de mercado/popularidad se
+  actualiza la matriz del generador aunque la jornada siga siendo la misma.
+  Los factores auxiliares sin datos quedan a 0%, desactivados; la media
+  ponderada se habilita solo si hay fuentes auxiliares importadas.
+
 ## 1.0.30 — nombres de equipos en porcentajes de Quinielista
 
 - RF-DAT-006: reconoce variantes documentadas de PSV Eindhoven, Shakhtar
