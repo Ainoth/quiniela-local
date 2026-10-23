@@ -1,5 +1,15 @@
 # Cambios
 
+## 1.0.34 — identidad de equipos femeninos y porcentajes por jornada
+
+- RF-DAT-007: reconoce la marca `W` que Quinielista intercala antes de `(F)`
+  en algunos equipos femeninos, como `Badalona W.(F)`, sin aceptar otros
+  equipos. Evita descargas de porcentajes para temporadas pasadas cuando el
+  proveedor solo identifica la jornada numérica y no permite fijar temporada.
+- Las pruebas comprueban el caso de Logroño–Badalona de J16, rechazan un equipo
+  distinto y verifican que no se solicita por error el porcentaje de una jornada
+  histórica.
+
 ## 1.0.33 — Cuenta unificada y riesgo sin desplegables
 
 - RF-UX-026: Cuenta mantiene los mismos tres bloques alineados en los tres

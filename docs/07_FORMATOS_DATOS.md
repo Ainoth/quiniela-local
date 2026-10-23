@@ -73,6 +73,14 @@ Línea de columna propia: `SSSSSSSSSSSSSS;GH;GA`, con 14 caracteres de signos y 
 
 ## 5. Fuentes y conectores externos
 
+La descarga de porcentajes de Quinielista identifica la petición por número de
+jornada, sin parámetro de temporada. Por ello solo se usa para la jornada en
+curso; para temporadas pasadas se conserva el porcentaje ya guardado o se
+importan datos ligados explícitamente a esa jornada. Al validar equipos, se
+tolera la marca `W` de Quinielista antes de `(F)` (por ejemplo, `Badalona
+W.(F)` frente a `Badalona (F)`); cualquier otra diferencia de identidad sigue
+siendo un error.
+
 Proveedores registrados con identificación, base URL, licencia, limitación de peticiones, formatos, disponibilidad, zona horaria, mecanismo de autenticación y política de caché. Los datos externos pasan por `validate -> normalize -> compare -> stage -> commit`. **Nunca sobrescribir sin más una jornada** ni mezclar porcentajes de distintas horas sin explicarlo.
 
 Conector SELAE: únicamente métodos públicos/permitidos y fuentes oficiales documentadas. Si no existe API abierta y autorizada, proporcionar importación manual o por fichero; no presuponer acceso mediante scraping que pueda violar condiciones de uso.

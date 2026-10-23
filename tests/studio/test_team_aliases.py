@@ -53,3 +53,27 @@ def test_quinielista_market_names_match_win1x2_aliases_for_champions_round():
         source_teams[number - 1] = (source_home, source_away)
 
     validate_teams(round_, source_teams)
+
+
+def test_quinielista_w_marker_matches_feminine_win1x2_team():
+    matches = tuple(
+        Match(index, f'Local {index}', f'Visitante {index}')
+        for index in range(1, 11)
+    ) + (
+        Match(11, 'Logroño (F)', 'Badalona (F)'),
+        Match(12, 'Deportivo (F)', 'Alavés (F)'),
+        Match(13, 'Eibar (F)', 'Madrid CCF (F)'),
+        Match(14, 'R.Madrid (F)', 'Tenerife (F)'),
+        Match(15, 'Local 15', 'Visitante 15'),
+    )
+    round_ = Round(
+        '26-27', 16, matches, 'current', 'WIN1X2', datetime.now(UTC).isoformat(),
+    )
+    source_teams = [(match.home, match.away) for match in matches]
+    source_teams[10] = ('LOGROÑO (F)', 'BADALONA W.(F)')
+
+    validate_teams(round_, source_teams)
+
+    source_teams[10] = ('LOGROÑO (F)', 'BADALONA B (F)')
+    with pytest.raises(ValueError, match='partido 11'):
+        validate_teams(round_, source_teams)

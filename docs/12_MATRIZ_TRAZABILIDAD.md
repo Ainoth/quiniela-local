@@ -1,5 +1,12 @@
 # 12 · Matriz de trazabilidad de requisitos
 
+RF-DAT-007 (v1.0.34): la identidad de clubes femeninos tolera la marca `W`
+que Quinielista añade antes de `(F)` y mantiene el rechazo de clubes distintos.
+La descarga en línea de porcentajes se limita a la jornada en curso, porque el
+endpoint consulta por número de jornada y no acepta temporada. Pruebas:
+`test_quinielista_w_marker_matches_feminine_win1x2_team` y
+`test_historical_round_does_not_download_current_season_percentages`.
+
 RF-UX-026/027 (v1.0.33): Cuenta presenta un solo selector de temporadas y una
 distribución compartidos por Manual/Azar/Automática. Cabeceras dentro de sus
 paneles; altura según contenido. Sin tablas vacías de reservas. Selección con

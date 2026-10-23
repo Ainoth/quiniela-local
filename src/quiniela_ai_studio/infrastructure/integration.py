@@ -70,6 +70,11 @@ TEAM_ALIASES = {
 def team_key(name: str) -> str:
     plain = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode()
     key = re.sub("[^A-Z0-9]", "", plain.upper())
+    key = TEAM_ALIASES.get(key, key)
+    # Quinielista añade a veces W al nombre del equipo femenino antes de (F),
+    # por ejemplo «Badalona W.(F)» frente a «Badalona (F)» en WIN1X2.
+    if key.endswith("WF"):
+        key = key[:-2] + "F"
     return TEAM_ALIASES.get(key, key)
 
 
@@ -161,6 +166,11 @@ def fetch_round_sources(round_: Round, cache: Path, *, cancelled=lambda: False) 
     """Descarga exclusivamente la jornada solicitada, validando también sus equipos."""
     if round_.season == "DEMO":
         raise ValueError("La demo es ficticia. Descarga partidos y selecciona una jornada real.")
+    if round_.mode != "current":
+        raise ValueError(
+            "Quinielista solo publica porcentajes para la jornada en curso; "
+            "no se pueden descargar para otra temporada o jornada."
+        )
     checkpoint(cancelled)
     payload = data_updater._download(data_updater.QUINIELISTA_PERCENTAGES.format(round_no=round_.number))
     updated = probability_snapshots(round_, payload)

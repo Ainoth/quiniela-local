@@ -1,3 +1,12 @@
+# Corrección de porcentajes por temporada — v1.0.34
+
+Quinielista devuelve los porcentajes por número de jornada, sin selector de
+temporada. La descarga en línea se limita a la jornada en curso para evitar
+asignar datos de otra temporada. La validación acepta la variante femenina
+`Badalona W.(F)` como `Badalona (F)` y sigue rechazando equipos distintos.
+Pruebas: `test_quinielista_w_marker_matches_feminine_win1x2_team` y
+`test_historical_round_does_not_download_current_season_percentages`.
+
 ## Quiniela AI Studio 1.0.27 — premios en Aciertos
 
 Aciertos lee el escrutinio definitivo PRE guardado de la jornada y muestra un

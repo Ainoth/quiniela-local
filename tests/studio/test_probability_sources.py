@@ -1,5 +1,6 @@
 """Fuentes verificables y descarga explícita sin confundir mercado y público."""
 import json
+from dataclasses import replace
 
 import pytest
 from test_integration import data_folder, load_win1x2, xml
@@ -103,6 +104,18 @@ def test_exact_round_download_and_cache_preservation(tmp_path, monkeypatch):
     with pytest.raises(ValueError):
         fetch_round_sources(round_, cache)
     assert path.read_bytes() == before
+
+
+def test_historical_round_does_not_download_current_season_percentages(tmp_path, monkeypatch):
+    round_ = load_win1x2(data_folder(tmp_path / 'source'))[-1]
+    historical = replace(round_, mode='past')
+    monkeypatch.setattr(
+        data_updater, '_download',
+        lambda _url: pytest.fail('No debe pedir porcentajes sin filtro de temporada.'),
+    )
+
+    with pytest.raises(ValueError, match='solo publica porcentajes para la jornada en curso'):
+        fetch_round_sources(historical, tmp_path / 'cache')
 
 
 def test_download_adopts_sources_without_changing_bets(window, tmp_path, monkeypatch):
