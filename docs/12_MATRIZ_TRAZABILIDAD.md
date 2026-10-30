@@ -1,5 +1,11 @@
 # 12 · Matriz de trazabilidad de requisitos
 
+RF-ESC-010 (v1.0.34): el adaptador del marcador combina Dataradar y ESPN por
+partido; una fila sin cobertura de ESPN nunca sustituye un resultado válido de
+la fuente primaria. Se normalizan variantes de los nombres de Almería, Oviedo,
+Logroño y Badalona. Pruebas: `test_preferred_espn_does_not_hide_primary_results_for_uncovered_matches`
+y `test_espn_resolves_quiniela_names_for_almeria_oviedo_and_logrono_badalona`.
+
 RF-DAT-007 (v1.0.34): la identidad de clubes femeninos tolera la marca `W`
 que Quinielista añade antes de `(F)` y mantiene el rechazo de clubes distintos.
 La descarga en línea de porcentajes se limita a la jornada en curso, porque el

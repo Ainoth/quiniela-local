@@ -86,6 +86,35 @@ def test_espn_fallback_matches_fixture_order_gender_and_team_aliases(monkeypatch
     assert matches[2].score == "—" and matches[2].status == "Sin comenzar"
 
 
+def test_espn_resolves_quiniela_names_for_almeria_oviedo_and_logrono_badalona(monkeypatch):
+    fixtures = (
+        Match(9, "Almería", "R.Oviedo", "24/10/202619:00"),
+        Match(11, "Logroño (F)", "Badalona (F)", "24/10/202618:15"),
+    )
+
+    def fake_scoreboard(day, league):
+        if day != "20261024":
+            return []
+        if league == "esp.2":
+            return parse_espn_scoreboard(
+                payload(event("Almería", "Real Oviedo", 2, 2, "post", "STATUS_FULL_TIME",
+                              completed=True, date="2026-10-24T17:00:00Z")), league, day
+            )
+        if league == "esp.w.1":
+            return parse_espn_scoreboard(
+                payload(event("Dux Logroño", "FC Badalona", 1, 0, "post", "STATUS_FULL_TIME",
+                              completed=True, date="2026-10-24T16:15:00Z")), league, day
+            )
+        return []
+
+    monkeypatch.setattr("quiniela_ai_studio.infrastructure.espn_live._fetch_scoreboard", fake_scoreboard)
+    matches = fetch_espn_live_scores(fixtures)
+
+    assert [(match.score, match.sign, match.final) for match in matches] == [
+        ("2 - 2", "X", True), ("1 - 0", "1", True),
+    ]
+
+
 def test_espn_fallback_marks_uncovered_fixtures_without_fabricating_scores(monkeypatch):
     fixture = Match(1, "Equipo desconocido", "Otro equipo", "17/10/202614:00")
     monkeypatch.setattr("quiniela_ai_studio.infrastructure.espn_live._fetch_scoreboard", lambda *_: [])
@@ -149,3 +178,41 @@ def test_round_adapter_enriches_stale_primary_rows_after_kickoff(monkeypatch):
     assert matches[0].score == "1 - 0"
     assert matches[0].source == SOURCE_NAME
     assert matches[1] == primary[1]
+
+
+def test_preferred_espn_does_not_hide_primary_results_for_uncovered_matches(monkeypatch):
+    from dataclasses import replace
+
+    import quiniela_ai_studio.infrastructure.integration as integration
+    import quiniela_ai_studio.infrastructure.espn_live as espn_live
+    from quiniela_studio.demo import demo_round
+    from live_results import LiveMatch
+
+    base = demo_round()
+    fixtures = tuple(replace(match, kickoff="01/01/2000 12:00") for match in base.matches)
+    round_ = replace(base, season="26-27", number=16, mode="current", matches=fixtures)
+    primary = tuple(
+        LiveMatch(
+            match.number, match.home, match.away,
+            "2 - 2" if match.number == 9 else "1 - 0" if match.number == 11 else "—",
+            "X" if match.number == 9 else "1" if match.number == 11 else "",
+            "22" if match.number == 9 else "10" if match.number == 11 else "",
+            "Finalizado" if match.number in (9, 11) else "Sin comenzar",
+            match.number in (9, 11), 1,
+        )
+        for match in fixtures
+    )
+    alternate = tuple(
+        LiveMatch(
+            match.number, match.home, match.away, "—", "", "",
+            "Sin cobertura de ESPN", False, 0, SOURCE_NAME,
+        )
+        for match in fixtures
+    )
+    monkeypatch.setattr(integration, "fetch_live_results", lambda *_: primary)
+    monkeypatch.setattr(espn_live, "fetch_espn_live_scores", lambda _: alternate)
+
+    matches = integration.live_for_round(round_, preferred_source=SOURCE_NAME)
+
+    assert matches[8] == primary[8]
+    assert matches[10] == primary[10]

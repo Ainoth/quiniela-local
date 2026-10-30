@@ -360,16 +360,6 @@ def live_for_round(round_: Round, preferred_source: str = "") -> tuple[LiveMatch
         validate_teams(round_, [(m.home, m.away) for m in matches])
         return matches
 
-    # Una vez que ESPN resuelve una jornada, usarlo primero en sus refrescos para
-    # no esperar cada vez a que falle la fuente primaria; si ESPN cae, se prueba Dataradar.
-    if preferred_source == "ESPN (alternativa)":
-        try:
-            matches = fetch_espn()
-            if any(match.status != "Sin cobertura de ESPN" for match in matches):
-                return matches
-        except (ConnectionError, ValueError):
-            pass
-
     try:
         matches = fetch_live_results(round_.season, round_.number)
     except (ConnectionError, ValueError) as primary_error:
@@ -393,7 +383,7 @@ def live_for_round(round_: Round, preferred_source: str = "") -> tuple[LiveMatch
     # sustituyen filas sin signo por resultados alternativos confirmados.
     now = datetime.now().astimezone()
     primary_by_number = {match.number: match for match in matches}
-    has_missing_started_match = any(
+    has_missing_started_match = preferred_source == "ESPN (alternativa)" or any(
         (fixture.number not in primary_by_number or not primary_by_number[fixture.number].sign)
         and _kickoff_has_passed(fixture.kickoff, now)
         for fixture in round_.matches[:14]
@@ -405,12 +395,23 @@ def live_for_round(round_: Round, preferred_source: str = "") -> tuple[LiveMatch
             return tuple(matches)
         alternate_by_number = {match.number: match for match in alternate}
         return tuple(
-            alternate_by_number.get(match.number, match)
-            if not match.sign and alternate_by_number.get(match.number, match).sign
-            else match
+            _prefer_confirmed_live_result(
+                match,
+                alternate_by_number.get(match.number),
+            )
             for match in matches
         )
     return tuple(matches)
+
+
+def _prefer_confirmed_live_result(primary: LiveMatch, alternate: LiveMatch | None) -> LiveMatch:
+    """Use ESPN only when it has a score/sign; uncovered rows never hide primary data."""
+    if alternate is None or not alternate.sign:
+        return primary
+    if primary.sign and (primary.final or not alternate.final):
+        # Keep a finished primary result; a live/unfinished alternate can be stale.
+        return primary
+    return alternate
 
 
 def _kickoff_has_passed(value: str, now: datetime) -> bool:

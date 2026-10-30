@@ -2,6 +2,9 @@
 
 ## 1.0.34 — identidad de equipos femeninos y porcentajes por jornada
 
+- RF-ESC-010: el escrutinio conserva resultados primarios cuando ESPN no cubre
+  algún partido, combina ambos proveedores sin perder marcadores y reconoce
+  nombres como R. Oviedo/Real Oviedo, Almería/UD Almería y Logroño/FC Badalona.
 - RF-DAT-007: reconoce la marca `W` que Quinielista intercala antes de `(F)`
   en algunos equipos femeninos, como `Badalona W.(F)`, sin aceptar otros
   equipos. Evita descargas de porcentajes para temporadas pasadas cuando el
