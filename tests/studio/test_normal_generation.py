@@ -8,12 +8,10 @@ import pytest
 
 from quiniela_ai_studio.domain.normal_generation import (
     ProbabilitySource,
-    apply_surprise,
     best_base,
     best_base_under_limit,
     combine_action_columns,
     generate_base_action,
-    historical_base,
     import_probability_source,
     iter_ranked_columns,
     normalize_percentages,
@@ -102,48 +100,6 @@ def test_automatic_base_respects_locked_width_and_impossible_limit():
     assert report["doubles"] >= 1
     with pytest.raises(ValueError, match="bloqueados"):
         best_base_under_limit(rows, 1, locks, ("1X",) + ("1",) * 13)
-
-
-def test_historical_base_grows_to_selected_sample_coverage_using_percentages():
-    rows = [(0.6, 0.25, 0.15)] + [(0.9, 0.07, 0.03)] * 13
-    history = ["1" * 14] * 4 + ["X" + "1" * 13] * 6
-    base, report = historical_base(rows, history, target_coverage=0.8, column_limit=100_000)
-    assert report["criteria"] == "maximizar_cobertura_historica_greedy_v1"
-    assert report["historical_coverage"] >= 0.8
-    assert report["history_rows"] == 10
-    assert report["doubles"] == 1
-    assert report["triples"] == 0
-    assert base[0] == "1X"
-    assert report["columns"] == 2
-
-
-def test_historical_base_preserves_locks_and_respects_technical_limit():
-    rows = [(0.6, 0.25, 0.15)] * 14
-    history = ["X" + "1" * 13]
-    locks = (True,) + (False,) * 13
-    base, report = historical_base(rows, history, 1.0, 100_000, locks, ("X",) + ("1",) * 13)
-    assert base[0] == "X"
-    assert report["historical_coverage"] == 1.0
-    with pytest.raises(ValueError, match="límite técnico"):
-        historical_base(rows, history, 1.0, 1, locks, ("1X",) + ("1",) * 13)
-
-
-def test_surprise_moves_wide_signs_to_matches_with_higher_favorite_failure_risk():
-    rows = [(0.9, 0.07, 0.03)] * 14
-    rows[1] = (0.4, 0.35, 0.25)
-    rows[2] = (0.5, 0.3, 0.2)
-    rows[3] = (0.6, 0.25, 0.15)
-    base = ["1"] * 14
-    base[0] = "1X2"
-    base[5] = "1X"
-    result, report = apply_surprise(base, rows, level=0)
-    assert report["risk_order"][:3] == [2, 3, 4]
-    assert result[1] == "1X2"
-    assert result[2] == "1X"
-    assert sum(len(row) == 3 for row in result) == 1
-    assert sum(len(row) == 2 for row in result) == 1
-    locked, _ = apply_surprise(base, rows, level=10, locks=(True,) + (False,) * 13, locked_base=tuple(base))
-    assert locked[0] == "1X2"
 
 
 def test_bundled_historical_results_load_and_include_verified_scores():

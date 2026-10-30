@@ -7,7 +7,7 @@ Integrar en la pestaña Normal (sin crear aplicación ni rediseñar el resto) la
 ## Inspección y límites confirmados
 
 - UI: `MainWindow.build_builder()` en `src/quiniela_ai_studio/ui/window.py`; el boleto fijo está en la columna izquierda y Normal en un panel derecho.
-- Datos disponibles: instantáneas por jornada `sport` (mercado publicado) y `public` (porcentajes jugados), además del histórico local de resultados finales. Este histórico alimenta la cobertura descriptiva de la base; no equivale a forma reciente por equipo ni a una predicción de resultados futuros. No hay tablas de clasificación, últimos cinco resultados ni probabilidades WIN1X2/LAE integradas.
+- Datos disponibles: instantáneas por jornada `sport` (mercado publicado) y `public` (porcentajes jugados); no hay tablas de clasificación, últimos cinco resultados, enfrentamientos históricos ni probabilidades WIN1X2/LAE.
 - Persistencia: ajustes SQLite por clave y auditoría ya disponibles en `Repository`.
 - El motor actual limita generación materializada a 100.000; la tabla de acciones necesita streaming para no alterar ese límite ni retener universos enormes.
 - No se encontraron ficheros X2_2003/Covadonga en el repositorio ni formatos documentados para esos nombres. No se atribuirá compatibilidad a formatos propietarios.

@@ -58,12 +58,8 @@ def test_T15_six_columns_real_gui_flow(window,tmp_path,monkeypatch):
     window.system_view.selectRow(0);index=window.system_view.currentIndex()
     window.refresh();assert window.system_view.currentIndex()==index
     window.navigation.setCurrentRow(1);QTest.qWait(10)
-    from PySide6.QtWidgets import QScrollArea
-    normal_scroll=window.pages.widget(1).findChild(QScrollArea)
-    normal_scroll.verticalScrollBar().setValue(normal_scroll.verticalScrollBar().maximum())
-    QTest.qWait(10)
-    button_y=window.generate_button.mapTo(normal_scroll.viewport(),window.generate_button.rect().topLeft()).y()
-    assert 0<=button_y and button_y+window.generate_button.height()<=normal_scroll.viewport().height()
+    assert window.generate_button.isVisible()
+    assert window.generate_button.mapTo(window,window.generate_button.rect().topLeft()).y()<window.height()
 
 
 def test_open_saved_coverage_reduction_from_mis_sistemas(window):
@@ -118,7 +114,6 @@ def test_locks_and_template_ui(window):
     QTest.mouseClick(window.lock_buttons[0],Qt.MouseButton.LeftButton)
     assert window.system.locks[0] and not window.sign_buttons[0]['1'].isEnabled()
     original=window.system.base[0]
-    window.normal_generator._toggle_count_mode('triples');window.normal_generator._toggle_count_mode('doubles')
     window.normal_generator.triples.setValue(4);window.normal_generator.doubles.setValue(6);window.apply_template()
     assert window.system.base[0]==original and window.system.locks[0]
 
@@ -540,13 +535,12 @@ def test_quick_condition_slider_populates_filters_and_recovers_original_bets(win
     window.set_system(window.service.edit(window.system,base,(False,)*14,'M1'))
     window.set_system(window.service.generated(window.system,engine.generate(base,'M1')))
     original=window.system
-    recommended_counts=(window.normal_generator.triples.value(),window.normal_generator.doubles.value())
     window.navigation.setCurrentRow(2);QTest.qWait(10)
     window.reduction_activation_buttons[0].setChecked(True)
     assert window.quick_conditions_slider.isVisible()
     window.quick_conditions_slider.setValue(0)
     assert window.system==original
-    assert (window.normal_generator.triples.value(),window.normal_generator.doubles.value())==recommended_counts
+    assert (window.normal_generator.triples.value(),window.normal_generator.doubles.value())==(0,0)
     assert tuple(control.value() for control in window.filter_ranges['variants'])==(5,8)
     assert tuple(control.value() for control in window.filter_ranges['x_count'])==(2,6)
     assert tuple(control.value() for control in window.filter_ranges['changes'])==(5,10)
@@ -803,7 +797,6 @@ def test_live_refresh_keeps_selected_bet_and_shows_pleno_in_header(window):
     matches=[LiveMatch(m.number,m.home,m.away,'1 - 0','1','10','Finalizado',True,0) for m in window.round.matches]
     matches[14]=replace(matches[14],score='0 - 2',sign='2',pleno='02')
     window.display_live(matches,'2026-10-12T10:00:00+00:00',False)
-    window.navigation.setCurrentRow(4);QTest.qWait(10)
     window.eval_view.setCurrentIndex(window.eval_model.index(1,0))
     assert window.live_model.rows[0][3]=='X'
     matches=[replace(m,score='0 - 0',sign='X') if m.number<15 else m for m in matches]

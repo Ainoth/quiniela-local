@@ -1,25 +1,4 @@
-# Quiniela AI Studio — v1.0.35
-
-## Normal: base histórica, controles independientes y boleto compacto
-
-En la pestaña Normal se pueden seleccionar las temporadas de resultados y una
-cobertura histórica objetivo. El algoritmo ensancha partidos de forma
-determinista: los resultados seleccionados miden cobertura descriptiva y los
-porcentajes actuales ordenan qué signos añadir. Un máximo técnico interno
-evita generar bases excesivas; si limita la cobertura, la app lo indica. No es
-una predicción de resultados futuros.
-
-Dobles y triples tienen modos Auto/Manual separados. Auto propone su cantidad
-desde el histórico y porcentajes; Manual habilita su deslizador. El factor
-sorpresa actúa por separado y solo mueve dobles/triples existentes hacia los
-partidos donde el favorito tiene más riesgo de fallar. La diferenciación del
-público permanece destinada al análisis de popularidad.
-
-El boleto compacto alinea cada porcentaje con su signo y reduce el espacio
-vertical entre partidos. Los botones Generar apuestas y Guardar TXT aparecen
-al final de la pestaña Normal.
-
-## Corrección de porcentajes por temporada — v1.0.34
+# Corrección de porcentajes por temporada — v1.0.34
 
 Quinielista devuelve los porcentajes por número de jornada, sin selector de
 temporada. La descarga en línea se limita a la jornada en curso para evitar

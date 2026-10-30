@@ -1,15 +1,5 @@
 # 12 · Matriz de trazabilidad de requisitos
 
-RF-NOR-006/007 y RF-UX-029 (v1.0.35): la base automática usa temporadas
-seleccionadas, cobertura objetivo y porcentajes de jornada, con límite técnico
-interno comunicado; dobles/triples Auto/Manual se manejan por separado. El
-factor sorpresa redistribuye las selecciones anchas existentes. Normal muestra
-porcentajes alineados con cada signo, reduce la altura del boleto y deja
-generación/guardado al final de la pestaña. Pruebas: `test_historical_base_*`,
-`test_normal_generator_automatic_selects_counts_from_history_and_percentages`,
-`test_count_modes_toggle_independently_and_hide_column_limit` y
-`test_normal_ballot_uses_compact_per_sign_percentages`.
-
 RF-DAT-007 (v1.0.34): la identidad de clubes femeninos tolera la marca `W`
 que Quinielista añade antes de `(F)` y mantiene el rechazo de clubes distintos.
 La descarga en línea de porcentajes se limita a la jornada en curso, porque el

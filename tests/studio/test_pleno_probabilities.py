@@ -83,8 +83,6 @@ def test_ui_autoselection_multiple_price_and_exports(window, tmp_path):
     window.repository.save_round(round_)
     window.load_rounds(round_.key)
     window.new_system()
-    window.normal_generator._toggle_count_mode('triples');window.normal_generator._toggle_count_mode('doubles')
-    window.normal_generator.triples.setValue(0)
     window.normal_generator.doubles.setValue(4)
     window.pleno_auto_level.setValue(4)
     window.pleno_mode.setCurrentIndex(1)  # Automático solicitado explícitamente.
@@ -131,7 +129,6 @@ def test_undo_restores_manual_pleno_after_template(window):
     window.repository.save_round(round_)
     window.load_rounds(round_.key)
     window.new_system()
-    window.normal_generator._toggle_count_mode('triples');window.normal_generator._toggle_count_mode('doubles')
     window.toggle_goal(0, 'M')
     window.toggle_goal(1, '2')
     original = window.system
@@ -150,7 +147,6 @@ def test_maximum_includes_full_fifteen(window):
     window.repository.save_round(round_)
     window.load_rounds(round_.key)
     window.new_system()
-    window.normal_generator._toggle_count_mode('triples');window.normal_generator._toggle_count_mode('doubles')
     window.normal_generator.triples.setValue(3)
     window.normal_generator.doubles.setValue(7)
     window.pleno_auto_level.setValue(10)
@@ -163,7 +159,6 @@ def test_maximum_includes_full_fifteen(window):
 def test_percentages_are_separate_and_aligned_below_goals(window):
     from PySide6.QtCore import QPoint
     from PySide6.QtTest import QTest
-    from PySide6.QtWidgets import QScrollArea
     window.resize(1024, 768)
     window.new_system()
     QTest.qWait(20)
@@ -178,8 +173,4 @@ def test_percentages_are_separate_and_aligned_below_goals(window):
             assert percentage.width() == button.width()
             assert button.text() == goal
     assert 'Elige al menos un gol' in window.pleno_selection_info.text()
-    normal_scroll = window.pages.widget(1).findChild(QScrollArea)
-    normal_scroll.ensureWidgetVisible(window.generate_button)
-    QTest.qWait(20)
-    button_y = window.generate_button.mapTo(normal_scroll.viewport(), QPoint(0, 0)).y()
-    assert 0 <= button_y and button_y + window.generate_button.height() <= normal_scroll.viewport().height()
+    assert window.generate_button.mapTo(window, QPoint(0, 0)).y() + window.generate_button.height() <= window.height()

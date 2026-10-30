@@ -16,7 +16,7 @@ def test_normal_generator_is_graphical_compact_and_edits_exact_base(window):
     assert panel.probability_table.rowCount() == 14
     assert panel.action_table.rowCount() == 5
     assert panel._matrix_values()[0] == (.5, .3, .2)
-    panel._toggle_count_mode("triples"); panel._toggle_count_mode("doubles")
+    panel.assignment_mode.setCurrentIndex(panel.assignment_mode.findData("manual"))
     panel.triples.setValue(6); panel.doubles.setValue(6)
     panel.fill_base_button.click(); QTest.qWait(20)
     assert [len(signs) for signs in window.system.base].count(3) == 6
@@ -30,7 +30,7 @@ def test_normal_generator_is_graphical_compact_and_edits_exact_base(window):
 def test_normal_generator_manual_mode_chooses_counts_and_parties_by_probability(window):
     window.new_system(); panel = window.normal_generator
     assert panel.probability_table.columnCount() == 5
-    panel._toggle_count_mode("triples"); panel._toggle_count_mode("doubles")
+    panel.assignment_mode.setCurrentIndex(panel.assignment_mode.findData("manual"))
     assert panel.triples.isEnabled() and panel.doubles.isEnabled()
     panel.triples.setValue(1); panel.doubles.setValue(1)
     panel.fill_base_button.click(); QTest.qWait(20)
@@ -39,25 +39,19 @@ def test_normal_generator_manual_mode_chooses_counts_and_parties_by_probability(
     report = json.loads(window.system.parameters)["normal_base_generation"]
     assert report["criteria"] == "maximizar_masa_probabilidad_independiente_v1"
     saved = window.repository.setting(f"normal_generator:{window.round.key}")
-    assert saved["triples_mode"] == saved["doubles_mode"] == saved["assignment_mode"] == "manual"
+    assert saved["assignment_mode"] == "manual"
     assert "assignments" not in saved
 
 
-def test_normal_generator_automatic_selects_counts_from_history_and_percentages(window):
+def test_normal_generator_automatic_selects_counts_under_column_limit(window):
     window.new_system(); panel = window.normal_generator
+    panel.assignment_mode.setCurrentIndex(panel.assignment_mode.findData("automatic"))
     assert not panel.triples.isEnabled() and not panel.doubles.isEnabled()
-    assert panel.selected_history_seasons
-    panel._historical_choice()
-    panel._refresh_historical_recommendation()
-    assert panel.history_recommendation is not None
+    panel.max_columns.setValue(6)
     panel.fill_base_button.click(); QTest.qWait(20)
     report = json.loads(window.system.parameters)["normal_base_generation"]
-    assert report["criteria"] == "maximizar_cobertura_historica_greedy_v1"
-    assert report["history_rows"] > 0
-    assert report["target_coverage"] == .7
-    assert 0 <= report["historical_coverage"] <= 1
-    assert report["target_reached"] == (report["historical_coverage"] >= report["target_coverage"])
-    assert report["columns"] * len(window.system.plenos) <= 100_000
+    assert report["criteria"] == "maximizar_probabilidad_conjunta_bajo_limite_columnas_v1"
+    assert report["columns"] <= 6
     assert report["columns"] == 3 ** report["triples"] * 2 ** report["doubles"]
     assert sum(len(signs) == 3 for signs in window.system.base) == report["triples"]
     assert sum(len(signs) == 2 for signs in window.system.base) == report["doubles"]
@@ -65,7 +59,6 @@ def test_normal_generator_automatic_selects_counts_from_history_and_percentages(
 
 def test_numeric_limits_matrix_normalization_and_saved_percentages(window):
     window.new_system(); panel = window.normal_generator
-    panel._toggle_count_mode("triples"); panel._toggle_count_mode("doubles")
     panel.triples.setValue(14); panel.doubles.setValue(1)
     assert panel.triples.value() + panel.doubles.value() <= 14
     panel.triples.setValue(0); panel.doubles.setValue(0)
@@ -78,33 +71,6 @@ def test_numeric_limits_matrix_normalization_and_saved_percentages(window):
     panel.probability_table.item(0, 2).setText("50")
     panel.load_percentages.click()
     assert [panel.probability_table.item(0, col).text() for col in (2, 3, 4)] == saved
-
-
-def test_normal_generator_count_modes_are_independent_and_auto_uses_history(window):
-    window.new_system(); panel = window.normal_generator
-    assert panel.count_modes == {"triples": "automatic", "doubles": "automatic"}
-    assert not panel.triples.isEnabled() and not panel.doubles.isEnabled()
-    assert panel.triple_auto_button.text() == panel.double_auto_button.text() == "Manual"
-    assert not hasattr(panel, "max_columns")
-    panel.triple_auto_button.click()
-    assert panel.count_modes == {"triples": "manual", "doubles": "automatic"}
-    assert panel.triples.isEnabled() and not panel.doubles.isEnabled()
-    assert panel.triple_auto_button.text() == "Auto" and panel.double_auto_button.text() == "Manual"
-    panel.triple_auto_button.click()
-    assert panel.count_modes == {"triples": "automatic", "doubles": "automatic"}
-    assert not panel.triples.isEnabled() and not panel.doubles.isEnabled()
-    assert panel.triple_auto_button.text() == panel.double_auto_button.text() == "Manual"
-
-
-def test_desktop_ballot_shows_compact_number_teams_and_three_percent_columns(window):
-    window.repository.save_round(with_goals()); window.load_rounds("DEMO/J01"); window.new_system()
-    assert len(window.match_number_labels) == 14
-    assert window.match_number_labels[0].width() == 14
-    assert window.match_labels[0].height() == 20
-    assert len(window.prob_labels[0]) == 3
-    assert all(label.text().endswith("%") for label in window.prob_labels[0])
-    assert all("/" not in label.text() and "[" not in label.text() for label in window.prob_labels[0])
-    assert all(button.height() == 20 for button in window.sign_buttons[0].values())
 
 
 def test_terminations_are_tiny_independent_toggle_buttons_and_persist(window):
@@ -177,7 +143,7 @@ def test_footer_progress_follows_generation_progress(window):
 def test_same_round_source_refresh_populates_matrix_and_disables_missing_factors(window):
     round_ = replace(
         with_goals(), season="26-27", number=15, mode="current", snapshots=(),
-        nominal_date="2026-10-21", editable_until="2099-10-22",
+        nominal_date="2026-10-21", editable_until="2026-10-22",
     )
     window.repository.save_round(round_)
     window.load_rounds(round_.key)
@@ -205,7 +171,6 @@ def test_same_round_source_refresh_populates_matrix_and_disables_missing_factors
 
 def test_normal_configuration_is_saved_per_round_and_restored(window):
     window.new_system(); panel = window.normal_generator
-    panel._toggle_count_mode("triples"); panel._toggle_count_mode("doubles")
     panel.triples.setValue(2); panel.doubles.setValue(4)
     panel._action_widgets[0]["endings"][9].click()
     panel._action_widgets[0]["cp_max"].setValue(0.000001)

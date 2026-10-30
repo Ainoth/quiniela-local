@@ -6,22 +6,19 @@ Aplicación de Quiniela para escritorio y Android. La versión de escritorio
 puede leer los datos instalados por WIN1X2; ambas versiones descargan datos,
 porcentajes y marcadores directamente de sus proveedores públicos.
 
-## Quiniela AI Studio — v1.0.35
+## Quiniela AI Studio — v1.0.34
 
 Interfaz gráfica en español que conserva la experiencia visual de Quiniela Local:
-fondo azul, boleto fijo compacto con partido y porcentajes junto a 1/X/2,
+fondo azul, boleto fijo en tabla con partido, hora y porcentajes junto a 1/X/2,
 Pleno 0/1/2/M, secciones a la derecha y **Descargar datos** en la cabecera.
 El núcleo está en `src/quiniela_ai_studio/{domain,application,infrastructure,ui}`.
-En **Normal**, la fila superior reúne descarga de porcentajes y relleno; generar
-apuestas y guardar TXT están al final de la pestaña. La matriz 1/X/2 permite elegir mercado,
+En **Normal**, la fila superior reúne descarga de porcentajes, relleno de la
+base, generación y guardado. La matriz 1/X/2 permite elegir mercado,
 popularidad o un perfil local realmente importado; la matriz editable conserva
-los valores visibles. Dobles y triples tienen modos Auto/Manual independientes.
-Auto usa las temporadas seleccionadas y los porcentajes actuales para formar
-la base hasta una cobertura histórica elegida; el límite técnico de columnas
-se aplica internamente y se informa si impide alcanzar la cobertura. El factor
-sorpresa redistribuye los dobles/triples existentes según el riesgo de fallo
-del favorito. Clasificación y últimos cinco requieren fuentes importadas y
-solo alteran la matriz al aplicar expresamente sus ponderaciones.
+los valores visibles. Manual fija las cantidades de dobles y triples;
+Automática las calcula dentro del máximo de columnas. Clasificación, últimos
+cinco e historial solo alteran la matriz al aplicar expresamente sus
+ponderaciones y requieren ficheros importados para esa jornada.
 La columna **Modelo % / Jugado %** muestra la fuente elegida, con sus datos
 guardados en la quiniela; los nombres completos y la procedencia están en la
 ayuda al pasar el ratón. El Pleno conserva las selecciones múltiples.

@@ -1,16 +1,5 @@
 # Cambios
 
-## 1.0.35 — controles automáticos por histórico y boleto compacto
-
-- RF-NOR-006: Normal deja elegir temporadas históricas y cobertura objetivo; el
-  algoritmo selecciona la base con un límite técnico interno y explica la
-  cobertura observada. Dobles y triples tienen modos Auto/Manual independientes;
-  Auto usa histórico seleccionado y porcentajes actuales.
-- RF-NOR-007: el factor sorpresa redistribuye dobles/triples existentes según
-  riesgo de fallo del favorito, independiente de los modos Auto/Manual.
-- RF-UX-029: boleto Normal compacto con porcentajes por signo y partidos más
-  juntos. Generar apuestas y guardar TXT quedan al final de la pestaña.
-
 ## 1.0.34 — identidad de equipos femeninos y porcentajes por jornada
 
 - RF-DAT-007: reconoce la marca `W` que Quinielista intercala antes de `(F)`

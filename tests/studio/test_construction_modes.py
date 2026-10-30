@@ -73,7 +73,8 @@ def test_reduced_template_preserves_locks_and_rejects_incompatible():
 def test_numeric_normal_counts_fill_base_and_stale_navigation(window):
     window.repository.save_round(with_goals());window.load_rounds('DEMO/J01');window.new_system()
     window.pleno_mode.setCurrentIndex(1)
-    window.normal_generator._toggle_count_mode('triples');window.normal_generator._toggle_count_mode('doubles')
+    window.normal_generator.assignment_mode.setCurrentIndex(
+        window.normal_generator.assignment_mode.findData('manual'))
     window.normal_generator.triples.setValue(2);window.normal_generator.doubles.setValue(3)
     window.normal_generator.fill_base_button.click();QTest.qWait(50)
     assert sum(len(signs)==3 for signs in window.system.base)==2
@@ -90,7 +91,6 @@ def test_numeric_normal_counts_fill_base_and_stale_navigation(window):
 def test_normal_and_reduced_independent_with_all_choices(window,tmp_path):
     window.repository.save_round(with_goals());window.load_rounds('DEMO/J01');window.new_system()
     window.pleno_mode.setCurrentIndex(1)
-    window.normal_generator._toggle_count_mode('triples');window.normal_generator._toggle_count_mode('doubles')
     window.normal_generator.triples.setValue(1);window.normal_generator.doubles.setValue(2)
     window.normal_generator.fill_base_button.click();QTest.qWait(50)
     window.apply_template()
