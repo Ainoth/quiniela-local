@@ -80,13 +80,12 @@ def test_classic_table_shows_schedule_and_selected_source_without_changing_bets(
     window.repository.save_round(round_);window.load_rounds(round_.key)
     original=window.service.imported(round_,'Fuentes de la tabla',generate(('1X',)+('1',)*13,'M0'))
     window.set_system(original);window.navigation.setCurrentRow(4);QTest.qWait(30)
-    assert window.kickoff_labels[0].text()=='MIÉ 18:45'
-    assert window.prob_labels[0].isVisible() and window.prob_labels[0].text()=='26 / 28 / 46'
-    assert window.prob_heading.text()=='Modelo %'
+    assert '14/10/2026 18:45' in window.match_labels[0].toolTip()
+    assert all(label.isVisible() for label in window.prob_labels[0])
+    assert [label.text() for label in window.prob_labels[0]]==['26%','28%','46%']
     window.ranking_source.setCurrentIndex(1)
-    assert window.prob_heading.text()=='Jugado %'
-    assert window.prob_labels[0].text()=='45 / 30 / 25'
-    assert round_.snapshot('public').source in window.prob_labels[0].toolTip()
+    assert [label.text() for label in window.prob_labels[0]]==['45%','30%','25%']
+    assert round_.snapshot('public').source in window.prob_labels[0][0].toolTip()
     assert window.system==original
     assert window.repository.load(original.system_id).hash==original.hash
     assert [label.text() for label in window.pleno_team_labels]==[round_.matches[14].home,round_.matches[14].away]
@@ -95,5 +94,5 @@ def test_classic_table_shows_schedule_and_selected_source_without_changing_bets(
 def test_classic_table_does_not_invent_missing_percentages_or_schedules(window):
     round_=replace(window.round,snapshots=(),matches=tuple(replace(m,kickoff='') for m in window.round.matches))
     window.repository.save_round(round_);window.load_rounds(round_.key);window.new_system()
-    assert all(label.text()=='—' for label in window.prob_labels)
-    assert all(label.text()=='—' for label in window.kickoff_labels)
+    assert all(label.text()=='—' for row in window.prob_labels for label in row)
+    assert all(not label.toolTip().splitlines()[1].strip() for label in window.match_labels)

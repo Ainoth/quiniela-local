@@ -37,7 +37,12 @@ def test_new_tab_filters_origin_and_persists_group_settings(window):
     window.advanced_relation_min.setValue(0)
     window.advanced_relation_max.setValue(0)
     assert len(window.filter_spec().apply(bets)) == 6
-    QTest.qWait(600)
+    # Debounce starts a worker; under the complete suite the worker may take
+    # longer than the old fixed 600 ms delay.
+    for _ in range(200):
+        QTest.qWait(50)
+        if not window.filter_timer.isActive() and window.filter_job is None:
+            break
 
     assert window.system.quantity == 6
     saved = json.loads(window.system.parameters)['filter_spec']['advanced']
@@ -243,6 +248,7 @@ def test_cuenta_uses_one_season_picker_and_keeps_labels_outside_scroll(window, a
 
 def test_every_risk_control_uses_visible_buttons(window):
     from PySide6.QtWidgets import QButtonGroup
+
     from quiniela_ai_studio.ui.risk_selector import RiskSelector
 
     for controls in (window.mode_azar_controls,window.mode_automatic_controls):
