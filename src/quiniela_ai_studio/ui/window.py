@@ -403,7 +403,7 @@ class MainWindow(QMainWindow):
     SECTIONS = ('Inicio', 'Normal', 'Optimizar', 'Análisis', 'Escrutinio', 'Mis Sistemas', 'Configuración', 'Reducidas', 'Reducciones')
     # Inicio llevaba a un panel redundante. Normal queda como primera entrada;
     # la página interna Inicio se conserva para no alterar índices persistidos.
-    TAB_ORDER = ('Normal', 'Reducciones', 'Análisis', 'Escrutinio', 'Mis Sistemas', 'Configuración', 'Reducidas')
+    TAB_ORDER = ('Normal', 'Reducciones', 'Análisis', 'Escrutinio', 'Mis Sistemas', 'Configuración')
 
     def __init__(self, repository):
         super().__init__()
@@ -504,7 +504,7 @@ class MainWindow(QMainWindow):
     def sync_tab_from_page(self, page_index):
         if 0 <= page_index < len(self.SECTIONS):
             section=self.SECTIONS[page_index]
-            self.tabs.setCurrentIndex(self.TAB_ORDER.index(section) if section in self.TAB_ORDER else 0)
+            if section in self.TAB_ORDER:self.tabs.setCurrentIndex(self.TAB_ORDER.index(section))
 
     def build_advanced_conditions(self):
         """Pestañas de reducción compactas, inspiradas en WIN1X2 y nativas Qt."""
@@ -537,7 +537,7 @@ class MainWindow(QMainWindow):
                     continue
                 # Cuenta and SSeguidos use the same plain dark workspace;
                 # the old ornamental texture obscured their dense controls.
-                canvas=ClassicReductionsCanvas(canvas_width,canvas_height,decorative=index not in (0,1))
+                canvas=ClassicReductionsCanvas(canvas_width,canvas_height,decorative=index not in (0,1,9,17,18))
                 canvas_layout=QVBoxLayout(canvas)
                 if index==0:canvas_layout.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
                 canvas_layout.setContentsMargins(8,4,8,10)
@@ -1815,6 +1815,7 @@ class MainWindow(QMainWindow):
         left_layout=QVBoxLayout(left);left_layout.setContentsMargins(4,4,4,4);left_layout.setSpacing(2)
         left_apply_row=QHBoxLayout();left_apply_row.addStretch(1);left_apply_row.addWidget(QLabel('Aplicar'))
         self.interruption_apply=SelectionSquare('Aplicar la matriz de interrupciones',size=14)
+        self.interruption_apply.toggled.connect(lambda checked:self._activate_reduction_tab(18,checked))
         self.interruption_apply.toggled.connect(self._interruption_manual_edited);left_apply_row.addWidget(self.interruption_apply)
         left_apply_row.addStretch(1);left_layout.addLayout(left_apply_row)
         left_note=QLabel('Fila = total de cambios · columna = racha máxima de cambios seguidos')
@@ -1832,6 +1833,7 @@ class MainWindow(QMainWindow):
         right_layout=QVBoxLayout(right);right_layout.setContentsMargins(4,4,4,4);right_layout.setSpacing(2)
         right_apply_row=QHBoxLayout();right_apply_row.addStretch(1);right_apply_row.addWidget(QLabel('Aplicar'))
         self.distance_apply=SelectionSquare('Aplicar figuras exactas de interrupciones',size=14)
+        self.distance_apply.toggled.connect(lambda checked:self._activate_reduction_tab(18,checked))
         self.distance_apply.toggled.connect(self._interruption_manual_edited);right_apply_row.addWidget(self.distance_apply);right_apply_row.addStretch(1)
         right_layout.addLayout(right_apply_row)
         lists=QHBoxLayout();lists.setContentsMargins(0,0,0,0);lists.setSpacing(3)
@@ -2001,6 +2003,7 @@ class MainWindow(QMainWindow):
                 self.sign_distance_squares[(sign,distance)]=square
             apply_row=QHBoxLayout();apply_row.setSpacing(2)
             square=SelectionSquare(f'Aplicar distancias de {sign}',size=12)
+            square.toggled.connect(lambda checked:self._activate_reduction_tab(18,checked))
             square.toggled.connect(self._interruption_manual_edited)
             apply_row.addWidget(square);apply_row.addWidget(QLabel('Aplicar'))
             panel_layout.addLayout(apply_row);self.sign_distance_apply[sign]=square
@@ -2011,6 +2014,11 @@ class MainWindow(QMainWindow):
         actions.addWidget(reset);actions.addStretch(1);layout.addLayout(actions)
         layout.addStretch(1)
         return view
+
+    def _activate_reduction_tab(self,index,checked):
+        """A nested filter enables its owner so the live reducer applies it."""
+        if checked and index in self.reduction_activation_buttons:
+            self.reduction_activation_buttons[index].setChecked(True)
 
     def _sign_distance_toggled(self,sign,distance,checked):
         if checked:self.sign_distance_values[sign].add(distance)

@@ -74,7 +74,9 @@ def test_group_editor_adds_compact_side_by_side_group_cards(window):
         assert bar.tabButton(tab_index,QTabBar.ButtonPosition.LeftSide) is None
     assert len(window.reduction_tab_pages) == 20  # Las demás pantallas quedan reservadas para fases futuras.
     assert 'Optimizar' not in window.TAB_ORDER
+    assert all(not window.classic_reduction_canvases[index].decorative for index in (0,9,17,18))
     assert not window.reduction_activation_buttons[19].isChecked()
+    assert 'Reducidas' not in window.TAB_ORDER
     assert not window.budget_apply.isEnabled()
     from quiniela_ai_studio.domain.models import Bet
     window.set_system(window.service.imported(window.round,'Optimizer test',(Bet('1'*14,'M0'),)))
@@ -554,12 +556,16 @@ def test_sign_distances_subtab_filters_and_restores_without_changing_figures(win
     assert not window.sign_distance_squares[('1', 14)].isEnabled()
     window.sign_distance_squares[('1', 3)].setChecked(True)
     window.sign_distance_apply['1'].setChecked(True)
-    assert window.filter_spec().apply(bets) == bets
-    window.reduction_activation_buttons[18].setChecked(True)
+    assert window.reduction_activation_buttons[18].isChecked()
     assert window.filter_spec().apply(bets) == (accepted,)
     assert 'Distancias se combina' in window._empty_filter_message(window.filter_spec())
     assert not window.distance_apply.isChecked()
-    window.apply_filters();QTest.qWait(500)
+    for _ in range(200):
+        QTest.qWait(10)
+        if not window.filter_timer.isActive() and window.filter_job is None:
+            break
+    assert window.system.bets == (accepted,)
+    window.apply_filters();QTest.qWait(50)
     saved=json.loads(window.system.parameters)['filter_spec']
     assert any(row['kind']=='allowed_sign_distance' and row['sign']=='1'
                and row['allowed_values']==[3] and row['active']
