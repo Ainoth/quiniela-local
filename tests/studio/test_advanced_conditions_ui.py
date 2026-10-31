@@ -535,6 +535,7 @@ def test_sign_distances_subtab_filters_and_restores_without_changing_figures(win
     assert window.filter_spec().apply(bets) == bets
     window.reduction_activation_buttons[18].setChecked(True)
     assert window.filter_spec().apply(bets) == (accepted,)
+    assert 'Distancias se combina' in window._empty_filter_message(window.filter_spec())
     assert not window.distance_apply.isChecked()
     window.apply_filters();QTest.qWait(500)
     saved=json.loads(window.system.parameters)['filter_spec']

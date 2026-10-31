@@ -6,6 +6,18 @@ la fuente primaria. Se normalizan variantes de los nombres de Almería, Oviedo,
 Logroño y Badalona. Pruebas: `test_preferred_espn_does_not_hide_primary_results_for_uncovered_matches`
 y `test_espn_resolves_quiniela_names_for_almeria_oviedo_and_logrono_badalona`.
 
+RF-RED-020 (v1.0.35): Distancias define la medida máxima entre apariciones,
+indica que se combina con el resto de condiciones y distingue la alcanzabilidad
+en la base de la disponibilidad tras filtrar. Cuando el cruce queda vacío, el
+mensaje sugiere revisar filtros o recuperar apuestas. Pruebas:
+`test_sign_distances_subtab_filters_and_restores_without_changing_figures` y
+`test_distances_are_index_differences_and_variants_share_a_family`.
+
+RF-UX-030 (v1.0.35): Optimizar presenta tres pasos —preparar candidatas,
+definir presupuesto/prioridad y revisar la propuesta—, explica el sentido del
+nivel rápido y deja explícito que las apuestas no cambian hasta aplicar.
+Prueba: `test_72_proposal_apply_and_audit`.
+
 RF-DAT-008 (v1.0.35): reconoce únicamente la errata «Sevila (F)» del PRE de
 WIN1X2 frente a «Sevilla (F)» en el XML de Quinielista para permitir la
 descarga completa de porcentajes de J18. La prueba verifica la equivalencia y
