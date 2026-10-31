@@ -10,6 +10,11 @@ generación/guardado al final de la pestaña. Pruebas: `test_historical_base_*`,
 `test_count_modes_toggle_independently_and_hide_column_limit` y
 `test_normal_ballot_uses_compact_per_sign_percentages`.
 
+RF-DAT-008 (v1.0.35): reconoce únicamente la errata «Sevila (F)» del PRE de
+WIN1X2 frente a «Sevilla (F)» en el XML de Quinielista para permitir la
+descarga completa de porcentajes de J18. La prueba verifica la equivalencia y
+que un equipo diferente continúa rechazándose: `test_win1x2_sevila_typo_matches_quinielista_sevilla_femenino`.
+
 RF-DAT-007 (v1.0.34): la identidad de clubes femeninos tolera la marca `W`
 que Quinielista añade antes de `(F)` y mantiene el rechazo de clubes distintos.
 La descarga en línea de porcentajes se limita a la jornada en curso, porque el

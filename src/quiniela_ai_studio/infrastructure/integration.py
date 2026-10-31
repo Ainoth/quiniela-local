@@ -64,6 +64,8 @@ TEAM_ALIASES = {
     "PSVEIDHOVEN": "PSVEINDHOVEN",
     "SHAKTARDONETSK": "SHAKHTARDONETSK",
     "RBLEIPZIG": "LEIPZIG",
+    # Errata del PRE WIN1X2 de J18: «Sevila (F)» por «Sevilla (F)».
+    "SEVILAF": "SEVILLAF",
 }
 
 

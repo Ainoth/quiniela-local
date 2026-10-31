@@ -2,6 +2,9 @@
 
 ## 1.0.35 — controles automáticos por histórico y boleto compacto
 
+- RF-DAT-008: permite descargar porcentajes cuando el PRE de WIN1X2 contiene
+  la errata «Sevila (F)» y Quinielista publica «Sevilla (F)»; otros equipos
+  siguen rechazándose.
 - RF-NOR-006: Normal deja elegir temporadas históricas y cobertura objetivo; el
   algoritmo selecciona la base con un límite técnico interno y explica la
   cobertura observada. Dobles y triples tienen modos Auto/Manual independientes;

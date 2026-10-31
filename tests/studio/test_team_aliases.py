@@ -77,3 +77,27 @@ def test_quinielista_w_marker_matches_feminine_win1x2_team():
     source_teams[10] = ('LOGROÑO (F)', 'BADALONA B (F)')
     with pytest.raises(ValueError, match='partido 11'):
         validate_teams(round_, source_teams)
+
+
+def test_win1x2_sevila_typo_matches_quinielista_sevilla_femenino():
+    assert team_key('Sevila (F)') == team_key('Sevilla (F)')
+
+    matches = tuple(
+        Match(index, f'Local {index}', f'Visitante {index}')
+        for index in range(1, 13)
+    ) + (
+        Match(13, 'Sevila (F)', 'R.Madrid (F)'),
+        Match(14, 'Tenerife (F)', 'Ath.Club (F)'),
+        Match(15, 'Ath.Club Bilbao', 'R.Sociedad'),
+    )
+    round_ = Round(
+        '26-27', 18, matches, 'current', 'WIN1X2', datetime.now(UTC).isoformat(),
+    )
+    teams = [(match.home, match.away) for match in matches]
+    teams[12] = ('SEVILLA (F)', 'R.MADRID (F)')
+
+    validate_teams(round_, teams)
+
+    teams[12] = ('SEVILLA B (F)', 'R.MADRID (F)')
+    with pytest.raises(ValueError, match='partido 13'):
+        validate_teams(round_, teams)
