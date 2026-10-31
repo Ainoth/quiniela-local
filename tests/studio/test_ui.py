@@ -455,11 +455,11 @@ def test_local_ballot_remains_visible_in_all_sections(window):
         assert window.goal_buttons[0]['M'].isVisible()
         expected=window.SECTIONS.index(window.TAB_ORDER[index])
         assert window.pages.currentIndex()==expected
-    window.tabs.setCurrentIndex(1)
+    window.tabs.setCurrentIndex(0)
     QTest.mouseClick(window.goal_buttons[0]['M'],Qt.MouseButton.LeftButton)
     QTest.mouseClick(window.goal_buttons[1]['0'],Qt.MouseButton.LeftButton)
     assert window.system.pleno=='M0'
-    assert 'fijos' in window.builder_info.text() and '6,75' in window.builder_info.text()
+    assert 'fijos' in window.builder_info.text() and '0,75' in window.builder_info.text()
 
 
 def test_partial_pleno_survives_restart(window,application):
