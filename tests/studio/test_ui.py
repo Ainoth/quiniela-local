@@ -259,7 +259,7 @@ def test_switching_system_in_mis_sistemas_clears_previous_prize_before_aciertos(
     window.repository.save_round(round_)
     window.load_rounds(round_.key)
     window.repository.set_setting('data_directory',str(folder))
-    assert window.tabs.tabText(4)=='Escrutinio'
+    assert window.tabs.tabText(3)=='Escrutinio'
     assert window.navigation.item(4).text()=='Escrutinio'
     winner=window.service.imported(round_,'Premiada',(Bet('1'*14,'00'),))
     loser=window.service.imported(round_,'Sin aciertos',(Bet('2'*14,'00'),))

@@ -66,15 +66,31 @@ def test_group_editor_adds_compact_side_by_side_group_cards(window):
     window.tabs.setCurrentIndex(1)
     assert window.navigation.currentRow() == 8
     window.navigation.setCurrentRow(8)
-    assert window.reduction_tabs.count() == 5
-    assert [window.reduction_tabs.tabText(i) for i in range(5)] == ['Cuenta','SSeguidos','Grupo','FSSeguidos','Interrupciones']
+    assert window.reduction_tabs.count() == 6
+    assert [window.reduction_tabs.tabText(i) for i in range(6)] == ['Cuenta','SSeguidos','Grupo','FSSeguidos','Interrupciones','Optimizar']
     for reduction_id,tab_index in window.reduction_visible_indexes.items():
         bar=window.reduction_tabs.tabBar()
         assert bar.tabButton(tab_index,QTabBar.ButtonPosition.RightSide) is window.reduction_activation_buttons[reduction_id]
         assert bar.tabButton(tab_index,QTabBar.ButtonPosition.LeftSide) is None
-    assert len(window.reduction_tab_pages) == 19  # Las demás pantallas quedan reservadas para fases futuras.
+    assert len(window.reduction_tab_pages) == 20  # Las demás pantallas quedan reservadas para fases futuras.
+    assert 'Optimizar' not in window.TAB_ORDER
+    assert not window.reduction_activation_buttons[19].isChecked()
+    assert not window.budget_apply.isEnabled()
+    from quiniela_ai_studio.domain.models import Bet
+    window.set_system(window.service.imported(window.round,'Optimizer test',(Bet('1'*14,'M0'),)))
+    window.reduction_activation_buttons[19].setChecked(True)
+    assert window.reduction_active[19]
+    assert window.budget_apply.isEnabled()
+    window.restore_filter_controls()
+    assert window.reduction_activation_buttons[19].isChecked()
+    window.reduction_activation_buttons[19].setChecked(False)
+    assert not window.budget_apply.isEnabled()
+    assert window.normal_generator.actions_group.isHidden()
     # Numeric arrows stay read-only; SSeguidos range fields are intentionally editable.
-    assert all(field.lineEdit().isReadOnly() for field in window.reduction_tabs.findChildren(QSpinBox))
+    optimizer_spins=set(window.reduction_tab_pages[19].findChildren(QSpinBox))
+    assert all(field.lineEdit().isReadOnly()
+               for field in window.reduction_tabs.findChildren(QSpinBox)
+               if field not in optimizer_spins)
     assert window.run_minmax_controls['1'][0].isReadOnly() is False
     window.add_advanced_group();window.add_advanced_group();window.add_advanced_group()
     assert len(window.advanced_groups) == 8

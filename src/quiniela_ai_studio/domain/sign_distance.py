@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from functools import lru_cache
 from itertools import pairwise
 
 
@@ -23,6 +24,11 @@ def maximum_sign_distance(column: str, sign: str) -> int:
 
 def possible_sign_distances(base: Sequence[str], sign: str) -> tuple[int, ...]:
     """Find all achievable maxima with a small exact dynamic program."""
+    return _possible_sign_distances(tuple(base), sign)
+
+
+@lru_cache(maxsize=64)
+def _possible_sign_distances(base: tuple[str, ...], sign: str) -> tuple[int, ...]:
     if len(base) != 14 or any(not item or set(item) - set("1X2") for item in base):
         raise ValueError("La base debe contener 14 selecciones válidas.")
     if sign not in ("1", "X", "2", "V"):
