@@ -402,7 +402,7 @@ class MainWindow(QMainWindow):
     SECTIONS = ('Inicio', 'Normal', 'Optimizar', 'Análisis', 'Escrutinio', 'Mis Sistemas', 'Configuración', 'Reducidas', 'Reducciones')
     # Inicio llevaba a un panel redundante. Normal queda como primera entrada;
     # la página interna Inicio se conserva para no alterar índices persistidos.
-    TAB_ORDER = ('Normal', 'Reducciones', 'Optimizar', 'Análisis', 'Escrutinio', 'Mis Sistemas', 'Configuración', 'Reducidas')
+    TAB_ORDER = ('Normal', 'Reducciones', 'Análisis', 'Escrutinio', 'Mis Sistemas', 'Configuración', 'Reducidas')
 
     def __init__(self, repository):
         super().__init__()
@@ -512,11 +512,11 @@ class MainWindow(QMainWindow):
         content=QWidget();layout=QVBoxLayout(content);scroll.setWidget(content);outer.addWidget(scroll,1)
         intro = QLabel('Elige un método y marca sus condiciones. El boleto base queda fijo a la izquierda; las reducciones se aplican a sus columnas.')
         intro.setWordWrap(True);layout.addWidget(intro)
-        names=('Cuenta','Racha','Cambio','Patrón','Pareja','Trío','Cuart.','Quint.','Acier.','Grupo','Relac.','Frec.','Suma','Colum.','IF/THEN','Reserva','Atenea','FSSeguidos','Interrupciones')
+        names=('Cuenta','Racha','Cambio','Patrón','Pareja','Trío','Cuart.','Quint.','Acier.','Grupo','Relac.','Frec.','Suma','Colum.','IF/THEN','Reserva','Atenea','FSSeguidos','Interrupciones','Optimizar')
         self.reduction_tabs=QTabWidget();self.reduction_tabs.setObjectName('reductionTabs');self.reduction_tabs.setDocumentMode(True);self.reduction_tabs.setUsesScrollButtons(True)
         self.reduction_tab_pages=[];self.reduction_tab_layouts=[]
-        descriptions=('Cantidad de signos','Rachas máximas','Cambios entre partidos','Patrones repetidos','Parejas de signos','Patrones de tres partidos','Patrones de cuatro partidos','Patrones de cinco partidos','Coincidencias con referencia','Grupos gráficos','Relación entre grupos','Frecuencia de columnas','Sumas y rangos','Columnas por grupos','Condición entre grupos','Columnas de reserva','Reducción de cobertura Atenea','Figuras exactas de signos seguidos','Totales y figuras de cambios entre partidos')
-        visible_reductions={0,1,9,17,18}
+        descriptions=('Cantidad de signos','Rachas máximas','Cambios entre partidos','Patrones repetidos','Parejas de signos','Patrones de tres partidos','Patrones de cuatro partidos','Patrones de cinco partidos','Coincidencias con referencia','Grupos gráficos','Relación entre grupos','Frecuencia de columnas','Sumas y rangos','Columnas por grupos','Condición entre grupos','Columnas de reserva','Reducción de cobertura Atenea','Figuras exactas de signos seguidos','Totales y figuras de cambios entre partidos','Optimización de apuestas por presupuesto')
+        visible_reductions={0,1,9,17,18,19}
         self.reduction_visible_indexes={}
         self.classic_reduction_canvases={}
         self.classic_headers={}
@@ -528,8 +528,12 @@ class MainWindow(QMainWindow):
                 tooltip='Rachas consecutivas de 1/X/2/V; comparte el filtro histórico Racha.' if index==1 else description
                 self.reduction_tabs.setTabToolTip(visible_index,tooltip)
                 self.reduction_visible_indexes[index]=visible_index
-                canvas_width={0:700,1:960,9:720,17:590,18:600}[index]
-                canvas_height={0:650,1:730,9:610,17:625,18:640}[index]
+                canvas_width={0:700,1:960,9:720,17:590,18:600}.get(index,600)
+                canvas_height={0:650,1:730,9:610,17:625,18:640}.get(index,600)
+                if index==19:
+                    self.reduction_tabs.setTabToolTip(visible_index,description)
+                    self.reduction_tab_pages.append(page);self.reduction_tab_layouts.append(page_layout)
+                    continue
                 # Cuenta and SSeguidos use the same plain dark workspace;
                 # the old ornamental texture obscured their dense controls.
                 canvas=ClassicReductionsCanvas(canvas_width,canvas_height,decorative=index not in (0,1))
@@ -548,7 +552,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.reduction_tabs,1)
         self.reduction_active={index:False for index in range(len(names))}
         self.reduction_activation_buttons={}
-        for index in sorted(visible_reductions):
+        for index in sorted(visible_reductions-{19}):
             name='Grupo' if index==9 else 'SSeguidos' if index==1 else names[index]
             square=SelectionSquare(f'Aplicar condiciones de {name}',size=14,parent=self.reduction_tabs.tabBar())
             square.toggled.connect(partial(self.reduction_tab_toggled,index))
@@ -605,7 +609,31 @@ class MainWindow(QMainWindow):
         self.advanced_feedback=QLabel();self.advanced_feedback.setWordWrap(True);self.reduction_tab_layouts[9].addWidget(self.advanced_feedback)
         layout.addWidget(self.filter_feedback);layout.addWidget(self.filter_reset)
         self._make_reduction_numeric_graphical()
+        self._move_optimizer_into_reductions()
+        self.reduction_tabs.currentChanged.connect(self._reduction_tab_selected)
         self.update_advanced_enabled()
+
+    def _reduction_tab_selected(self,index):
+        if index==self.reduction_visible_indexes.get(17):
+            for sign in ('1','X','2','V'):
+                self._refresh_fss_figure_list(sign)
+
+    def _move_optimizer_into_reductions(self):
+        """Place budget optimization beside reduction methods and gate it explicitly."""
+        source=self.page_layout(2)
+        destination=self.reduction_tab_layouts[19]
+        while source.count():
+            item=source.takeAt(0);widget=item.widget()
+            if widget is None:continue
+            if widget.objectName()=='title':widget.deleteLater()
+            else:widget.setParent(None);destination.addWidget(widget)
+        square=SelectionSquare('Activar optimización por presupuesto',size=14,parent=self.reduction_tabs.tabBar())
+        square.toggled.connect(partial(self.reduction_tab_toggled,19))
+        tab_index=self.reduction_visible_indexes[19]
+        self.reduction_tabs.tabBar().setTabButton(tab_index,QTabBar.ButtonPosition.RightSide,square)
+        self.reduction_activation_buttons[19]=square
+        self.reduction_active[19]=False
+        self.budget_apply.setEnabled(False)
 
     def _make_reduction_numeric_graphical(self):
         """Keep numeric arrows, remove free typing from all reduction controls."""
@@ -1485,6 +1513,7 @@ class MainWindow(QMainWindow):
         self.fss_figure_values={sign:{} for sign in ('1','X','2','V')}
         self.fss_total_controls={};self.fss_figure_lists={};self.fss_figure_apply={}
         self.fss_possible_figures={sign:{} for sign in ('1','X','2','V')}
+        self.fss_render_signatures={}
         self.fss_generation_metadata={}
 
         self.fss_context=QLabel();self.fss_context.setVisible(False);self.fss_context.setStyleSheet('font-weight:bold;color:#35d9f4;')
@@ -1626,13 +1655,21 @@ class MainWindow(QMainWindow):
     def _refresh_fss_figure_list(self,sign):
         from quiniela_ai_studio.domain.streak_statistics import possible_run_figures
         if sign not in self.fss_figure_lists:return
-        self.fss_possible_figures[sign]=possible_run_figures(self._streak_base(),sign)
+        base=tuple(self._streak_base())
+        self.fss_possible_figures[sign]=possible_run_figures(base,sign)
         total=self.fss_total_controls[sign].value();widget=self.fss_figure_lists[sign]
         self.fss_total_controls[sign].set_allowed_totals(set(self.fss_possible_figures[sign]),
             set(self.fss_figure_values[sign]))
         selected=self.fss_figure_values[sign].get(total,set());possible=self.fss_possible_figures[sign].get(total,())
-        widget.blockSignals(True);widget.clear()
         figures=sorted(set(possible)|selected,key=lambda figure:tuple(-int(part) for part in figure.split('-')) if figure else ())
+        if (hasattr(self,'reduction_tabs') and
+                self.reduction_tabs.currentIndex()!=self.reduction_visible_indexes.get(17)):
+            self.fss_render_signatures.pop(sign,None)
+            return
+        signature=(base,total,tuple(sorted(selected)),tuple(figures))
+        if self.fss_render_signatures.get(sign)==signature:return
+        self.fss_render_signatures[sign]=signature
+        widget.blockSignals(True);widget.clear()
         if not figures:
             widget.setToolTip('No hay figuras alcanzables con este total y esta base.')
         for figure in figures:
@@ -2012,7 +2049,7 @@ class MainWindow(QMainWindow):
         selected=set(selected);self.configuring_filters=True
         try:
             for season,square in self.history_season_squares.get('Interrupciones',{}).items():
-                square.setChecked(season in selected)
+                square.blockSignals(True);square.setChecked(season in selected);square.blockSignals(False)
         finally:self.configuring_filters=False
 
     def _update_interruption_context(self):
@@ -2265,8 +2302,13 @@ class MainWindow(QMainWindow):
 
     def _streak_base(self):
         if self.system:
-            try:return self.service.origin_bets(self.system)[0].base
-            except ValueError:return self.system.base
+            key=(self.system.system_id,self.system.revision)
+            cached=getattr(self,'_streak_base_cache',None)
+            if cached and cached[0]==key:return cached[1]
+            try:base=tuple(self.service.origin_bets(self.system)[0].base)
+            except ValueError:base=tuple(self.system.base)
+            self._streak_base_cache=(key,base)
+            return base
         return ('1X2',)*14
 
     def _sync_streak_minmax_fields(self,sign):
@@ -2800,6 +2842,11 @@ class MainWindow(QMainWindow):
 
     def reduction_tab_toggled(self,index,checked):
         self.reduction_active[index]=bool(checked)
+        if index==19:
+            if self.system:
+                self.repository.set_setting(f'optimizer_enabled:{self.system.system_id}',bool(checked))
+            self.update_filter_controls()
+            return
         if self.system:
             self.repository.set_setting(f'reduction_tabs_configured:{self.system.system_id}',True)
         self.manual_filters_changed()
@@ -3706,7 +3753,7 @@ class MainWindow(QMainWindow):
         note=QLabel('El boleto permanece visible a la izquierda. La vista muestra hasta 100 filas; el archivo exportado conserva todas las apuestas.');note.setWordWrap(True);preview.addWidget(note)
         row=QHBoxLayout();self.button('Guardar apuestas (TXT)',self.export_txt,row);self.button('Guardar quiniela (JSON)',self.export_json,row);preview.addLayout(row)
         self.full_export_button=self.data_button('Guardar todas las combinaciones…',self.export_development,preview)
-        self.normal_generator.actions_group.setParent(None);preview.addWidget(self.normal_generator.actions_group)
+        self.normal_generator.actions_group.hide()
         self.preview_view.setMaximumHeight(220)
 
     def rename(self):
@@ -4073,8 +4120,14 @@ class MainWindow(QMainWindow):
         if configured and isinstance(saved_tabs,list):
             active=set(saved_tabs)&{0,1,9,17,18}
             for index,square in self.reduction_activation_buttons.items():
+                if index==19:continue
                 square.blockSignals(True);square.setChecked(index in active);square.blockSignals(False)
                 self.reduction_active[index]=index in active
+        optimizer_enabled=bool(self.system and self.repository.setting(f'optimizer_enabled:{self.system.system_id}',False))
+        self.reduction_activation_buttons[19].blockSignals(True)
+        self.reduction_activation_buttons[19].setChecked(optimizer_enabled)
+        self.reduction_activation_buttons[19].blockSignals(False)
+        self.reduction_active[19]=optimizer_enabled
         level=params.get('quick_level')
         self.quick_level=level if type(level) is int and 0<=level<=10 else None
         self.quick_conditions_slider.blockSignals(True);self.quick_conditions_slider.setValue(self.quick_level if self.quick_level is not None else 10);self.quick_conditions_slider.blockSignals(False)
@@ -4197,7 +4250,7 @@ class MainWindow(QMainWindow):
         self.filter_max_x.setEnabled(self.filter_checks['max_x_run'].isChecked())
         self.filter_max_two.setEnabled(self.filter_checks['max_two_run'].isChecked())
         self.filter_reference.setEnabled(self.filter_checks['coincidences'].isChecked())
-        ready=bool(self.system and self.system.bets)
+        ready=bool(self.system and self.system.bets and self.reduction_active.get(19,False))
         if self.round_picker.currentData():
             self.budget_apply.setEnabled(ready and self.round.editable and not self.filter_timer.isActive() and self.filter_job is None)
 
@@ -4254,7 +4307,7 @@ class MainWindow(QMainWindow):
                                      if self.reduction_active.get(8,False)
                                      and self.filter_checks['coincidences'].isChecked() else ''),
                           advanced=self.advanced_spec(),reduction_rules=self.build_reduction_rules(),
-                          reduction_tabs_enabled=tuple(index for index,active in self.reduction_active.items() if active),
+                          reduction_tabs_enabled=tuple(index for index,active in self.reduction_active.items() if active and index<19),
                           quick_conditions_active=self.quick_level is not None)
 
     def _restore_reduction_rules(self, rows):
@@ -4313,7 +4366,8 @@ class MainWindow(QMainWindow):
                     else:
                         risk,_summary,_calculate=self.mode_automatic_controls['FSSeguidos'];self._set_risk_value(risk,rule.generation_risk)
                         chosen=set(rule.evidence_seasons)
-                        for season,square in self.history_season_squares.get('FSSeguidos',{}).items():square.setChecked(season in chosen)
+                        for season,square in self.history_season_squares.get('FSSeguidos',{}).items():
+                            square.blockSignals(True);square.setChecked(season in chosen);square.blockSignals(False)
             if rule.tab_index==18:
                 method=rule.generation_method
                 self.interruption_generation_metadata.update(method=method,risk=rule.generation_risk,
@@ -4324,7 +4378,9 @@ class MainWindow(QMainWindow):
                     if rule.generation_seed is not None:seed.setValue(rule.generation_seed)
                 elif method=='automática':
                     risk,_summary,_calculate=self.mode_automatic_controls['Interrupciones'];self._set_risk_value(risk,rule.generation_risk)
-                    for season,square in self.history_season_squares.get('Interrupciones',{}).items():square.setChecked(season in set(rule.evidence_seasons))
+                    chosen=set(rule.evidence_seasons)
+                    for season,square in self.history_season_squares.get('Interrupciones',{}).items():
+                        square.blockSignals(True);square.setChecked(season in chosen);square.blockSignals(False)
             if rule.generation_method=='azar':
                 title='Cuenta' if rule.rule_id.startswith('count-values-') else 'Racha' if rule.tab_index==1 else ''
                 if title=='Cuenta':
@@ -4342,7 +4398,8 @@ class MainWindow(QMainWindow):
                     source=rule.evidence_source)
                 self._set_risk_value(self.mode_automatic_controls['Racha'][0],rule.generation_risk)
                 chosen_seasons=set(rule.evidence_seasons)
-                for season,square in self.history_season_squares.get('Racha',{}).items():square.setChecked(season in chosen_seasons)
+                for season,square in self.history_season_squares.get('Racha',{}).items():
+                    square.blockSignals(True);square.setChecked(season in chosen_seasons);square.blockSignals(False)
 
             if rule.kind=='allowed_count' and rule.sign in self.count_values:
                 self.count_values[rule.sign]=set(rule.allowed_values);self.count_apply[rule.sign].setChecked(rule.active)

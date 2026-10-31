@@ -5,6 +5,7 @@ from __future__ import annotations
 import random
 from collections import Counter
 from collections.abc import Iterable, Sequence
+from functools import lru_cache
 
 
 def validate_result_column(column: str) -> str:
@@ -98,6 +99,11 @@ def possible_run_figures(base: Sequence[str], sign: str) -> dict[int, tuple[str,
     lengths. For fourteen positions the partition set is small even when the
     base represents millions of columns.
     """
+    return _possible_run_figures(tuple(base), sign)
+
+
+@lru_cache(maxsize=64)
+def _possible_run_figures(base: tuple[str, ...], sign: str) -> dict[int, tuple[str, ...]]:
     _validate_streak_base(base, sign)
 
     def belongs(value: str) -> bool:

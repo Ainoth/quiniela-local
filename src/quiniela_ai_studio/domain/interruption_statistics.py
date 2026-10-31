@@ -5,6 +5,7 @@ from __future__ import annotations
 import random
 from collections import Counter
 from collections.abc import Iterable, Sequence
+from functools import lru_cache
 from itertools import pairwise
 
 
@@ -40,6 +41,13 @@ def possible_interruption_profiles(
     and the completed run partition. With fourteen positions this stays small
     even when the quiniela base represents millions of possible columns.
     """
+    return _possible_interruption_profiles(tuple(base))
+
+
+@lru_cache(maxsize=64)
+def _possible_interruption_profiles(
+    base: tuple[str, ...],
+) -> tuple[tuple[int, int, str], ...]:
     _validate_base(base)
     states = {(sign, 0, ()) for sign in dict.fromkeys(base[0])}
     for pick in base[1:]:
