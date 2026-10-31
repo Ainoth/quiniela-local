@@ -19,10 +19,19 @@ pytest_plugins=('test_ui',)
 def test_72_proposal_apply_and_audit(window):
     original=window.service.imported(window.round,'Sintético 72',generate(BASE72,'M0'))
     window.set_system(original);window.navigation.setCurrentRow(2)
+    assert window.budget_group.title()=='2 · Define presupuesto y prioridad'
+    assert window.budget_apply.text()=='Calcular propuesta'
+    assert '10 · sin condiciones rápidas' in window._quick_conditions_text(10)
+    assert 'más restrictiva' in window._quick_conditions_text(2)
+    assert 'Quiniela abierta:' in window.optimize_info.text()
+    assert 'Límite:' in window.budget_capacity.text()
     window.budget.setValue(5);window.optimize();wait_for_data(window)
     assert window.system==original and window.optimization_result.report['cost_cents']==450
     assert window.optimization_result.report['after']['universe_total']==72
     assert window.optimization_dialog.isVisible()
+    assert 'Propuesta: 6 apuestas' in window.optimization_dialog.summary.text()
+    assert 'tus apuestas permanecen intactas' in window.optimization_dialog.summary.text()
+    assert 'tus apuestas aún no han cambiado' in window.portfolio_summary.text()
     window.optimization_dialog.apply_button.click()
     assert window.system.quantity==6 and window.system.cost(window.round)==450
     assert 'minimum_hits' in window.system.parameters

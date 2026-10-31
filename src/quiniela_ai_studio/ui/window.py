@@ -1858,7 +1858,7 @@ class MainWindow(QMainWindow):
 
         pages={};hosts={}
         manual=QWidget();manual_layout=QVBoxLayout(manual);manual_layout.setContentsMargins(3,3,3,3);manual_layout.setSpacing(3)
-        manual_note=QLabel('Marca en verde los totales y las figuras admitidas. Los cambios se miden entre los 14 partidos; el Pleno queda fuera.')
+        manual_note=QLabel('Marca en verde los totales y las figuras admitidas. Los cambios se miden entre los 14 partidos; el Pleno queda fuera. Distancias se combina con las demás pestañas activas y puede dejar cero apuestas si no hay cruces.')
         manual_note.setWordWrap(True);manual_note.setVisible(False);manual_note.setSizePolicy(QSizePolicy.Policy.Preferred,QSizePolicy.Policy.Fixed)
         manual_layout.addWidget(manual_note)
         manual_layout.addLayout(subtab_row())
@@ -1942,6 +1942,8 @@ class MainWindow(QMainWindow):
         """Build the independent 1/X/2/V maximum-distance panel."""
         view=QWidget();layout=QVBoxLayout(view)
         layout.setContentsMargins(3,4,3,3);layout.setSpacing(3)
+        note=QLabel('La distancia es la separación máxima entre apariciones consecutivas. Cada selección se combina con las demás condiciones activas; que sea posible en la base no garantiza que queden apuestas.')
+        note.setWordWrap(True);note.setObjectName('muted');layout.addWidget(note)
         columns=QHBoxLayout();columns.setContentsMargins(0,0,0,0);columns.setSpacing(1)
         self.sign_distance_values={sign:set() for sign in ('1','X','2','V')}
         self.sign_distance_apply={};self.sign_distance_squares={}
@@ -1998,7 +2000,8 @@ class MainWindow(QMainWindow):
                 button=self.sign_distance_squares[(sign,distance)]
                 button.setEnabled(distance in possible or distance in self.sign_distance_values[sign])
                 button.setToolTip(f'Máxima separación entre apariciones consecutivas de {sign}: {distance}. '
-                                  +('Alcanzable desde la base.' if distance in possible else 'No alcanzable desde la base.'))
+                                  +('Alcanzable desde la base; otras condiciones activas pueden dejar cero apuestas.'
+                                    if distance in possible else 'No alcanzable desde la base.'))
 
     def _interruption_season_setting_key(self):
         current=self.round_picker.currentData()
@@ -3555,7 +3558,11 @@ class MainWindow(QMainWindow):
             return ' / '.join(f'{100*v:.1f}' for v in snap.values[index]) if snap else 'Sin datos'
         self.analysis_model.update_rows([(f'{i+1}. {m.home} – {m.away}',percentages('sport',i),percentages('public',i)) for i,m in enumerate(view_round.matches[:14])])
         self.optimize_info.setToolTip(f'Identificador de contenido: {system.hash}' if system else '')
-        self.optimize_info.setText(f'{system.quantity:,} apuestas · coste {money(system.cost(round_))}' if system else 'Abre una quiniela en Mis Sistemas.')
+        self.optimize_info.setText(
+            f'Quiniela abierta: {system.quantity:,} apuestas · {money(system.cost(round_))}. '
+            'El cálculo parte del desarrollo de origen y respeta las condiciones activas.'
+            if system else 'Abre una quiniela en Mis Sistemas.'
+        )
         self.refresh_reduction()
         self.update_data_buttons()
 
@@ -3970,16 +3977,21 @@ class MainWindow(QMainWindow):
         self.quick_level=None;self.configuring_filters=False
         self.filter_job=None;self.filter_epoch=0;self.filter_pending=False;self.athena_job=None
         self.filter_timer=QTimer(self);self.filter_timer.setSingleShot(True);self.filter_timer.setInterval(150);self.filter_timer.timeout.connect(self.start_live_filter)
-        progressive=QGroupBox('1. Ajusta cuántas apuestas conservar')
+        progressive=QGroupBox('1 · Prepara las apuestas candidatas')
         progressive_layout=QVBoxLayout(progressive)
         self.quick_conditions_slider=QSlider(Qt.Orientation.Horizontal);self.quick_conditions_slider.setObjectName('optimizationSlider');self.quick_conditions_slider.setRange(0,10);self.quick_conditions_slider.setValue(10)
         self.quick_conditions_slider.setTickPosition(QSlider.TickPosition.TicksBelow);self.quick_conditions_slider.setTickInterval(1)
-        self.quick_conditions_slider.setAccessibleName('Ajustes de optimización: cero menos apuestas, diez máximo de apuestas')
+        self.quick_conditions_slider.setAccessibleName('Nivel de condiciones rápidas: cero es más restrictivo; diez no aplica condiciones rápidas')
         progressive_layout.addWidget(self.quick_conditions_slider)
-        ends=QHBoxLayout();ends.addWidget(QLabel('0 · menos apuestas'));ends.addStretch();ends.addWidget(QLabel('10 · máximo de apuestas'));progressive_layout.addLayout(ends)
-        self.quick_description=QLabel('Nivel 10 / 10');self.quick_description.setWordWrap(True);progressive_layout.addWidget(self.quick_description)
+        ends=QHBoxLayout();ends.addWidget(QLabel('0 · Más restrictivo'));ends.addStretch();ends.addWidget(QLabel('10 · Sin filtro rápido'));progressive_layout.addLayout(ends)
+        self.quick_description=QLabel('Sin condiciones rápidas: se consideran todas las apuestas del desarrollo de origen.')
+        self.quick_description.setWordWrap(True);progressive_layout.addWidget(self.quick_description)
+        quick_note=QLabel('Este nivel filtra candidatas; no fija el número final ni el importe. El presupuesto se define abajo y la propuesta se revisa antes de aplicarla.')
+        quick_note.setWordWrap(True);quick_note.setObjectName('muted');progressive_layout.addWidget(quick_note)
         outer.addWidget(progressive)
-        self.optimize_info=QLabel();self.optimize_info.setWordWrap(True);outer.addWidget(self.optimize_info)
+        self.optimize_info=QLabel();self.optimize_info.setWordWrap(True);self.optimize_info.setObjectName('optimizationSourceSummary')
+        self.optimize_info.setStyleSheet('background:#12385c;border:1px solid #2c6c98;border-radius:4px;padding:6px;')
+        outer.addWidget(self.optimize_info)
         outer.addWidget(scroll,1)
         self.methods_status=QLabel('La garantía combinatoria se verifica dentro de un universo concreto. No garantiza un premio económico.')
         self.methods_status.setWordWrap(True)
@@ -4007,14 +4019,14 @@ class MainWindow(QMainWindow):
         self.filter_reset=QPushButton('Quitar todas las condiciones');self.filter_reset.clicked.connect(self.reset_filters)
         self.filter_feedback=QLabel();self.filter_feedback.setWordWrap(True)
         layout.addStretch()
-        self.budget_group=QGroupBox('2. Ajusta el resultado a tu presupuesto')
-        budget_outer=QVBoxLayout(self.budget_group);budget_layout=QHBoxLayout();budget_outer.addLayout(budget_layout);budget_layout.addWidget(QLabel('1. Máximo (€)'))
+        self.budget_group=QGroupBox('2 · Define presupuesto y prioridad')
+        budget_outer=QVBoxLayout(self.budget_group);budget_layout=QHBoxLayout();budget_outer.addLayout(budget_layout);budget_layout.addWidget(QLabel('Presupuesto máximo (€)'))
         self.budget=QDoubleSpinBox();self.budget.setRange(0,100000);self.budget.setDecimals(2);self.budget.setValue(10);budget_layout.addWidget(self.budget)
         self.budget_capacity=QLabel();budget_layout.addWidget(self.budget_capacity)
-        row=QHBoxLayout();row.addWidget(QLabel('2. Objetivo'));self.portfolio_objective=QComboBox()
+        row=QHBoxLayout();row.addWidget(QLabel('Qué quieres priorizar'));self.portfolio_objective=QComboBox()
         for label,key in (('Automático recomendado','auto'),('Máxima probabilidad','probability'),('Máxima cobertura 13+/12+','coverage'),('Valor esperado: no disponible','expected')):self.portfolio_objective.addItem(label,key)
         self.portfolio_objective.model().item(3).setEnabled(False);row.addWidget(self.portfolio_objective,1);budget_outer.addLayout(row)
-        self.budget_apply=self.button('3. Optimizar mis apuestas',self.optimize,row,primary=True,editable=True)
+        self.budget_apply=self.button('Calcular propuesta',self.optimize,row,primary=True,editable=True)
         self.portfolio_cancel=self.button('Cancelar optimización',self.cancel_data,budget_outer)
         self.portfolio_cancel.setEnabled(False)
         advanced_toggle=QCheckBox('Parámetros avanzados');budget_outer.addWidget(advanced_toggle)
@@ -4032,10 +4044,13 @@ class MainWindow(QMainWindow):
         self.portfolio_pleno_model=QCheckBox('Incluir Pleno en probabilidad: independencia explícita de goles')
         for i,(label_text,control) in enumerate((('Semilla',self.portfolio_seed),('Tiempo de búsqueda (s)',self.portfolio_time),('Universo',self.portfolio_scope),('Canal',self.portfolio_channel))):advanced_layout.addWidget(QLabel(label_text),i,0);advanced_layout.addWidget(control,i,1)
         advanced_layout.addWidget(self.portfolio_pleno_model,4,0,1,2)
-        self.portfolio_summary=QLabel('La propuesta se revisa antes de aplicar. Valor esperado desactivado: faltan recaudación y modelo de premios fiable.');self.portfolio_summary.setWordWrap(True);budget_outer.addWidget(self.portfolio_summary)
+        self.portfolio_summary=QLabel('3 · Revisa la propuesta antes de aplicarla. El cálculo no modifica tus apuestas.')
+        self.portfolio_summary.setWordWrap(True);self.portfolio_summary.setObjectName('optimizationProposalSummary')
+        self.portfolio_summary.setStyleSheet('background:#102b45;border:1px solid #2c6c98;border-radius:4px;padding:6px;')
+        budget_outer.addWidget(self.portfolio_summary)
         self.budget.valueChanged.connect(self.update_budget_capacity)
         outer.addWidget(self.budget_group)
-        self.budget_apply.setToolTip('Optimiza el desarrollo de origen respetando las condiciones. Muestra una propuesta sin cambiar tus apuestas hasta que la apliques.')
+        self.budget_apply.setToolTip('Calcula una cartera dentro del presupuesto y de las condiciones activas. Tus apuestas no cambian hasta que pulses «Aplicar selección» en la propuesta.')
         outer.addWidget(self.methods_status)
         for minimum,maximum in self.filter_ranges.values():
             minimum.valueChanged.connect(self.manual_filters_changed);maximum.valueChanged.connect(self.manual_filters_changed)
@@ -4120,7 +4135,7 @@ class MainWindow(QMainWindow):
                 self.count_values[sign]=set(range(low,high+1));self.count_apply[sign].setChecked(True)
         for (sign,value),button in self.count_squares.items():button.setChecked(value in self.count_values[sign])
         self._refresh_count_profiles()
-        self.quick_description.setText(f'Nivel {self.quick_level} / 10' if self.quick_level is not None else 'Condiciones personalizadas' if saved else 'Nivel 10 / 10')
+        self.quick_description.setText(self._quick_conditions_text(self.quick_level) if self.quick_level is not None else 'Condiciones personalizadas: se usan los límites que has seleccionado.' if saved else self._quick_conditions_text(10))
         self.filter_feedback.setText('Primero pulsa «Generar apuestas» al final de la pestaña Normal.' if not self.system or (not self.system.bets and not saved) else '')
         self.configuring_filters=False;self.update_filter_controls()
 
@@ -4141,7 +4156,7 @@ class MainWindow(QMainWindow):
             minimum.setValue(limits[0]);maximum.setValue(limits[1])
         self.filter_max_one.setValue(spec.max_one_run)
         self.filter_max_x.setValue(spec.max_x_run);self.filter_max_two.setValue(spec.max_two_run)
-        self.quick_description.setText(f'Nivel {level} / 10')
+        self.quick_description.setText(self._quick_conditions_text(level))
         self.configuring_filters=False
         self.update_filter_controls();self.schedule_live_filter()
 
@@ -4151,8 +4166,27 @@ class MainWindow(QMainWindow):
     def manual_filters_changed(self):
         if self.configuring_filters:return
         self.quick_level=None
-        self.quick_description.setText('Condiciones personalizadas')
+        self.quick_description.setText('Condiciones personalizadas: se usan los límites que has seleccionado.')
         self.schedule_live_filter()
+
+    @staticmethod
+    def _quick_conditions_text(level):
+        if level == 10:
+            return 'Nivel 10 · sin condiciones rápidas; se consideran todas las apuestas del desarrollo de origen.'
+        return f'Nivel {level}/10 · aplica condiciones rápidas; cuanto más bajo sea, más restrictiva es la selección.'
+
+    @staticmethod
+    def _empty_filter_message(spec):
+        distance_rules = [
+            rule for rule in spec.reduction_rules
+            if rule.active and rule.tab_index in spec.reduction_tabs_enabled
+            and rule.kind in ('allowed_sign_distance', 'allowed_interruption_figure')
+        ]
+        if distance_rules:
+            return ('No quedan apuestas. Distancias se combina con las otras condiciones activas: '
+                    'una distancia posible en la base puede no aparecer en las apuestas restantes. '
+                    'Cambia la distancia, desactiva otra condición o pulsa «Recuperar apuestas anteriores».')
+        return 'No quedan apuestas. Sube el nivel o cambia las condiciones.'
 
     def update_filter_controls(self):
         """Make activation explicit; inactive limits remain editable only after selection."""
@@ -4171,7 +4205,7 @@ class MainWindow(QMainWindow):
     def reset_filters(self):
         self.configuring_filters=True
         self.quick_level=None
-        self.quick_description.setText('Sin condiciones')
+        self.quick_description.setText(self._quick_conditions_text(10))
         self.quick_conditions_slider.blockSignals(True);self.quick_conditions_slider.setValue(10);self.quick_conditions_slider.blockSignals(False)
         for check in self.filter_checks.values():check.setChecked(False)
         self.count_values.clear();self.count_values.update({sign:set() for sign in ('V','X','2')})
@@ -4502,7 +4536,7 @@ class MainWindow(QMainWindow):
             parameters=json.loads(system.parameters)
             if bets!=system.bets or parameters.get('filter_spec')!=json.loads(json.dumps(spec.parameters())) or parameters.get('quick_level')!=level:
                 self.set_system(self.service.save_filtered(system,spec,bets,candidates,quick_level=level,allow_empty=True))
-            self.filter_feedback.setText('No quedan apuestas. Sube el nivel o cambia las condiciones.' if not bets else '')
+            self.filter_feedback.setText(self._empty_filter_message(spec) if not bets else '')
             if hasattr(self,'advanced_feedback'):
                 before=sum(b.quantity for b in candidates);after=sum(b.quantity for b in bets)
                 detail=''
@@ -4561,7 +4595,7 @@ class MainWindow(QMainWindow):
         if not self.round_picker.currentData() or not hasattr(self,'budget_capacity'):return
         price=self.frozen_round().price_cents
         cents=int(Decimal(self.budget.cleanText().replace(',','.'))*100)
-        self.budget_capacity.setText(f'Hasta {cents//price} apuestas · {money(price)}/apuesta')
+        self.budget_capacity.setText(f'Límite: {cents//price} apuestas a {money(price)}/apuesta')
 
     def open_tulotero(self,bets=None,round_=None):
         if bets is None:
@@ -5100,7 +5134,10 @@ class MainWindow(QMainWindow):
             self.optimization_result=result;self.optimization_source=source
             from quiniela_ai_studio.ui.portfolio_dialogs import result_dialog
             self.optimization_dialog=result_dialog(self,result,source);self.optimization_dialog.show()
-            self.portfolio_summary.setText(f'Propuesta: {result.report["selected"]} apuestas · {money(result.report["cost_cents"])} · {result.report["optimality"]}. Revisa la ventana antes de aplicar.')
+            self.portfolio_summary.setText(
+                f'3 · Propuesta lista: {result.report["selected"]:,} apuestas · '
+                f'{money(result.report["cost_cents"])}. Revisa la ventana; tus apuestas aún no han cambiado.'
+            )
             return
         if self.data_kind=='verification':
             self.repository.record_event('coverage_verification',dict(round_key=self.data_context.round_key,revision=self.data_context.revision,**result))

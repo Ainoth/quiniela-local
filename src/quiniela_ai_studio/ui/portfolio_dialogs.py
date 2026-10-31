@@ -2,7 +2,7 @@
 import json
 from pathlib import Path
 
-from PySide6.QtCore import QUrl
+from PySide6.QtCore import Qt, QUrl
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QDialog,
@@ -32,7 +32,21 @@ def result_dialog(parent,result,source):
     report=result.report;after=report['after']
     dialog=QDialog(parent);dialog.setWindowTitle('Propuesta de optimización · revisa antes de aplicar');dialog.resize(880,650)
     layout=QVBoxLayout(dialog)
-    summary=QLabel(f'{report["candidates"]} candidatas → {report["selected"]} apuestas · {report["cost_cents"]/100:.2f} € · remanente {report["remaining_cents"]/100:.2f} €\n{report["algorithm"]} · {report["optimality"]}\nUniverso: {after["universe_total"]} · {after["universe"]} · cobertura {after["status"]}\nGarantía mínima: {after["minimum_hits"] if after["minimum_hits"] is not None else "NO VERIFICADA"} dentro del universo. No garantiza premios económicos.');summary.setWordWrap(True);layout.addWidget(summary)
+    minimum = after["minimum_hits"] if after["minimum_hits"] is not None else "No verificada"
+    summary=QLabel(
+        f'<h2>Propuesta: {report["selected"]:,} apuestas</h2>'
+        f'<p><b>Candidatas revisadas:</b> {report["candidates"]:,}<br>'
+        f'<b>Coste:</b> {report["cost_cents"]/100:.2f} € · '
+        f'<b>Presupuesto sin usar:</b> {report["remaining_cents"]/100:.2f} €</p>'
+        f'<p><b>Objetivo y método:</b> {report["algorithm"]} · {report["optimality"]}<br>'
+        f'<b>Universo:</b> {after["universe_total"]:,} resultados · {after["universe"]}<br>'
+        f'<b>Cobertura:</b> {after["status"]} · mínimo observado/verificado: {minimum}</p>'
+        '<p>Revisa las pestañas y pulsa <b>Aplicar selección</b> para cambiar la quiniela. '
+        'Hasta entonces, tus apuestas permanecen intactas. La cobertura no garantiza un premio económico.</p>'
+    )
+    summary.setTextFormat(Qt.TextFormat.RichText);summary.setWordWrap(True)
+    summary.setStyleSheet('background:#12385c;border:1px solid #2c6c98;border-radius:5px;padding:8px;')
+    layout.addWidget(summary)
     warnings=QLabel('\n'.join(report['warnings']) or 'Plenos conservados. La propuesta todavía NO se ha aplicado.');warnings.setWordWrap(True);layout.addWidget(warnings)
     tabs=QTabWidget();layout.addWidget(tabs,1)
     coverage_page=QWidget();coverage_layout=QVBoxLayout(coverage_page);tabs.addTab(coverage_page,'Cobertura')
@@ -66,7 +80,7 @@ def result_dialog(parent,result,source):
         if path:parent.safe(lambda:atomic_text(path,json.dumps(report,ensure_ascii=False,indent=2)))
     audit.clicked.connect(save_audit)
     close=QPushButton('No aplicar / cerrar');row.addWidget(close);close.clicked.connect(dialog.reject)
-    dialog.proposal=result;dialog.apply_button=apply
+    dialog.proposal=result;dialog.apply_button=apply;dialog.summary=summary
     return dialog
 
 

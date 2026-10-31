@@ -2,6 +2,10 @@
 
 ## 1.0.35 — controles automáticos por histórico y boleto compacto
 
+- RF-RED-020 / RF-UX-030: Distancias explica que las selecciones se cruzan con
+  las demás condiciones y que «posible desde la base» no asegura apuestas
+  restantes. Optimizar separa candidatas, presupuesto/prioridad y revisión de
+  propuesta; la ventana aclara que nada cambia antes de «Aplicar selección».
 - RF-DAT-008: permite descargar porcentajes cuando el PRE de WIN1X2 contiene
   la errata «Sevila (F)» y Quinielista publica «Sevilla (F)»; otros equipos
   siguen rechazándose.
