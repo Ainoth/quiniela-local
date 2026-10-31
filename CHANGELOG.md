@@ -1,10 +1,21 @@
 # Cambios
 
+## 1.0.35 — controles automáticos por histórico y boleto compacto
+
+- RF-DAT-008: permite descargar porcentajes cuando el PRE de WIN1X2 contiene
+  la errata «Sevila (F)» y Quinielista publica «Sevilla (F)»; otros equipos
+  siguen rechazándose.
+- RF-NOR-006: Normal deja elegir temporadas históricas y cobertura objetivo; el
+  algoritmo selecciona la base con un límite técnico interno y explica la
+  cobertura observada. Dobles y triples tienen modos Auto/Manual independientes;
+  Auto usa histórico seleccionado y porcentajes actuales.
+- RF-NOR-007: el factor sorpresa redistribuye dobles/triples existentes según
+  riesgo de fallo del favorito, independiente de los modos Auto/Manual.
+- RF-UX-029: boleto Normal compacto con porcentajes por signo y partidos más
+  juntos. Generar apuestas y guardar TXT quedan al final de la pestaña.
+
 ## 1.0.34 — identidad de equipos femeninos y porcentajes por jornada
 
-- RF-ESC-010: el escrutinio conserva resultados primarios cuando ESPN no cubre
-  algún partido, combina ambos proveedores sin perder marcadores y reconoce
-  nombres como R. Oviedo/Real Oviedo, Almería/UD Almería y Logroño/FC Badalona.
 - RF-DAT-007: reconoce la marca `W` que Quinielista intercala antes de `(F)`
   en algunos equipos femeninos, como `Badalona W.(F)`, sin aceptar otros
   equipos. Evita descargas de porcentajes para temporadas pasadas cuando el
