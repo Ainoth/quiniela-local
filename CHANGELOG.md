@@ -1,5 +1,13 @@
 # Cambios
 
+## 2.0.2 — escrutinio a dos columnas
+
+- Coloca la previsión orientativa a la izquierda y el resultado real/oficial a
+  la derecha, con tarjeta verde; el estado pendiente también ocupa ese panel.
+- Cambia la previsión a una disposición vertical con tabla compacta para que
+  importes, encabezados y procedencia no se solapen ni queden cortados.
+- Conserva la previsión como referencia cuando aparece el reparto oficial.
+
 ## 2.0.1 — previsión de premios dentro de Escrutinio
 
 - Recupera la tarjeta dorada de previsión orientativa que estaba en la app

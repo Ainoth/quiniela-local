@@ -41,3 +41,10 @@ y no confirma un premio ni el cobro de apuestas.
 - Rechazo de jornadas distintas y escenarios inválidos.
 - Cálculo de premios propios en categorías 14 y 15.
 - Representación Qt del resumen y de la tarjeta dorada.
+
+## Presentación en v2.0.2
+
+La vista usa dos columnas fijas: previsión dorada a la izquierda y resultado
+real/oficial en verde a la derecha. La estimación queda disponible como
+referencia junto al reparto oficial; su tabla vertical mantiene visibles las
+categorías, importes y subtotales en ventanas estrechas.

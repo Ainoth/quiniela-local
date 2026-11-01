@@ -146,12 +146,13 @@ QSlider::handle:horizontal {background:#ffc83d; width:18px; margin:-6px 0; borde
 QSlider#optimizationSlider::handle:horizontal {background:#35d27f;}
 QProgressBar {border:1px solid #2a6698; text-align:center;}
 QProgressBar::chunk {background:#159881;}
-QFrame#prizeCard {background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 #123d40,stop:0.55 #10354e,stop:1 #163554); border:2px solid #e4bd43; border-radius:7px;}
+QFrame#prizeCard {background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 #104a33,stop:0.55 #103b35,stop:1 #12354a); border:2px solid #37c878; border-radius:7px;}
 QFrame#prizeCard QLabel {background:transparent;}
-QFrame#prizeBreakdownCard {background:#0d2946; border:1px solid #62a9c5; border-radius:5px;}
+QFrame#prizeBreakdownCard {background:#0d352b; border:1px solid #37b86f; border-radius:5px;}
 QFrame#prizeBreakdownCard QLabel {background:transparent; border:none;}
 QFrame#estimatePrizeCard {background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 #493c17,stop:0.55 #24364b,stop:1 #17304a); border:2px solid #d8ae38; border-radius:7px;}
 QFrame#estimatePrizeCard QLabel {background:transparent; border:none;}
+QLabel#prizeNoticeCard {background:#103a31; color:#b8f2ca; border:1px solid #37b86f; border-radius:6px; padding:12px; font-size:13px; font-weight:bold;}
 QFrame#scrutinySummaryCard {background:qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #104968,stop:1 #102c49); border:1px solid #36b5d3; border-radius:6px;}
 QFrame#scrutinySummaryCard QLabel {background:transparent; border:none;}
 QLabel#prizeTableGroup {color:#75e5ec; font-weight:bold; font-size:10px;}
@@ -159,9 +160,13 @@ QLabel#prizeTableHeader {color:#a9d8e5; font-size:10px;}
 QLabel#prizeTableValue {color:#e7f5fa; font-size:10px;}
 QLabel#prizeTableOwn {color:#ffe17a; font-size:10px; font-weight:bold;}
 QLabel#prizeTableTotal {color:#ffe17a; font-size:13px; font-weight:bold;}
-QLabel#prizeHeadline {font-size:18px; font-weight:bold; color:#ffe17a;}
-QLabel#prizeTotal {font-size:32px; font-weight:bold; color:#ffe17a;}
-QLabel#prizeFinePrint {font-size:10px; color:#b9dfdf;}
+QLabel#prizeHeadline {font-size:17px; font-weight:bold; color:#a9f1bd;}
+QLabel#prizeTotal {font-size:29px; font-weight:bold; color:#b8f2ca;}
+QLabel#prizeFinePrint {font-size:10px; color:#c2e9d0;}
+QFrame#prizeCard QLabel#prizeCategoryHeading {color:#9be1b0;}
+QFrame#prizeCard QLabel#prizeCategoryValue {color:#d4f9de;}
+QFrame#prizeBreakdownCard QLabel#prizeTableGroup {color:#8be8a6;}
+QFrame#prizeBreakdownCard QLabel#prizeTableOwn, QFrame#prizeBreakdownCard QLabel#prizeTableTotal {color:#a9f1bd;}
 QLabel#prizeCategoryHeading {font-size:10px; color:#8fe6e1; font-weight:bold;}
 QLabel#prizeCategoryValue {font-size:11px; color:#fff2b8;}
 QLabel#estimateHeadline {font-size:17px; font-weight:bold; color:#ffe17a;}
@@ -3861,14 +3866,15 @@ class MainWindow(QMainWindow):
         self.remember_builder()
         if changed:self.template_timer.stop();self.restore_builder_controls();self.restore_filter_controls();self.choose_reduction_positions()
         self.refresh()
-        if self.navigation.currentRow()==4 and not self.manual_mode.isChecked() and not self.show_cached_scrutiny():
+        if self.navigation.currentRow()==4 and not self.manual_mode.isChecked():
+            if not self.show_cached_scrutiny():
+                if self.live_matches:self.evaluate_live()
+                else:
+                    self.prize_card.hide();self.prize_notice.show()
+                    self.prize_notice.setText('Premios pendientes de escrutinio publicado.')
+                    self.eval_model.update_rows([])
+                    self.eval_summary.setText('Abre una quiniela con apuestas y carga resultados para ver tus aciertos.')
             self.fetch_prize_estimate()
-            if self.live_matches:self.evaluate_live()
-            else:
-                self.prize_card.hide();self.prize_notice.show()
-                self.prize_notice.setText('Premios pendientes de escrutinio publicado.')
-                self.eval_model.update_rows([])
-                self.eval_summary.setText('Abre una quiniela con apuestas y carga resultados para ver tus aciertos.')
 
     def clear_scrutiny_awards(self):
         """Discard awards from the previously selected system immediately."""
@@ -4845,7 +4851,7 @@ class MainWindow(QMainWindow):
         prize_layout=QHBoxLayout(self.prize_card);prize_layout.setContentsMargins(12,7,12,7);prize_layout.setSpacing(18)
         self.prize_layout=prize_layout
         prize_highlight=QVBoxLayout();prize_highlight.setSpacing(1)
-        self.prize_headline=QLabel('✦ ¡Hay premio en tu quiniela!');self.prize_headline.setObjectName('prizeHeadline')
+        self.prize_headline=QLabel('PREMIO REAL · ESCRUTINIO OFICIAL');self.prize_headline.setObjectName('prizeHeadline')
         self.prize_total=QLabel();self.prize_total.setObjectName('prizeTotal')
         self.prize_fine_print=QLabel('Importe calculado para las apuestas guardadas. Comprueba el boleto validado antes de cobrar.')
         self.prize_fine_print.setObjectName('prizeFinePrint');self.prize_fine_print.setWordWrap(True)
@@ -4887,22 +4893,19 @@ class MainWindow(QMainWindow):
         detail_layout.addWidget(total_label,8,3)
         self.prize_detail_total=QLabel();self.prize_detail_total.setObjectName('prizeTableTotal')
         detail_layout.addWidget(self.prize_detail_total,8,4)
-        self.prize_cards_layout=QBoxLayout(QBoxLayout.Direction.LeftToRight)
-        self.prize_cards_layout.setContentsMargins(0,0,0,0);self.prize_cards_layout.setSpacing(8)
-        self.prize_cards_layout.addWidget(self.prize_card,1)
-        self.prize_cards_layout.addWidget(self.prize_detail_card,1)
         self.prize_card.hide();self.prize_detail_card.hide()
-        lower_layout.addLayout(self.prize_cards_layout)
         self.estimate_prize_card=QFrame();self.estimate_prize_card.setObjectName('estimatePrizeCard')
-        estimate_layout=QHBoxLayout(self.estimate_prize_card);estimate_layout.setContentsMargins(12,7,12,7);estimate_layout.setSpacing(16)
-        estimate_highlight=QVBoxLayout();estimate_highlight.setSpacing(2)
+        estimate_layout=QVBoxLayout(self.estimate_prize_card);estimate_layout.setContentsMargins(12,9,12,9);estimate_layout.setSpacing(5)
+        estimate_top=QHBoxLayout();estimate_top.setContentsMargins(0,0,0,0);estimate_top.setSpacing(8)
         self.estimate_headline=QLabel('≈ PREVISIÓN ORIENTATIVA');self.estimate_headline.setObjectName('estimateHeadline')
         self.estimate_total=QLabel('—');self.estimate_total.setObjectName('estimateTotal')
         self.estimate_scenario_label=QLabel('');self.estimate_scenario_label.setObjectName('estimateDisclaimer');self.estimate_scenario_label.setWordWrap(True)
-        estimate_highlight.addWidget(self.estimate_headline);estimate_highlight.addWidget(self.estimate_total);estimate_highlight.addWidget(self.estimate_scenario_label)
-        estimate_layout.addLayout(estimate_highlight,1)
-        estimate_grid=QGridLayout();estimate_grid.setContentsMargins(0,0,0,0);estimate_grid.setHorizontalSpacing(12);estimate_grid.setVerticalSpacing(1)
-        for column,caption in enumerate(('Categoría','Tus apuestas','€/apuesta estimado','Subtotal estimado')):
+        estimate_top.addWidget(self.estimate_headline);estimate_top.addStretch(1);estimate_top.addWidget(self.estimate_total)
+        self.estimate_refresh_button=QPushButton('Actualizar');self.estimate_refresh_button.setToolTip('Actualizar la previsión de premios')
+        self.estimate_refresh_button.clicked.connect(self.fetch_prize_estimate);estimate_top.addWidget(self.estimate_refresh_button)
+        estimate_layout.addLayout(estimate_top);estimate_layout.addWidget(self.estimate_scenario_label)
+        estimate_grid=QGridLayout();estimate_grid.setContentsMargins(0,0,0,0);estimate_grid.setHorizontalSpacing(6);estimate_grid.setVerticalSpacing(2)
+        for column,caption in enumerate(('Categoría','Tus apuestas','€/u. estimado','Subtotal')):
             label=QLabel(caption);label.setObjectName('prizeCategoryHeading');estimate_grid.addWidget(label,0,column)
         self.estimate_category_rows={}
         for row,category in enumerate((15,14,13,12,11,10),1):
@@ -4910,16 +4913,21 @@ class MainWindow(QMainWindow):
             for column,label in enumerate(labels):
                 label.setObjectName('prizeCategoryValue');estimate_grid.addWidget(label,row,column)
             self.estimate_category_rows[category]=labels
-        estimate_layout.addLayout(estimate_grid,0)
-        estimate_actions=QVBoxLayout();self.estimate_refresh_button=QPushButton('Actualizar previsión');self.estimate_refresh_button.clicked.connect(self.fetch_prize_estimate);estimate_actions.addWidget(self.estimate_refresh_button)
-        self.estimate_source_label=QLabel('');self.estimate_source_label.setObjectName('estimateDisclaimer');self.estimate_source_label.setWordWrap(True);estimate_actions.addWidget(self.estimate_source_label);estimate_actions.addStretch(1)
-        estimate_layout.addLayout(estimate_actions)
-        lower_layout.addWidget(self.estimate_prize_card)
-        self.estimate_prize_card.hide()
+        for column,width in enumerate((3,2,2,2)):estimate_grid.setColumnStretch(column,width)
+        estimate_layout.addLayout(estimate_grid)
+        self.estimate_source_label=QLabel('');self.estimate_source_label.setObjectName('estimateDisclaimer');self.estimate_source_label.setWordWrap(True)
+        estimate_layout.addWidget(self.estimate_source_label)
         self.estimate_worker=None;self.estimate_round_key=None;self.estimate_model=None
-        self.prize_notice=QLabel('Premios pendientes de escrutinio publicado.');self.prize_notice.setObjectName('muted')
+        self.estimate_prize_card.hide()
+        self.prize_notice=QLabel('Premios pendientes de escrutinio publicado.');self.prize_notice.setObjectName('prizeNoticeCard')
         self.prize_cache_error=''
-        self.prize_notice.setWordWrap(True);lower_layout.addWidget(self.prize_notice)
+        self.prize_notice.setWordWrap(True)
+        self.official_prize_column=QWidget();official_layout=QVBoxLayout(self.official_prize_column)
+        official_layout.setContentsMargins(0,0,0,0);official_layout.setSpacing(5)
+        official_layout.addWidget(self.prize_card);official_layout.addWidget(self.prize_detail_card);official_layout.addWidget(self.prize_notice)
+        self.prize_cards_layout=QHBoxLayout();self.prize_cards_layout.setContentsMargins(0,0,0,0);self.prize_cards_layout.setSpacing(8)
+        self.prize_cards_layout.addWidget(self.estimate_prize_card,1);self.prize_cards_layout.addWidget(self.official_prize_column,1)
+        lower_layout.addLayout(self.prize_cards_layout)
         self.eval_summary=QLabel('Abre una quiniela con apuestas para ver tus aciertos.');self.eval_summary.setWordWrap(True);self.eval_summary.setMinimumHeight(48);lower_layout.addWidget(self.eval_summary)
         self.eval_view,self.eval_model=self.table(('Apuesta','Pleno','Copias','Aciertos','Fallos','Pendientes','Máximo','Pleno ahora'),lower_layout)
         self.eval_view.verticalHeader().hide()
@@ -4978,11 +4986,18 @@ class MainWindow(QMainWindow):
         if total is None:
             message='Premios pendientes de escrutinio publicado.'
             if self.prize_cache_error:message+=f' El PRE guardado no se ha usado: {self.prize_cache_error}'
+            self.prize_headline.setText('PREMIO REAL · PENDIENTE')
+            self.prize_total.clear()
+            self.prize_fine_print.setText('El importe real aparecerá cuando se publique y valide el escrutinio. La previsión orientativa queda a la izquierda.')
             self.prize_notice.setText(message)
             return
         if total==0:
+            self.prize_headline.setText('PREMIO REAL · ESCRUTINIO OFICIAL')
+            self.prize_total.setText(prize_money(0))
+            self.prize_fine_print.setText('Escrutinio definitivo publicado · estas apuestas no tienen premio.')
             self.prize_notice.setText('Escrutinio publicado · sin premios en estas apuestas guardadas.')
             return
+        self.prize_headline.setText('PREMIO REAL · ESCRUTINIO OFICIAL')
         self.prize_total.setText(prize_money(total))
         self.prize_total.setAccessibleName(f'Premio total calculado: {prize_money(total)}')
         self.prize_fine_print.setText(
@@ -5583,8 +5598,6 @@ class MainWindow(QMainWindow):
                 or self.round.season=='DEMO' or not self.scrutiny_bets()):
             return
         context=self.frozen_round()
-        if self.published_scrutiny:
-            self.estimate_prize_card.hide();return
         if self.estimate_round_key!=context.key:
             self.estimate_round_key=context.key
             cached=self.repository.setting('prize_estimate:'+context.key)
@@ -5632,18 +5645,22 @@ class MainWindow(QMainWindow):
 
     def render_prize_forecast(self,outcome=None):
         """Paint a clearly separate scenario estimate; official awards keep priority."""
-        if outcome is not None and outcome.get('prize_cents') is not None:
-            self.estimate_prize_card.hide();return
         bets=self.scrutiny_bets()
         if not bets:
-            self.estimate_prize_card.hide();return
+            self.estimate_prize_card.show()
+            self.estimate_total.setText('—')
+            self.estimate_context_label('Importa apuestas o abre un desarrollo para mostrar aquí la previsión orientativa.')
+            return
         if not self.estimate_model:
             self.estimate_prize_card.show()
             self.estimate_total.setText('—')
-            self.estimate_context_label('Importa apuestas o abre un desarrollo. La previsión usará los marcadores disponibles y el signo más probable en los partidos pendientes.')
+            self.estimate_context_label('Sin datos de estimación. La previsión usará los marcadores disponibles y el signo más probable en los partidos pendientes.')
             return
         result_signs={};pleno=''
-        if self.manual_mode.isChecked():
+        if self.published_scrutiny:
+            result_signs={index+1:sign for index,sign in enumerate(self.published_scrutiny['result'])}
+            pleno=self.published_scrutiny['pleno']
+        elif self.manual_mode.isChecked():
             result_signs={index+1:sign for index,sign in enumerate(self.result_input.text().upper()) if sign in '1X2'}
             pleno=self.result_pleno.text().upper()
         else:

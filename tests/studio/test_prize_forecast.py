@@ -74,6 +74,8 @@ def test_estimate_applies_current_scenario_and_separates_15_from_14():
 
 
 def test_desktop_shows_live_progress_and_golden_forecast_card(window):
+    assert window.prize_cards_layout.itemAt(0).widget() is window.estimate_prize_card
+    assert window.prize_cards_layout.itemAt(1).widget() is window.official_prize_column
     bets = (Bet("1" * 14, "00"), Bet("1" * 14, "11"))
     window.system = window.service.imported(window.round, "Previsión", bets)
     window.estimate_model = {
