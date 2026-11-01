@@ -3421,6 +3421,11 @@ class MainWindow(QMainWindow):
 
     def select_round(self, *_):
         if not self.round_picker.currentData(): return
+        if hasattr(self,'external_scrutiny_bets'):
+            self.external_scrutiny_bets=None
+            self.external_scrutiny_name=''
+            self.external_scrutiny_status.setText('Escrutando las apuestas de la quiniela abierta.')
+            self.clear_external_scrutiny_button.hide()
         self.repository.set_setting('selected_round', self.round_picker.currentData())
         for header in self.classic_headers.values():
             header.set_context(self.round.season,str(self.round.number))
@@ -4611,6 +4616,7 @@ class MainWindow(QMainWindow):
     def build_evaluation(self):
         layout=self.page_layout(4)
         self.published_scrutiny=None
+        self.external_scrutiny_bets=None;self.external_scrutiny_name=''
         self.live_worker=None;self.live_context=None
         self.live_timer=QTimer(self);self.live_timer.setInterval(60000);self.live_timer.timeout.connect(self.fetch_live_automatically)
         row=QHBoxLayout();self.auto_live=QCheckBox('Marcador automático');self.auto_live.setChecked(self.repository.setting('automatic_live',True));row.addWidget(self.auto_live)
@@ -4618,7 +4624,14 @@ class MainWindow(QMainWindow):
         for seconds in (30,60,120):self.live_interval.addItem(f'Cada {seconds} segundos',seconds)
         saved_interval=self.live_interval.findData(self.repository.setting('live_interval_seconds',60))
         self.live_interval.setCurrentIndex(saved_interval if saved_interval>=0 else 1);row.addWidget(self.live_interval)
-        self.manual_mode=QCheckBox('Introducir resultados a mano');row.addWidget(self.manual_mode);layout.addLayout(row)
+        self.manual_mode=QCheckBox('Introducir resultados a mano');row.addWidget(self.manual_mode)
+        self.external_scrutiny_button=QPushButton('Escrutar fichero externo (TXT/CSV)');row.addWidget(self.external_scrutiny_button)
+        self.external_scrutiny_button.clicked.connect(lambda:self.safe(self.import_external_scrutiny))
+        self.clear_external_scrutiny_button=QPushButton('Volver a la quiniela abierta');row.addWidget(self.clear_external_scrutiny_button)
+        self.clear_external_scrutiny_button.clicked.connect(self.clear_external_scrutiny);self.clear_external_scrutiny_button.hide()
+        layout.addLayout(row)
+        self.external_scrutiny_status=QLabel('Escrutando las apuestas de la quiniela abierta.')
+        self.external_scrutiny_status.setObjectName('muted');self.external_scrutiny_status.setWordWrap(True);layout.addWidget(self.external_scrutiny_status)
         self.live_status=QLabel('El marcador se actualizará al abrir esta sección.');self.live_status.setWordWrap(True);layout.addWidget(self.live_status)
         self.live_pleno_summary=QLabel('Pleno actual: pendiente');self.live_pleno_summary.setWordWrap(True);layout.addWidget(self.live_pleno_summary)
         self.scrutiny_splitter=QSplitter(Qt.Orientation.Vertical);self.scrutiny_splitter.setChildrenCollapsible(False)
@@ -4824,11 +4837,53 @@ class MainWindow(QMainWindow):
         )
 
     def evaluate(self,prizes=None,source='PRE seleccionado',scrutiny=None):
-        if not self.system or not self.system.bets:raise ValueError('Abre una quiniela con apuestas preparadas.')
+        bets=self.scrutiny_bets()
+        if not bets:raise ValueError('Abre una quiniela con apuestas o importa un fichero externo para escrutar.')
         result=self.result_input.text().upper();pleno=self.result_pleno.text().upper()
-        outcome=engine.evaluate(self.system.bets,result,pleno,finalized=(self.final_check.isChecked(),)*14,
+        outcome=engine.evaluate(bets,result,pleno,finalized=(self.final_check.isChecked(),)*14,
                                 prizes=prizes,official=prizes is not None)
         self.render_scrutiny(outcome,pleno,self.final_check.isChecked(),source,scrutiny)
+
+    def scrutiny_bets(self):
+        if self.external_scrutiny_bets is not None:return self.external_scrutiny_bets
+        return self.system.bets if self.system else ()
+
+    def import_external_scrutiny(self):
+        path,_=QFileDialog.getOpenFileName(self,'Apuestas externas para escrutinio',filter='Apuestas TuLotero preparadas (*.txt *.csv);;Todos los archivos (*)')
+        if not path:return
+        from quiniela_ai_studio.domain.tickets import ChannelRules
+        from quiniela_ai_studio.infrastructure.ticket_files import read_ticket_file
+        source=Path(path);rules=ChannelRules(**self.repository.setting('tulotero_channel_rules',dict(minimum=2,maximum=8)))
+        if source.suffix.casefold()=='.csv':
+            bets=read_ticket_file(source,'csv',rules)
+        else:
+            try:bets=files.read_txt(source)
+            except ValueError as raw_error:
+                try:bets=read_ticket_file(source,'txt',rules)
+                except ValueError:raise raw_error
+        quantity=sum(bet.quantity for bet in bets)
+        if QMessageBox.question(self,'Asignar fichero a la jornada',
+            f'¿Escrutar {quantity:,} apuestas del fichero «{source.name}» para {self.frozen_round().key}?\n'
+            'Se usarán solo para el escrutinio de esta jornada; no se guardarán ni reemplazarán tus quinielas.')!=QMessageBox.StandardButton.Yes:return
+        self.external_scrutiny_bets=tuple(bets);self.external_scrutiny_name=source.name
+        self.external_scrutiny_status.setText(f'Fichero externo: {source.name} · {quantity:,} apuestas · asignado a {self.frozen_round().key}.')
+        self.clear_external_scrutiny_button.show()
+        if self.manual_mode.isChecked():self.refresh_manual_evaluation()
+        elif self.live_matches:self.evaluate_live()
+        elif not self.show_cached_scrutiny():
+            self.eval_model.update_rows([])
+            self.eval_summary.setText(f'{quantity:,} apuestas cargadas. Esperando resultados en directo o introduce resultados manualmente.')
+
+    def clear_external_scrutiny(self):
+        self.external_scrutiny_bets=None;self.external_scrutiny_name=''
+        self.external_scrutiny_status.setText('Escrutando las apuestas de la quiniela abierta.')
+        self.clear_external_scrutiny_button.hide()
+        if not self.scrutiny_bets():
+            self.eval_model.update_rows([])
+            self.eval_summary.setText('Abre una quiniela con apuestas o importa otro fichero externo.')
+        elif self.manual_mode.isChecked():self.refresh_manual_evaluation()
+        elif self.live_matches:self.evaluate_live()
+        else:self.show_cached_scrutiny()
 
     def read_scrutiny(self):
         path,_=QFileDialog.getOpenFileName(self,'Seleccionar PRE de esta temporada',filter='WIN1X2 (PRE*.txt Pre*.txt)')
@@ -5172,7 +5227,8 @@ class MainWindow(QMainWindow):
 
     def show_cached_scrutiny(self):
         """Use a matching definitive PRE or a previously verified published page."""
-        if self.manual_mode.isChecked() or not self.system or not self.system.bets:
+        bets=self.scrutiny_bets()
+        if self.manual_mode.isChecked() or not bets:
             self.clear_scrutiny_awards()
             return False
         context=self.frozen_round()
@@ -5205,7 +5261,7 @@ class MainWindow(QMainWindow):
                 return False
         self.prize_cache_error=''
         self.published_scrutiny=scrutiny
-        outcome=engine.evaluate(self.system.bets,scrutiny['result'],scrutiny['pleno'],
+        outcome=engine.evaluate(bets,scrutiny['result'],scrutiny['pleno'],
                                 finalized=(True,)*14,prizes=scrutiny['prizes'],official=True)
         self.render_scrutiny(outcome,scrutiny['pleno'],True,source,scrutiny)
         self.live_pleno_summary.setText(f'Pleno publicado: {scrutiny["pleno"][0]}–{scrutiny["pleno"][1]}')
@@ -5221,7 +5277,7 @@ class MainWindow(QMainWindow):
     def maybe_fetch_published_scrutiny(self):
         """Look up published payouts in a worker after all scores are final."""
         if (self.close_pending or self.manual_mode.isChecked() or self.published_scrutiny or
-            self.published_worker is not None or not self.system or not self.system.bets or
+            self.published_worker is not None or not self.scrutiny_bets() or
             self.navigation.currentRow()!=4 or len(self.live_matches or ())!=15 or
             not all(match.final and (match.sign if match.number<15 else match.pleno) for match in self.live_matches)):
             return
@@ -5243,7 +5299,7 @@ class MainWindow(QMainWindow):
             'fixture':[[m.home_id,m.away_id] for m in context.matches],
             'nominal_date':context.nominal_date,'scrutiny':scrutiny})
         if (self.round.key==context.key and not self.manual_mode.isChecked() and
-            self.system and self.system.bets):
+            self.scrutiny_bets()):
             self.show_cached_scrutiny()
 
     def published_failed(self,context,message):
@@ -5414,8 +5470,9 @@ class MainWindow(QMainWindow):
         self.display_live(matches,cached['captured_at'],cached=True)
 
     def evaluate_live(self):
-        if not self.system or not self.system.bets:
-            self.eval_model.update_rows([]);self.eval_summary.setText('Abre una quiniela con apuestas para compararla con los resultados.');return
+        bets=self.scrutiny_bets()
+        if not bets:
+            self.eval_model.update_rows([]);self.eval_summary.setText('Abre una quiniela o importa un fichero externo para compararlo con los resultados.');return
         if self.show_cached_scrutiny():return
         if not self.live_matches:raise ValueError('Actualiza o recupera primero el marcador de esta jornada.')
         from quiniela_ai_studio.infrastructure.integration import validate_teams
@@ -5423,7 +5480,7 @@ class MainWindow(QMainWindow):
         result=''.join(m.sign or '-' for m in self.live_matches[:14])
         finalized=tuple(bool(m.final and m.sign) for m in self.live_matches[:14])
         last=self.live_matches[14]
-        outcome=engine.evaluate(self.system.bets,result,last.pleno,finalized=finalized,pleno_final=last.final)
+        outcome=engine.evaluate(bets,result,last.pleno,finalized=finalized,pleno_final=last.final)
         self.render_scrutiny(outcome,last.pleno,last.final)
         self.maybe_fetch_published_scrutiny()
 

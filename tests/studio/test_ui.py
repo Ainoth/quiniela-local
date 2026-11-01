@@ -62,6 +62,37 @@ def test_T15_six_columns_real_gui_flow(window,tmp_path,monkeypatch):
     assert window.generate_button.mapTo(window,window.generate_button.rect().topLeft()).y()<window.height()
 
 
+@pytest.mark.parametrize(('format','suffix'),(('csv','.csv'),('txt','.txt'),('raw','.txt')))
+def test_scrutiny_imports_external_tulotero_files_without_creating_a_system(window,tmp_path,monkeypatch,format,suffix):
+    from PySide6.QtWidgets import QMessageBox
+    from quiniela_ai_studio.domain.models import Bet
+    from quiniela_ai_studio.infrastructure import files
+    from quiniela_ai_studio.infrastructure.ticket_files import write_ticket_file
+
+    bets=(Bet('1'*14,'00'),Bet('X'+'1'*13,'00'))
+    path=tmp_path/f'preparacion-tulotero{suffix}'
+    if format=='raw':files.write_txt(path,bets)
+    else:write_ticket_file(path,bets,window.round.price_cents,format=format)
+    monkeypatch.setattr(QFileDialog,'getOpenFileName',lambda *args,**kwargs:(str(path),format.upper()))
+    monkeypatch.setattr(QMessageBox,'question',lambda *args:QMessageBox.StandardButton.Yes)
+    window.manual_mode.setChecked(True)
+    window.result_input.setText('1'*14);window.result_pleno.setText('00');window.final_check.setChecked(True)
+
+    window.import_external_scrutiny()
+
+    assert window.system is None
+    assert window.external_scrutiny_name==path.name
+    assert sum(bet.quantity for bet in window.scrutiny_bets())==2
+    assert window.eval_model.rowCount()==2
+    assert window.eval_model.rows[0][3:5]==(14,0)
+    assert window.eval_model.rows[1][3:5]==(13,1)
+    assert 'asignado a' in window.external_scrutiny_status.text()
+
+    window.clear_external_scrutiny()
+    assert window.external_scrutiny_bets is None
+    assert window.eval_model.rowCount()==0
+
+
 def test_open_saved_coverage_reduction_from_mis_sistemas(window):
     """A saved Hermes report has its verifier nested under ``coverage``."""
     from quiniela_ai_studio.domain.coverage_reducer import (
