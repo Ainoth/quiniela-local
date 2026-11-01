@@ -132,6 +132,18 @@ de SELAE ni como compatibilidad con bases propietarias históricas.
 
 ## 9. Marcador en directo alternativo (v1.0.16)
 
+### Previsión orientativa de premios (v2.0.1)
+
+El adaptador `infrastructure/prize_estimate.py` lee del bloque de datos
+embebido en la página de Quinielista recaudación, bote, precio y porcentajes
+de la temporada/jornada solicitada. Rechaza otra jornada, limita la respuesta
+y se ejecuta en segundo plano. `domain/prize_forecast.py` compone los
+resultados recibidos con el signo público más probable de los pendientes,
+calcula la distribución de aciertos esperados y el desglose estimado de las
+apuestas propias. La respuesta válida se conserva por jornada en ajustes
+locales y se actualiza cada diez minutos. El PRE o escrutinio público validado
+mantiene prioridad: la previsión nunca se muestra como premio oficial.
+
 ### Escrutinio publicado con PRE provisional (v1.0.28)
 
 Cuando los 15 marcadores están finalizados y el PRE aún no contiene el reparto,

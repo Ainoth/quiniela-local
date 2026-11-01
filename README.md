@@ -6,7 +6,7 @@ Aplicación de Quiniela para escritorio y Android. La versión de escritorio
 puede leer los datos instalados por WIN1X2; ambas versiones descargan datos,
 porcentajes y marcadores directamente de sus proveedores públicos.
 
-## Quiniela AI Studio — v2.0.0
+## Quiniela AI Studio — v2.0.1
 
 ## Quiniela AI Studio — v1.0.37
 
@@ -116,6 +116,17 @@ uso sin conexión. La tarjeta indica la procedencia de los importes.
 Un segundo panel compacto muestra los acertantes y premios oficiales de las
 seis categorías junto a las apuestas premiadas de la quiniela abierta y sus
 subtotales. Al cambiar de quiniela, ambos paneles se actualizan para ella.
+
+Mientras no haya escrutinio definitivo, Escrutinio muestra una segunda tarjeta
+dorada con la previsión orientativa de tus apuestas. Consulta recaudación, bote
+y porcentajes públicos de Quinielista; combina los signos ya recibidos con el
+favorito publicado para partidos pendientes y estima los importes por categoría
+según el reparto vigente. Incluye el total, tus apuestas en cada categoría, el
+importe unitario estimado y la hora de actualización. Se refresca cada diez
+minutos mientras la pestaña está abierta y también manualmente. La tarjeta
+resumen añade aciertos confirmados, aciertos provisionales, fallos confirmados
+y partidos pendientes. Ni la previsión ni el total estimado acreditan un premio
+oficial o el cobro de un boleto.
 
 La ventana y la barra de tareas recuperan el icono de Quiniela Local; se incluye
 en el paquete instalable. En Linux, el acceso directo debe usar

@@ -1,5 +1,7 @@
 # 12 · Matriz de trazabilidad de requisitos
 
+RF-ESC-015 (v2.0.1): Escrutinio consulta en segundo plano recaudación, bote y porcentajes de Quinielista; estima por categoría las apuestas propias en un escenario de marcadores recibidos y favoritos pendientes. La tarjeta dorada de previsión se oculta cuando hay reparto definitivo. Un resumen muestra aciertos confirmados/provisionales, fallos y pendientes. Pruebas: `test_prize_forecast.py`.
+
 RF-NOR-006/007 y RF-UX-029 (v1.0.35): la base automática usa temporadas
 seleccionadas, cobertura objetivo y porcentajes de jornada, con límite técnico
 interno comunicado; dobles/triples Auto/Manual se manejan por separado. El

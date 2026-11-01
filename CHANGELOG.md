@@ -1,5 +1,18 @@
 # Cambios
 
+## 2.0.1 — previsión de premios dentro de Escrutinio
+
+- Recupera la tarjeta dorada de previsión orientativa que estaba en la app
+  móvil: recaudación, bote, escenario con marcadores recibidos y favoritos
+  para los pendientes, más el desglose estimado de las apuestas propias.
+- Descarga recaudación y porcentajes de Quinielista en segundo plano, guarda
+  la última respuesta por jornada, reintenta cada diez minutos y permite
+  actualizar manualmente. La tarjeta queda separada del reparto oficial.
+- Añade un resumen compacto de aciertos confirmados, aciertos provisionales,
+  fallos confirmados y pendientes.
+- Corrige el texto de Mis Sistemas que indicaba que la app no calculaba
+  ganancias previstas.
+
 ## 2.0.0 — escritorio y móvil en una edición convergente
 
 - Integra en el generador de escritorio los controles recientes de la app móvil:
