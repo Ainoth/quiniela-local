@@ -4,7 +4,7 @@ import threading
 from collections import Counter
 
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QFileDialog, QMessageBox
+from PySide6.QtWidgets import QFileDialog, QMessageBox, QScrollArea
 from test_pleno_probabilities import with_goals
 from test_portfolio import BASE72
 from test_ui import wait_for_data
@@ -16,9 +16,15 @@ from quiniela_ai_studio.infrastructure.ticket_files import read_ticket_file
 pytest_plugins=('test_ui',)
 
 
+def open_optimizer(window):
+    window.navigation.setCurrentRow(8)
+    window.reduction_tabs.setCurrentIndex(window.reduction_visible_indexes[19])
+
+
 def test_72_proposal_apply_and_audit(window):
     original=window.service.imported(window.round,'Sintético 72',generate(BASE72,'M0'))
-    window.set_system(original);window.navigation.setCurrentRow(2)
+    window.set_system(original);open_optimizer(window)
+    window.reduction_activation_buttons[19].setChecked(True)
     assert window.budget_group.title()=='2 · Define presupuesto y prioridad'
     assert window.budget_apply.text()=='Calcular propuesta'
     assert '10 · sin condiciones rápidas' in window._quick_conditions_text(10)
@@ -103,7 +109,7 @@ def test_cancelled_optimization_is_audited_without_modifying_system(window,monke
         QTest.qWait(5)
         if entered.is_set():break
     assert entered.is_set()
-    window.navigation.setCurrentRow(2)
+    open_optimizer(window)
     assert window.portfolio_cancel.isEnabled() and window.portfolio_cancel.isVisible()
     window.portfolio_cancel.click();wait_for_data(window)
     assert not window.portfolio_cancel.isEnabled()
@@ -125,10 +131,13 @@ def test_failed_optimization_is_audited_without_modifying_system(window,monkeypa
 
 
 def test_advanced_parameters_scroll_without_hiding_budget_actions(window):
-    window.navigation.setCurrentRow(2)
+    open_optimizer(window)
     window.portfolio_advanced_toggle.setChecked(True);QTest.qWait(50)
     assert window.minimumSizeHint().height()<=768
     assert window.portfolio_advanced.isVisible()
+    page_scroll=window.pages.widget(8).findChildren(QScrollArea)[0]
+    page_scroll.verticalScrollBar().setValue(page_scroll.verticalScrollBar().maximum())
+    QTest.qWait(50)
     for button in (window.budget_apply,window.portfolio_cancel):
         assert button.isVisible()
         assert button.mapTo(window,button.rect().bottomRight()).y()<window.height()

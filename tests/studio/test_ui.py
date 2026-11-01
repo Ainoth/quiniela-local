@@ -566,7 +566,8 @@ def test_quick_condition_slider_populates_filters_and_recovers_original_bets(win
     window.set_system(window.service.edit(window.system,base,(False,)*14,'M1'))
     window.set_system(window.service.generated(window.system,engine.generate(base,'M1')))
     original=window.system
-    window.navigation.setCurrentRow(2);QTest.qWait(10)
+    recommended_counts=(window.normal_generator.triples.value(),window.normal_generator.doubles.value())
+    window.navigation.setCurrentRow(8);window.reduction_tabs.setCurrentIndex(window.reduction_visible_indexes[19]);QTest.qWait(10)
     window.reduction_activation_buttons[0].setChecked(True)
     assert window.quick_conditions_slider.isVisible()
     window.quick_conditions_slider.setValue(0)
@@ -604,7 +605,9 @@ def test_live_optimization_latest_request_empty_recovery_and_budget_last(window)
     window.set_system(window.service.edit(window.system,base,(False,)*14,'M1'))
     window.set_system(window.service.generated(window.system,engine.generate(base,'M1')))
     original=window.system
-    window.navigation.setCurrentRow(2)
+    window.navigation.setCurrentRow(8)
+    window.reduction_tabs.setCurrentIndex(window.reduction_visible_indexes[19])
+    window.reduction_activation_buttons[19].setChecked(True)
     window.reduction_activation_buttons[0].setChecked(True)
     normal_counts=(window.normal_generator.triples.value(),window.normal_generator.doubles.value())
     window.quick_conditions_slider.setValue(0);window.quick_conditions_slider.setValue(8);window.quick_conditions_slider.setValue(1)
@@ -624,10 +627,14 @@ def test_live_optimization_latest_request_empty_recovery_and_budget_last(window)
     window.quick_conditions_slider.setValue(0);window.quick_conditions_slider.setValue(10)
     wait_for_optimization(window)
     assert window.system.bets==original.bets
+    assert window.budget_apply.isEnabled()
     window.budget.setValue(3);window.budget_apply.click()
     wait_for_data(window);window.optimization_dialog.apply_button.click()
     assert window.system.quantity==4 and window.system.cost(window.round)==300
     assert all(bet in original.bets for bet in window.system.bets)
+    window.reduction_activation_buttons[19].setChecked(False)
+    assert window.system.bets==original.bets
+    assert not window.reduction_active[19]
 
 
 def test_close_cancels_pending_live_optimization(window,application):

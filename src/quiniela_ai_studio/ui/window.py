@@ -2021,7 +2021,10 @@ class MainWindow(QMainWindow):
 
     def _sign_distance_toggled(self,sign,distance,checked):
         if checked:self.sign_distance_values[sign].add(distance)
-        else:self.sign_distance_values[sign].discard(distance)
+        else:
+            self.sign_distance_values[sign].discard(distance)
+            if not self.sign_distance_values[sign] and self.sign_distance_apply[sign].isChecked():
+                self.sign_distance_apply[sign].setChecked(False)
         self._interruption_manual_edited()
 
     def initialize_sign_distances(self):
@@ -2135,7 +2138,10 @@ class MainWindow(QMainWindow):
             self.interruption_selected_figures.add(key)
             if key[0] not in self.interruption_selected_totals:
                 self.interruption_total_buttons[key[0]].setChecked(True)
-        else:self.interruption_selected_figures.discard(key)
+        else:
+            self.interruption_selected_figures.discard(key)
+            if not self.interruption_selected_figures and self.distance_apply.isChecked():
+                self.distance_apply.setChecked(False)
         self._interruption_manual_edited()
 
     def _interruption_manual_edited(self):
@@ -2232,9 +2238,7 @@ class MainWindow(QMainWindow):
             # Disabled marker preserves the independent total-selection UI state.
             rules.append(ReductionRule('interruption-distance-totals','allowed_interruption_total',0,13,
                 allowed_values=tuple(sorted(self.interruption_selected_totals)),active=False,**common))
-        if self.distance_apply.isChecked() and not self.interruption_selected_figures:
-            raise ValueError('Selecciona al menos una figura en Distancias o desactiva su aplicación.')
-        if self.distance_apply.isChecked():
+        if self.distance_apply.isChecked() and self.interruption_selected_figures:
             impossible={pair for pair in self.interruption_selected_figures
                         if pair[1] not in self.interruption_possible_figures.get(pair[0],set())}
             if impossible:raise ValueError('La base actual ya no alcanza alguna figura seleccionada en Distancias.')
@@ -2246,8 +2250,6 @@ class MainWindow(QMainWindow):
                     run_length=total,allowed_figures=selected,active=self.distance_apply.isChecked() and bool(selected),**common))
         for sign in ('1','X','2','V'):
             values=self.sign_distance_values[sign]
-            if self.sign_distance_apply[sign].isChecked() and not values:
-                raise ValueError(f'Selecciona una distancia de {sign} o desactiva Aplicar.')
             if self.sign_distance_apply[sign].isChecked() and values-self.sign_distance_possible[sign]:
                 raise ValueError(f'La base actual no alcanza alguna distancia seleccionada de {sign}.')
             if values:
@@ -2852,12 +2854,52 @@ class MainWindow(QMainWindow):
         self.reduction_active[index]=bool(checked)
         if index==19:
             if self.system:
-                self.repository.set_setting(f'optimizer_enabled:{self.system.system_id}',bool(checked))
+                system_id=self.system.system_id
+                self.repository.set_setting(f'optimizer_enabled:{system_id}',bool(checked))
+                if not checked:
+                    key=f'optimizer_restore:{system_id}'
+                    revision=self.repository.setting(key)
+                    if revision is None:
+                        cursor=self.system
+                        while cursor:
+                            params=json.loads(cursor.parameters)
+                            report=params.get('optimization_report')
+                            if isinstance(report,dict) and type(report.get('input_revision')) is int:
+                                revision=report['input_revision'];break
+                            previous=params.get('input_revision')
+                            if type(previous) is not int or previous>=cursor.revision:break
+                            cursor=self.repository.load(system_id,previous)
+                    if revision is not None:
+                        try:
+                            target=self.repository.load(system_id,revision)
+                            restored=self.service.restore_version(self.system,target)
+                            self.set_system(restored)
+                            self.restore_filter_controls()
+                            self.repository.set_setting(key,None)
+                            self.background_status('Optimización desactivada; se recuperaron las apuestas anteriores a la propuesta.')
+                        except (ValueError,OSError,sqlite3.Error) as exc:
+                            self.reduction_active[index]=True
+                            self.reduction_activation_buttons[index].blockSignals(True)
+                            self.reduction_activation_buttons[index].setChecked(True)
+                            self.reduction_activation_buttons[index].blockSignals(False)
+                            self.repository.set_setting(f'optimizer_enabled:{system_id}',True)
+                            self.background_status(f'No se pudieron recuperar las apuestas anteriores: {exc}')
+                            return
             self.update_filter_controls()
             return
         if self.system:
             self.repository.set_setting(f'reduction_tabs_configured:{self.system.system_id}',True)
         self.manual_filters_changed()
+
+    def apply_optimization_result(self,source,result):
+        """Apply the reviewed proposal and remember the exact pre-optimization state."""
+        if self.system!=source or self.round.key!=source.round_key:
+            raise ValueError('La quiniela abierta cambió. Repite el cálculo para aplicar la propuesta.')
+        updated=self.service.apply_portfolio(source,result)
+        key=f'optimizer_restore:{source.system_id}'
+        if self.repository.setting(key) is None:
+            self.repository.set_setting(key,source.revision)
+        self.set_system(updated)
 
     def _build_pattern_tabs(self):
         """Pair/triple/quartet/quintet use the same window-count semantics."""

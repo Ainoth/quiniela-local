@@ -70,7 +70,7 @@ def result_dialog(parent,result,source):
     def commit():
         def action():
             if parent.system!=source or parent.round.key!=source.round_key:raise ValueError('La quiniela abierta cambió. Repite el cálculo para aplicar una propuesta.')
-            parent.set_system(parent.service.apply_portfolio(source,result));dialog.accept()
+            parent.apply_optimization_result(source,result);dialog.accept()
         parent.safe(action)
     apply.clicked.connect(commit)
     export=QPushButton('TuLotero: preparar boletos');row.addWidget(export);export.clicked.connect(lambda:parent.open_tulotero(result.bets,round_))

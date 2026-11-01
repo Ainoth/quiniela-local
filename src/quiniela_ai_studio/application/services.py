@@ -153,6 +153,16 @@ class SystemService:
                                                        filter_spec=json.loads(system.parameters).get('filter_spec',{}),
                                                        quick_level=json.loads(system.parameters).get('quick_level'))))
 
+    def restore_version(self,system,target):
+        """Create a new revision containing an exact earlier saved state."""
+        self._editable(system)
+        if target.system_id!=system.system_id or target.round_key!=system.round_key:
+            raise ValueError('La copia de recuperación pertenece a otra quiniela.')
+        return self.version(system,name=target.name,base=target.base,locks=target.locks,
+            pleno=target.pleno,bets=target.bets,origin=target.origin,
+            parameters=target.parameters,round_snapshot=target.round_snapshot,
+            action='restore_origin')
+
     def refresh_sources(self, system):
         """Adopta fuentes actualizadas mediante versión explícita sin cambiar apuestas/precio."""
         current = self._editable(system)
