@@ -609,8 +609,8 @@ class MainWindow(QMainWindow):
         help_text.setWordWrap(True);self.reduction_tab_layouts[9].addWidget(help_text)
         self.advanced_feedback=QLabel();self.advanced_feedback.setWordWrap(True);self.reduction_tab_layouts[9].addWidget(self.advanced_feedback)
         layout.addWidget(self.filter_feedback);layout.addWidget(self.filter_reset)
-        self._make_reduction_numeric_graphical()
         self._move_optimizer_into_reductions()
+        self._make_reduction_numeric_graphical()
         self.reduction_tabs.currentChanged.connect(self._reduction_tab_selected)
         self.update_advanced_enabled()
 
@@ -1663,10 +1663,6 @@ class MainWindow(QMainWindow):
             set(self.fss_figure_values[sign]))
         selected=self.fss_figure_values[sign].get(total,set());possible=self.fss_possible_figures[sign].get(total,())
         figures=sorted(set(possible)|selected,key=lambda figure:tuple(-int(part) for part in figure.split('-')) if figure else ())
-        if (hasattr(self,'reduction_tabs') and
-                self.reduction_tabs.currentIndex()!=self.reduction_visible_indexes.get(17)):
-            self.fss_render_signatures.pop(sign,None)
-            return
         signature=(base,total,tuple(sorted(selected)),tuple(figures))
         if self.fss_render_signatures.get(sign)==signature:return
         self.fss_render_signatures[sign]=signature
