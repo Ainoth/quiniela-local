@@ -76,10 +76,16 @@ Línea de columna propia: `SSSSSSSSSSSSSS;GH;GA`, con 14 caracteres de signos y 
 La descarga de porcentajes de Quinielista identifica la petición por número de
 jornada, sin parámetro de temporada. Por ello solo se usa para la jornada en
 curso; para temporadas pasadas se conserva el porcentaje ya guardado o se
-importan datos ligados explícitamente a esa jornada. Al validar equipos, se
-tolera la marca `W` de Quinielista antes de `(F)` (por ejemplo, `Badalona
-W.(F)` frente a `Badalona (F)`); cualquier otra diferencia de identidad sigue
-siendo un error.
+importan datos ligados explícitamente a esa jornada. La identidad de equipos
+se resuelve centralmente en `domain.team_identity`: normaliza acentos,
+puntuación y sufijos de entidad; reconoce abreviaturas documentadas y permite
+una errata de edición en un token significativo si la coincidencia es única en
+la jornada. Se conserva el orden local/visitante, la categoría masculina o
+femenina cuando está indicada y los calificadores de filial (B/II). Una
+coincidencia ambigua o un rival diferente nunca se acepta. Si un proveedor da
+un nombre dudoso en el marcador, solo se oculta el resultado de ese partido;
+los resultados confirmados de las otras filas siguen visibles y se intenta la
+fuente alternativa.
 
 Proveedores registrados con identificación, base URL, licencia, limitación de peticiones, formatos, disponibilidad, zona horaria, mecanismo de autenticación y política de caché. Los datos externos pasan por `validate -> normalize -> compare -> stage -> commit`. **Nunca sobrescribir sin más una jornada** ni mezclar porcentajes de distintas horas sin explicarlo.
 

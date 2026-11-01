@@ -3,6 +3,7 @@
 import itertools
 import json
 import math
+from dataclasses import replace
 
 import pytest
 
@@ -186,6 +187,27 @@ def test_csv_probability_import_checks_order_teams_sums_and_identity():
     assert source.kind == "form5" and source.values[0] == pytest.approx((.5, .3, .2))
     with pytest.raises(ValueError, match="no coinciden"):
         import_probability_source((header + body.replace(round_.matches[0].home, "Otro", 1)).encode(), round_key=round_.key, matches=round_.matches)
+
+
+def test_probability_import_accepts_unique_team_typo_but_rejects_other_club():
+    original = demo_round()
+    fixtures = list(original.matches)
+    fixtures[0] = replace(fixtures[0], home="Sevilla")
+    round_ = replace(original, matches=tuple(fixtures))
+    header = "number,home,away,p1,px,p2,source,captured_at,kind\n"
+    body = "".join(
+        f'{i},{"Sevila" if i == 1 else match.home},{match.away},50,30,20,Fixture,2026-10-15T10:00:00+02:00,form5\n'
+        for i, match in enumerate(round_.matches[:14], 1)
+    )
+    source = import_probability_source(
+        (header + body).encode(), round_key=round_.key, matches=round_.matches
+    )
+    assert source.values[0] == pytest.approx((.5, .3, .2))
+    reordered = body.replace("1,Sevila", "1,Rayo", 1)
+    with pytest.raises(ValueError, match="no coinciden"):
+        import_probability_source(
+            (header + reordered).encode(), round_key=round_.key, matches=round_.matches
+        )
 
 
 def test_json_probability_import_and_invalid_round():

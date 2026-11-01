@@ -16,6 +16,26 @@
   conserva el resultado válido del proveedor primario.
 - Sube la versión del paquete de escritorio a 2.0.0.
 
+## 1.0.37 — identidad coherente de equipos entre fuentes
+
+- RF-DAT-008: centraliza aliases, acentos, abreviaturas y typos acotados en
+  `domain.team_identity`; porcentajes, importaciones, ESPN, marcador y escrutinio
+  comparan los equipos con las mismas reglas y conservan local/visitante,
+  categoría y filiales.
+- Un nombre dudoso ya no borra los resultados confirmados de los otros partidos:
+  esa fila queda sin marcador y se consulta ESPN como alternativa.
+- Al actualizar fuentes se conservan los sistemas cuando los nombres cambiaron
+  de formato pero la jornada y sus cruces siguen siendo los mismos.
+
+## 1.0.36 — alias de Sevilla femenino en marcador
+
+- RF-ESC-011: reconoce la errata «Sevila (F)» del calendario local como
+  «Sevilla (F)» al validar el marcador. Un nombre correcto del proveedor ya no
+  invalida los 15 partidos y oculta resultados recibidos para el resto de la
+  jornada.
+- Prueba la equivalencia del alias y sigue rechazando equipos realmente
+  distintos.
+
 ## 1.0.35 — controles automáticos por histórico y boleto compacto
 
 - RF-RED-020 / RF-UX-030: Distancias explica que las selecciones se cruzan con

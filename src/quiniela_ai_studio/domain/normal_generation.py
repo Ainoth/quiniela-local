@@ -13,6 +13,7 @@ from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass
 
 from .models import SIGNS, Match, normalize_base, validate_column, validate_datetime
+from .team_identity import uniquely_matches_team
 
 SOURCE_SCHEMA = "quiniela_ai_studio.probabilities"
 MAX_SOURCE_BYTES = 20 * 1024 * 1024
@@ -152,7 +153,7 @@ def import_probability_source(
         for index, (entry, match) in enumerate(zip(entries, matches[:14]), 1):
             if not isinstance(entry, dict) or entry.get("number") != index:
                 raise ValueError(f"El partido {index} tiene número u orden incorrecto.")
-            _validate_pair(entry.get("home"), entry.get("away"), match, index)
+            _validate_pair(entry.get("home"), entry.get("away"), match, index, matches[:14])
             rows.append(_convert_values((entry.get("p1"), entry.get("px"), entry.get("p2")), index))
     else:
         source_name = ""
@@ -175,7 +176,7 @@ def import_probability_source(
             row = {str(key).strip().lower(): value for key, value in raw.items() if key}
             if str(row.get("number", "")).strip() != str(index):
                 raise ValueError(f"El partido {index} tiene número u orden incorrecto.")
-            _validate_pair(row.get("home"), row.get("away"), match, index)
+            _validate_pair(row.get("home"), row.get("away"), match, index, matches[:14])
             rows.append(_convert_values((row.get("p1"), row.get("px"), row.get("p2")), index))
         source_names = {str(row.get("source", "")).strip() for row in records}
         capture_times = {str(row.get("captured_at", "")).strip() for row in records}
@@ -194,11 +195,15 @@ def import_probability_source(
                              tuple((m.home, m.away) for m in matches[:14]), filename)
 
 
-def _validate_pair(home, away, match: Match, index: int) -> None:
+def _validate_pair(home, away, match: Match, index: int, matches: Sequence[Match] = ()) -> None:
     if not isinstance(home, str) or not isinstance(away, str):
         raise ValueError(f"Faltan los equipos del partido {index}.")
-    clean = lambda value: " ".join(value.casefold().replace(".", "").split())
-    if clean(home) != clean(match.home) or clean(away) != clean(match.away):
+    homes = [candidate.home for candidate in matches] or [match.home]
+    aways = [candidate.away for candidate in matches] or [match.away]
+    if not (
+        uniquely_matches_team(match.home, home, homes, allow_missing_gender=True)
+        and uniquely_matches_team(match.away, away, aways, allow_missing_gender=True)
+    ):
         raise ValueError(f"Los equipos del partido {index} no coinciden con la jornada.")
 
 

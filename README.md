@@ -8,6 +8,8 @@ porcentajes y marcadores directamente de sus proveedores públicos.
 
 ## Quiniela AI Studio — v2.0.0
 
+## Quiniela AI Studio — v1.0.37
+
 Interfaz gráfica en español que conserva la experiencia visual de Quiniela Local:
 fondo azul, boleto fijo compacto con partido y porcentajes junto a 1/X/2,
 Pleno 0/1/2/M, secciones a la derecha y **Descargar datos** en la cabecera.
