@@ -1,5 +1,11 @@
 # Cambios
 
+## 2.0.6 — previsión en filas compactas
+
+- Presenta Pleno 15 y las categorías 14–10 en una fila cada una.
+- Reduce la altura y tipografía de las tarjetas, manteniendo apuestas,
+  €/apuesta y subtotal en cada línea.
+
 ## 2.0.5 — espacio del resumen de Escrutinio
 
 - El separador de Escrutinio reserva espacio para la previsión y el estado
