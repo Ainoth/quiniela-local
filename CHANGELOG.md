@@ -1,5 +1,12 @@
 # Cambios
 
+## 2.0.3 — tarjetas de escrutinio legibles
+
+- Reorganiza las categorías de la previsión en seis tarjetas compactas para
+  evitar que se aplasten dentro de la columna.
+- Reduce el texto auxiliar a una línea breve y limita el botón de actualización.
+- Permite que los paneles se ajusten a la anchura disponible.
+
 ## 2.0.2 — escrutinio a dos columnas
 
 - Coloca la previsión orientativa a la izquierda y el resultado real/oficial a
