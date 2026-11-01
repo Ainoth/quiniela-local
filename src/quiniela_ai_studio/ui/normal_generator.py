@@ -25,6 +25,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QProgressBar,
     QPushButton,
+    QSlider,
     QSpinBox,
     QTableWidget,
     QTableWidgetItem,
@@ -32,10 +33,12 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from quiniela_ai_studio.domain.engine import MAX_GENERATED
 from quiniela_ai_studio.domain.normal_generation import (
     ProbabilitySource,
+    apply_surprise,
     best_base,
-    best_base_under_limit,
+    historical_base,
     import_probability_source,
     normalize_percentages,
     parse_columns_file,
@@ -44,6 +47,7 @@ from quiniela_ai_studio.domain.normal_generation import (
 )
 from quiniela_ai_studio.infrastructure.files import read_bytes
 from quiniela_ai_studio.infrastructure.normal_generation import generate_actions_file
+from quiniela_ai_studio.ui.season_picker import SeasonPicker
 
 
 class ActionWorker(QThread):
@@ -87,6 +91,9 @@ class NormalGenerator(QWidget):
         self.last_report = None
         self._loading = False
         self.matrix_origin = "manual"
+        self.count_modes = {"triples": "automatic", "doubles": "automatic"}
+        self.selected_history_seasons: set[str] = set()
+        self.history_recommendation = None
         self._build()
 
     def _build(self):
@@ -156,28 +163,43 @@ class NormalGenerator(QWidget):
         controls_box = QGroupBox("2 · Elegir dobles y triples")
         controls = QGridLayout(controls_box)
         controls.setContentsMargins(6, 8, 6, 5); controls.setHorizontalSpacing(5); controls.setVerticalSpacing(3)
-        self.assignment_mode = QComboBox()
-        self.assignment_mode.addItem("Automática · según porcentajes", "automatic")
-        self.assignment_mode.addItem("Manual · indicar cantidades", "manual")
-        self.assignment_mode.setFixedWidth(220)
-        controls.addWidget(QLabel("ASIGNACIÓN"), 0, 0)
-        controls.addWidget(self.assignment_mode, 0, 1, 1, 3)
-        self.triples = QSpinBox(); self.triples.setRange(0, 14); self.triples.setValue(0); self.triples.setFixedWidth(64)
-        self.doubles = QSpinBox(); self.doubles.setRange(0, 14); self.doubles.setValue(0); self.doubles.setFixedWidth(64)
+        self.history_button = QPushButton("Elegir temporadas…")
+        self.history_button.clicked.connect(lambda: self.window.safe(self._choose_history_seasons))
+        self.history_summary = QLabel("Histórico: últimas 6 temporadas")
+        self.history_summary.setObjectName("muted")
+        controls.addWidget(QLabel("HISTÓRICO"), 0, 0)
+        controls.addWidget(self.history_button, 0, 1)
+        controls.addWidget(self.history_summary, 0, 2, 1, 3)
+        self.history_coverage = QSlider(Qt.Orientation.Horizontal)
+        self.history_coverage.setRange(10, 100); self.history_coverage.setSingleStep(5); self.history_coverage.setPageStep(10); self.history_coverage.setValue(70)
+        self.history_coverage_label = QLabel("70%")
+        self.history_coverage.valueChanged.connect(self._history_coverage_changed)
+        controls.addWidget(QLabel("COBERTURA HISTÓRICA"), 1, 0)
+        controls.addWidget(self.history_coverage, 1, 1, 1, 3)
+        controls.addWidget(self.history_coverage_label, 1, 4)
+        self.surprise_level = QSlider(Qt.Orientation.Horizontal)
+        self.surprise_level.setRange(0, 10); self.surprise_level.setSingleStep(1); self.surprise_level.setValue(0)
+        self.surprise_level_label = QLabel("0/10")
+        self.surprise_level.valueChanged.connect(self._surprise_changed)
+        controls.addWidget(QLabel("FACTOR SORPRESA"), 2, 0)
+        controls.addWidget(self.surprise_level, 2, 1, 1, 3)
+        controls.addWidget(self.surprise_level_label, 2, 4)
+        self.triples = QSlider(Qt.Orientation.Horizontal); self.triples.setRange(0, 14); self.triples.setValue(0)
+        self.doubles = QSlider(Qt.Orientation.Horizontal); self.doubles.setRange(0, 14); self.doubles.setValue(0)
+        self.triple_count_label = QLabel("0"); self.double_count_label = QLabel("0")
+        self.triple_auto_button = QPushButton("Auto"); self.triple_auto_button.setObjectName("autoCountMode")
+        self.double_auto_button = QPushButton("Auto"); self.double_auto_button.setObjectName("autoCountMode")
+        self.triple_auto_button.clicked.connect(lambda: self._toggle_count_mode("triples"))
+        self.double_auto_button.clicked.connect(lambda: self._toggle_count_mode("doubles"))
         self.triples.valueChanged.connect(lambda value: self._count_changed("triples", value))
         self.doubles.valueChanged.connect(lambda value: self._count_changed("doubles", value))
-        self.triple_plus, self.triple_minus = self._step_buttons(self.triples)
-        self.double_plus, self.double_minus = self._step_buttons(self.doubles)
-        controls.addWidget(QLabel("TRIPLES"), 1, 0); controls.addWidget(self.triples, 1, 1); controls.addWidget(self.triple_plus, 1, 2); controls.addWidget(self.triple_minus, 1, 3)
-        controls.addWidget(QLabel("DOBLES"), 2, 0); controls.addWidget(self.doubles, 2, 1); controls.addWidget(self.double_plus, 2, 2); controls.addWidget(self.double_minus, 2, 3)
-        self.max_columns = QSpinBox(); self.max_columns.setRange(1, 100_000); self.max_columns.setValue(6); self.max_columns.setGroupSeparatorShown(True); self.max_columns.setFixedWidth(94)
-        self.max_columns.setToolTip("En Automática se buscará la base que conserve más probabilidad conjunta sin superar este número de columnas.")
-        self.max_columns.valueChanged.connect(self._configuration_changed)
-        self.max_columns_label = QLabel("Máx. columnas")
-        controls.addWidget(self.max_columns_label, 3, 0); controls.addWidget(self.max_columns, 3, 1)
+        controls.addWidget(QLabel("TRIPLES"), 3, 0); controls.addWidget(self.triples, 3, 1, 1, 2); controls.addWidget(self.triple_count_label, 3, 3); controls.addWidget(self.triple_auto_button, 3, 4)
+        controls.addWidget(QLabel("DOBLES"), 4, 0); controls.addWidget(self.doubles, 4, 1, 1, 2); controls.addWidget(self.double_count_label, 4, 3); controls.addWidget(self.double_auto_button, 4, 4)
         self.combination_count = QLabel("1 columna base"); self.combination_count.setStyleSheet("color:#49dbff;font-weight:bold;")
-        controls.addWidget(self.combination_count, 4, 0, 1, 4)
-        self.assignment_mode.currentIndexChanged.connect(self._assignment_mode_changed)
+        controls.addWidget(self.combination_count, 5, 0, 1, 5)
+        history_note = QLabel("Automático usa el porcentaje objetivo observado en las temporadas elegidas y los porcentajes de esta jornada. Es descriptivo, no una predicción; el coste no elige la base.")
+        history_note.setWordWrap(True); history_note.setObjectName("muted")
+        controls.addWidget(history_note, 6, 0, 1, 5)
         right.addWidget(controls_box)
 
         save_row = QHBoxLayout()
@@ -249,7 +271,7 @@ class NormalGenerator(QWidget):
         self.generate_file_button.clicked.connect(lambda: self.window.safe(self._choose_output))
         self.cancel_action_button.clicked.connect(self._cancel_generation)
         self._load_action_rows(None)
-        self._assignment_mode_changed()
+        self._refresh_count_modes()
         self._apply_local_styles()
 
     def _refresh_matrix_sources(self):
@@ -280,11 +302,13 @@ class NormalGenerator(QWidget):
                 self.matrix_origin = "manual"
                 self._matrix_edited()
                 self.base_status.setText("Matriz editable: se usarán los porcentajes visibles al rellenar la base.")
+                self._refresh_historical_recommendation()
             return
         self._populate_probability_table(source.values)
         self.matrix_origin = key
         self._matrix_edited()
         self.base_status.setText(f"Matriz desde {source.source} · captura {source.captured_at}.")
+        self._refresh_historical_recommendation()
 
     @staticmethod
     def _step_buttons(spin):
@@ -347,6 +371,8 @@ class NormalGenerator(QWidget):
                     self._matrix_edited()
             self._refresh_availability(system)
             self._refresh_matrix_sources()
+            self._refresh_history_summary()
+            self._refresh_historical_recommendation()
             return
         self._loading = True
         self.current_round = round_
@@ -385,10 +411,26 @@ class NormalGenerator(QWidget):
         for key, spin in self.weight_spin.items():
             spin.setValue(int(config.get("weights", {}).get(key, 50)))
         initial_base = system.base if system and self.window.system_mode(system) == "normal" else ("1",) * 14
-        self.assignment_mode.setCurrentIndex(max(0, self.assignment_mode.findData(config.get("assignment_mode", "automatic"))))
         self.triples.setValue(int(config.get("triples", sum(len(value) == 3 for value in initial_base))))
         self.doubles.setValue(int(config.get("doubles", sum(len(value) == 2 for value in initial_base))))
-        self.max_columns.setValue(max(1, min(100_000, int(config.get("max_columns", 6)))))
+        self.surprise_level.setValue(max(0, min(10, int(config.get("surprise_level", 0)))) )
+        legacy_mode = config.get("assignment_mode", "automatic")
+        default_mode = "manual" if legacy_mode == "manual" else "automatic"
+        self.count_modes = {
+            "triples": config.get("triples_mode", default_mode),
+            "doubles": config.get("doubles_mode", default_mode),
+        }
+        for which in self.count_modes:
+            if self.count_modes[which] not in {"manual", "automatic"}:
+                self.count_modes[which] = default_mode
+        self.history_coverage.blockSignals(True)
+        self.history_coverage.setValue(max(10, min(100, int(float(config.get("historical_target", .7)) * 100))))
+        self.history_coverage.blockSignals(False)
+        inventory = self._history_inventory()
+        available_seasons = sorted(inventory, reverse=True)
+        saved_seasons = config.get("history_seasons")
+        self.selected_history_seasons = (set(saved_seasons) & set(available_seasons)
+                                         if saved_seasons is not None else set(available_seasons[:6]))
         self.keep_duplicates.setChecked(bool(config.get("keep_duplicates", False)))
         self.intersection.setChecked(bool(config.get("intersection", False)))
         self._load_action_rows(config.get("actions"))
@@ -397,6 +439,11 @@ class NormalGenerator(QWidget):
         self._refresh_matrix_sources()
         self._matrix_edited()
         self._update_theoretical_count()
+        self._refresh_count_modes()
+        self.history_coverage_label.setText(f"{self.history_coverage.value()}%")
+        self.surprise_level_label.setText(f"{self.surprise_level.value()}/10")
+        self._refresh_history_summary()
+        self._refresh_historical_recommendation()
 
     def _populate_probability_table(self, values):
         self.probability_table.blockSignals(True)
@@ -440,27 +487,119 @@ class NormalGenerator(QWidget):
         self.matrix_origin = "manual"
         self._refresh_matrix_sources()
         self._matrix_edited()
+        self._refresh_historical_recommendation()
 
     def _configuration_changed(self, *_):
         if not self._loading: self._save_configuration()
 
-    def _assignment_mode_changed(self, *_):
-        manual = self.assignment_mode.currentData() == "manual"
-        for widget in (self.triples, self.doubles, self.triple_plus, self.triple_minus, self.double_plus, self.double_minus):
-            widget.setEnabled(manual)
-        self.max_columns.setEnabled(not manual)
-        self.max_columns_label.setEnabled(not manual)
-        self.assignment_mode.setToolTip(
-            "Indica las cantidades; los partidos se eligen por su probabilidad." if manual
-            else "El programa elige cantidades y partidos con mayor probabilidad conjunta dentro del máximo de columnas."
-        )
+    def _refresh_count_modes(self):
+        for which, slider, button, label in (
+            ("triples", self.triples, self.triple_auto_button, self.triple_count_label),
+            ("doubles", self.doubles, self.double_auto_button, self.double_count_label),
+        ):
+            automatic = self.count_modes.get(which, "automatic") == "automatic"
+            slider.setEnabled(not automatic)
+            button.setText("Manual" if automatic else "Auto")
+            button.setToolTip("Desbloquear esta cantidad y ajustarla manualmente." if automatic
+                              else "Calcular esta cantidad con las temporadas seleccionadas y los porcentajes actuales.")
+            label.setText(str(slider.value()))
+
+    def _history_inventory(self):
+        from collections import Counter
+        return Counter(str(row.get("season")) for row in getattr(self.window, "historical_reduction_results", [])
+                       if row.get("season") and row.get("results14") and len(row["results14"]) == 14)
+
+    def _history_rows(self):
+        return [row["results14"] for row in getattr(self.window, "historical_reduction_results", [])
+                if str(row.get("season")) in self.selected_history_seasons
+                and row.get("results14") and len(row["results14"]) == 14]
+
+    def _refresh_history_summary(self):
+        inventory = self._history_inventory()
+        rows = sum(inventory.get(season, 0) for season in self.selected_history_seasons)
+        self.history_summary.setText(f"{len(self.selected_history_seasons)} temporadas · {rows:,} jornadas".replace(",", ".")
+                                     if rows else "Selecciona temporadas con resultados")
+
+    def _choose_history_seasons(self):
+        inventory = self._history_inventory()
+        if not inventory:
+            raise ValueError("No hay resultados históricos disponibles en esta instalación.")
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Temporadas para la base automática")
+        dialog.resize(430, 420)
+        layout = QVBoxLayout(dialog)
+        picker = SeasonPicker(dialog)
+        picker.set_seasons(inventory, self.selected_history_seasons)
+        layout.addWidget(picker)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        buttons.accepted.connect(dialog.accept); buttons.rejected.connect(dialog.reject)
+        layout.addWidget(buttons)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            self.selected_history_seasons = picker.selected_seasons()
+            self._refresh_history_summary()
+            self._refresh_historical_recommendation()
+            self._save_configuration()
+
+    def _historical_choice(self):
+        history = self._history_rows()
+        if not history:
+            raise ValueError("Selecciona al menos una temporada con resultados finales.")
+        system = self.window.system
+        if not system:
+            raise ValueError("Pulsa Nuevo para crear la quiniela de esta jornada.")
+        column_limit = max(1, MAX_GENERATED // max(1, len(system.plenos)))
+        return historical_base(self._matrix_values(), history, self.history_coverage.value() / 100,
+                               column_limit, system.locks, system.base)
+
+    def _refresh_historical_recommendation(self, *_):
+        self.history_coverage_label.setText(f"{self.history_coverage.value()}%")
+        try:
+            _base, report = self._historical_choice()
+        except (ValueError, TypeError):
+            self.history_recommendation = None
+            self._refresh_history_summary()
+            return
+        self.history_recommendation = report
+        for which, slider in (("triples", self.triples), ("doubles", self.doubles)):
+            if self.count_modes.get(which) == "automatic":
+                other = self.doubles if which == "triples" else self.triples
+                value = report[which]
+                if value + other.value() > 14 and self.count_modes.get("doubles" if which == "triples" else "triples") == "manual":
+                    value = 14 - other.value()
+                slider.blockSignals(True); slider.setValue(value); slider.blockSignals(False)
+        self._refresh_count_modes()
+        self._update_theoretical_count()
+        if not self._loading:
+            self._save_configuration()
+
+    def _history_coverage_changed(self, value):
+        self.history_coverage_label.setText(f"{value}%")
+        self._refresh_historical_recommendation()
+
+    def _surprise_changed(self, value):
+        self.surprise_level_label.setText(f"{value}/10")
+        if not self._loading: self._save_configuration()
+
+    def _toggle_count_mode(self, which):
+        if self.count_modes.get(which) == "automatic":
+            self.count_modes[which] = "manual"
+        else:
+            _base, report = self._historical_choice()
+            other = self.doubles if which == "triples" else self.triples
+            value = min(report[which], 14 - other.value())
+            slider = self.triples if which == "triples" else self.doubles
+            slider.blockSignals(True); slider.setValue(value); slider.blockSignals(False)
+            self.count_modes[which] = "automatic"
+            self.history_recommendation = report
+        self._refresh_count_modes(); self._update_theoretical_count()
         if not self._loading: self._save_configuration()
 
     def _count_changed(self, which, value):
         other = self.doubles if which == "triples" else self.triples
+        active = self.triples if which == "triples" else self.doubles
         if value + other.value() > 14:
-            target = self.triples if which == "triples" else self.doubles
-            target.blockSignals(True); target.setValue(14 - other.value()); target.blockSignals(False)
+            active.blockSignals(True); active.setValue(14 - other.value()); active.blockSignals(False)
+        (self.triple_count_label if which == "triples" else self.double_count_label).setText(str(active.value()))
         self._update_theoretical_count()
         if not self._loading: self._save_configuration()
 
@@ -475,8 +614,11 @@ class NormalGenerator(QWidget):
         data = dict(percentages=percentages,
                     weights={key: spin.value() for key, spin in self.weight_spin.items()},
                     triples=self.triples.value(), doubles=self.doubles.value(),
-                    assignment_mode=self.assignment_mode.currentData(),
-                    max_columns=self.max_columns.value(),
+                    triples_mode=self.count_modes["triples"], doubles_mode=self.count_modes["doubles"],
+                    assignment_mode="automatic" if all(mode == "automatic" for mode in self.count_modes.values()) else "manual",
+                    historical_target=self.history_coverage.value() / 100,
+                    history_seasons=sorted(self.selected_history_seasons),
+                    surprise_level=self.surprise_level.value(),
                     matrix_origin=self.matrix_origin,
                     keep_duplicates=self.keep_duplicates.isChecked(), intersection=self.intersection.isChecked(),
                     actions=[self._action_config(row) for row in range(self.action_table.rowCount())])
@@ -508,6 +650,7 @@ class NormalGenerator(QWidget):
         if values and isinstance(values[0][0], str): values = [[float(value.replace(",", ".")) / 100 for value in row] for row in values]
         self._populate_probability_table(values); self.matrix_origin = "manual"
         self._matrix_edited()
+        self._refresh_historical_recommendation()
 
     def _normalize_matrix(self):
         rows = []
@@ -520,6 +663,7 @@ class NormalGenerator(QWidget):
             rows.append(values)
         normalized = normalize_percentages(rows, 2)
         self._populate_probability_table(normalized); self.matrix_origin = "manual"; self._matrix_edited()
+        self._refresh_historical_recommendation()
 
     def use_selected_snapshot(self, kind):
         """Actualiza la matriz solo si aún sigue vinculada a una captura externa."""
@@ -533,6 +677,7 @@ class NormalGenerator(QWidget):
         self._refresh_matrix_sources()
         self.base_status.setText(f"Matriz desde {source.source} · captura {source.captured_at}.")
         self._matrix_edited()
+        self._refresh_historical_recommendation()
 
     def _refresh_availability(self, system):
         for kind in ("classification", "form5", "history"):
@@ -711,6 +856,7 @@ class NormalGenerator(QWidget):
         values = weighted_probabilities(sources)
         self._populate_probability_table(values); self.matrix_origin = "weighted"; self._matrix_edited()
         self._refresh_matrix_sources()
+        self._refresh_historical_recommendation()
         self.base_status.setText("Porcentajes recalculados como media ponderada de las fuentes importadas. Se normalizó cada fila a 100%.")
         self._save_configuration()
 
@@ -719,15 +865,11 @@ class NormalGenerator(QWidget):
         if not system: raise ValueError("Pulsa Nuevo para crear la quiniela de esta jornada.")
         if self.window.system_mode(system) != "normal": raise ValueError("La base automática solo modifica una quiniela Normal.")
         probabilities = self._matrix_values()
-        if self.assignment_mode.currentData() == "manual":
-            base, report = best_base(probabilities, self.triples.value(), self.doubles.value(), system.locks, system.base)
+        base, report = self.build_recommended_base()
+        if all(mode == "manual" for mode in self.count_modes.values()):
             mode = "cantidades elegidas por ti; partidos seleccionados por probabilidad"
         else:
-            base, report = best_base_under_limit(probabilities, self.max_columns.value(), system.locks, system.base)
-            for spin, value in ((self.triples, report["triples"]), (self.doubles, report["doubles"])):
-                spin.blockSignals(True); spin.setValue(value); spin.blockSignals(False)
-            mode = "cantidades y partidos elegidos por probabilidad conjunta bajo el límite"
-            self._update_theoretical_count()
+            mode = "cantidades según temporadas seleccionadas y porcentajes de la jornada"
         parameters = json.loads(system.parameters)
         weights = {key: spin.value() for key, spin in self.weight_spin.items()}
         used_sources = ({key: [source.source for _source_key, source in self._sources_for_kind(key)] if weights[key] else [] for key in weights}
@@ -742,7 +884,54 @@ class NormalGenerator(QWidget):
         self.repository.record_event("normal_base_generated", report)
         self.window.set_system(updated)
         self._save_configuration()
-        self.base_status.setText(f"Base rellenada: {report['triples']} triples, {report['doubles']} dobles y {report['fixed']} fijos. Criterio: {mode}.")
+        historical_note = ""
+        if "historical_coverage" in report:
+            historical_note = (f" Histórico: {report['historical_coverage']:.1%} observado frente al objetivo "
+                               f"{report['target_coverage']:.0%} en {report['history_rows']} jornadas; "
+                               + ("objetivo alcanzado." if report["target_reached"] else
+                                  "el límite técnico de 100.000 apuestas no permite alcanzar el objetivo."))
+        self.base_status.setText(f"Base rellenada: {report['triples']} triples, {report['doubles']} dobles y {report['fixed']} fijos. Criterio: {mode}.{historical_note}")
+
+    def build_recommended_base(self, probabilities=None):
+        """Build using automatic historical counts where selected, plus surprise placement."""
+        system = self.window.system
+        if not system: raise ValueError("Pulsa Nuevo para crear la quiniela de esta jornada.")
+        own_probabilities = self._matrix_values()
+        selected_probabilities = validate_percentages(probabilities or own_probabilities)
+        modes = self.count_modes
+        stats = None
+        if modes["triples"] == "manual" and modes["doubles"] == "manual":
+            base, report = best_base(selected_probabilities, self.triples.value(), self.doubles.value(), system.locks, system.base)
+        else:
+            proposed_base, stats = self._historical_choice()
+            triples = stats["triples"] if modes["triples"] == "automatic" else self.triples.value()
+            doubles = stats["doubles"] if modes["doubles"] == "automatic" else self.doubles.value()
+            if triples + doubles > 14:
+                if modes["triples"] == "automatic": triples = 14 - doubles
+                else: doubles = 14 - triples
+            if (modes["triples"] == modes["doubles"] == "automatic"
+                    and tuple(tuple(row) for row in selected_probabilities) == tuple(tuple(row) for row in own_probabilities)):
+                base, report = proposed_base, stats
+            else:
+                base, report = best_base(selected_probabilities, triples, doubles, system.locks, system.base)
+                report["criteria"] = "cantidades_automaticas_historicas_y_manual_v1"
+            report.update(history_seasons=sorted(self.selected_history_seasons),
+                          history_target=self.history_coverage.value() / 100,
+                          history_rows=stats["history_rows"],
+                          historical_coverage=stats["historical_coverage"],
+                          target_coverage=stats["target_coverage"], target_reached=stats["target_reached"])
+        base, surprise = apply_surprise(base, own_probabilities, self.surprise_level.value(), system.locks, system.base)
+        report.update(triples=sum(len(row) == 3 for row in base),
+                      doubles=sum(len(row) == 2 for row in base),
+                      fixed=sum(len(row) == 1 for row in base),
+                      columns=3 ** sum(len(row) == 3 for row in base) * 2 ** sum(len(row) == 2 for row in base),
+                      surprise_level=self.surprise_level.value(),
+                      surprise_risk_order=surprise["risk_order"],
+                      surprise_distribution=[len(row) for row in base])
+        for slider, value in ((self.triples, report["triples"]), (self.doubles, report["doubles"])):
+            slider.blockSignals(True); slider.setValue(value); slider.blockSignals(False)
+        self._refresh_count_modes(); self._update_theoretical_count()
+        return base, report
 
     def _profile_items(self):
         return self.repository.setting(f"normal_sources:{self.current_round.key}", [])

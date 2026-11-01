@@ -158,6 +158,7 @@ QLabel#prizeTotal {font-size:32px; font-weight:bold; color:#ffe17a;}
 QLabel#prizeFinePrint {font-size:10px; color:#b9dfdf;}
 QLabel#prizeCategoryHeading {font-size:10px; color:#8fe6e1; font-weight:bold;}
 QLabel#prizeCategoryValue {font-size:11px; color:#fff2b8;}
+QWidget#ballot QLabel[ballotPercentage="true"] {color:#124675; background:#e8f6ff; border:1px solid #a6cde6; border-radius:3px; font-size:10px; font-weight:bold;}
 QWidget#ballot QLabel {color:#082b70; background:#f6f7fb;}
 QWidget#ballot {background:#f6f7fb; border-radius:5px;}
 QWidget#ballot QLabel[ballotShade="even"] {background:#cde9fc;}
@@ -3583,7 +3584,10 @@ class MainWindow(QMainWindow):
             optimization.get('after') if isinstance(optimization,dict) else None
         )
         guarantee=coverage_footer(verification)
-        self.footer.setText(f'{quantity:,} apuestas · {money(self.system.cost(round_) if self.system else 0)} · {pending} sin Pleno{guarantee} · Premio económico no garantizado')
+        base_quantity=(engine.size(self.system.base)*len(self.system.plenos)) if self.system else 0
+        base_cost=money(base_quantity*round_.price_cents)
+        current_cost=money(self.system.cost(round_) if self.system else 0)
+        self.footer.setText(f'Base completa · {base_quantity:,} · {base_cost}  │  Desarrollo actual · {quantity:,} · {current_cost} · {pending} sin Pleno{guarantee} · Premio económico no garantizado')
         self.home_info.setText(f'{round_.key}\n15 partidos · {len(self.repository.systems(round_.key))} quinielas guardadas\nPrecio por apuesta: {money(round_.price_cents)} por apuesta. Guardar un archivo no envía ni paga la apuesta.')
         self.data_info.setText('Datos guardados: ' + (self.repository.setting('data_directory') or 'todavía no has añadido datos') + '\nWIN1X2 aporta partidos y premios. Quinielista aporta elecciones de otros jugadores y marcadores.')
         self.rule_price.setValue(round_.price_cents)
@@ -3620,8 +3624,6 @@ class MainWindow(QMainWindow):
             kickoff=match.kickoff[:10]+' '+match.kickoff[10:] if len(match.kickoff)==15 else match.kickoff
             self.match_labels[i].setText(f'{match.home} – {match.away}')
             self.match_labels[i].setToolTip(f'{match.home} – {match.away}\n{kickoff}')
-            self.kickoff_labels[i].setText(self.kickoff_caption(match.kickoff))
-            self.kickoff_labels[i].setToolTip(kickoff or 'Horario no disponible')
             snapshot = view_round.snapshot('sport'); public = view_round.snapshot('public')
             fmt = lambda snap,position=i: ' / '.join(f'{100*v:.0f}' for v in snap.values[position]) if snap else 'Sin datos'
             self.match_labels[i].setToolTip(f'{match.home} – {match.away}\n{kickoff}\nDeportiva 1/X/2: {fmt(snapshot)}\nPúblico 1/X/2: {fmt(public)}')
@@ -3646,7 +3648,7 @@ class MainWindow(QMainWindow):
                 button.setEnabled(bool(system and round_.editable and not busy))
         self.pleno_selection_info.setText(f'{engine.size(system.base):,} columnas × {len(system.plenos)} Plenos = {engine.size(system.base)*len(system.plenos):,} apuestas\nCoste si juegas todas: {money(engine.size(system.base)*len(system.plenos)*view_round.price_cents)} · {len(system.plenos)} parejas de goles' if system and system.plenos else 'Elige al menos un gol para el local y otro para el visitante.\nPuedes marcar varias casillas. M significa 3 goles o más.')
         self.preview_model.update_rows([(b.column,b.pleno or '—',b.quantity) for b in system.bets[:100]] if system else [])
-        self.preview_info.setText(f'{quantity:,} apuestas listas. Pulsa Guardar apuestas (TXT) para sacar el archivo.' if quantity else 'Elige los signos y los goles del Pleno y pulsa Generar debajo del boleto.' if system else 'Pulsa Nuevo para empezar una quiniela.')
+        self.preview_info.setText(f'{quantity:,} apuestas listas. Pulsa Guardar apuestas (TXT) para sacar el archivo.' if quantity else 'Elige los signos y goles del Pleno; Generar apuestas está al final de Normal.' if system else 'Pulsa Nuevo para empezar una quiniela.')
         self.name_input.blockSignals(True); self.name_input.setText(system.name if system else ''); self.name_input.blockSignals(False)
         self.name_input.setEnabled(bool(system and round_.editable and not busy))
         self.builder_info.setText(f'Apuestas posibles: {engine.size(system.base)*len(system.plenos):,} · {sum(len(p)==1 for p in system.base)} fijos / {sum(len(p)==2 for p in system.base)} dobles / {sum(len(p)==3 for p in system.base)} triples\nCoste si juegas todas: {money(engine.size(system.base)*len(system.plenos)*view_round.price_cents)} · apuestas guardadas: {system.quantity:,}' if system else 'Pulsa Nuevo y elige los signos de cada partido.')
@@ -3709,32 +3711,36 @@ class MainWindow(QMainWindow):
         grid_widget = QWidget();grid_widget.setFixedHeight(322)
         grid = QGridLayout(grid_widget); grid.setSpacing(1);grid.setContentsMargins(6,4,6,4);grid.setAlignment(Qt.AlignmentFlag.AlignTop)
         grid_widget.setObjectName('ballot')
-        for col,title in enumerate(('', 'Partido', 'Hora', 'Modelo %', '1', 'X', '2', 'Bloq.')):
+        self.prob_headers=[]
+        for col,title in enumerate(('#', 'Partido', '1 %', 'X %', '2 %', '1', 'X', '2', 'Bloq.')):
             heading=QLabel(title);heading.setFixedHeight(20);heading.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            heading.setProperty('ballotHeader','sign' if col in (4,5,6) else 'data')
+            heading.setProperty('ballotHeader','sign' if col in (5,6,7) else 'data')
             grid.addWidget(heading,0,col)
-            if col==3:self.prob_heading=heading
-        self.match_labels=[];self.kickoff_labels=[];self.prob_labels=[];self.sign_buttons=[];self.lock_buttons=[]
+            if col in (2,3,4):self.prob_headers.append(heading)
+        self.match_labels=[];self.match_number_labels=[];self.prob_labels=[];self.sign_buttons=[];self.lock_buttons=[]
         for i in range(14):
             shade='even' if i%2==0 else 'odd'
-            number=QLabel(str(i+1));number.setFixedSize(20,20);number.setAlignment(Qt.AlignmentFlag.AlignCenter);number.setProperty('ballotShade',shade)
-            number.setStyleSheet('font-weight:bold;');grid.addWidget(number,i+1,0)
+            number=QLabel(str(i+1));number.setFixedSize(14,19);number.setAlignment(Qt.AlignmentFlag.AlignLeft|Qt.AlignmentFlag.AlignVCenter);number.setProperty('ballotShade',shade)
+            number.setObjectName('matchNumber');number.setStyleSheet('font-weight:bold;font-size:9px;');self.match_number_labels.append(number);grid.addWidget(number,i+1,0)
             label=QLabel();label.setMinimumWidth(140);label.setFixedHeight(20);label.setStyleSheet('font-size:11px; font-weight:bold;')
             label.setSizePolicy(QSizePolicy.Policy.Ignored,QSizePolicy.Policy.Fixed)
             label.setProperty('ballotShade',shade);self.match_labels.append(label);grid.addWidget(label,i+1,1)
-            hour=QLabel();hour.setFixedSize(58,20);hour.setAlignment(Qt.AlignmentFlag.AlignCenter);hour.setStyleSheet('font-size:9px;');hour.setProperty('ballotShade',shade)
-            self.kickoff_labels.append(hour);grid.addWidget(hour,i+1,2)
-            prob=QLabel();prob.setFixedSize(72,20);prob.setAlignment(Qt.AlignmentFlag.AlignCenter);prob.setStyleSheet('font-size:9px;');prob.setProperty('ballotShade',shade)
-            self.prob_labels.append(prob);grid.addWidget(prob,i+1,3)
+            percentage_row=[]
+            for j in range(3):
+                prob=QLabel('—');prob.setFixedSize(34,19);prob.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                prob.setStyleSheet('font-size:10px;font-weight:700;padding:0 1px;');prob.setProperty('ballotShade',shade);prob.setProperty('ballotPercentage',True)
+                percentage_row.append(prob);grid.addWidget(prob,i+1,j+2)
+            self.prob_labels.append(percentage_row)
             signs={}
             for j, sign in enumerate('1X2'):
                 button=QPushButton(sign); button.setCheckable(True); button.setFixedSize(27,20); button.setStyleSheet("padding: 1px;")
                 button.setAccessibleName(f'Partido {i+1}, signo {sign}')
-                button.clicked.connect(partial(self.toggle_sign,i,sign));grid.addWidget(button,i+1,j+4);signs[sign]=button
+                button.clicked.connect(partial(self.toggle_sign,i,sign));grid.addWidget(button,i+1,j+5);signs[sign]=button
             self.sign_buttons.append(signs)
             lock=QPushButton('Bloquear');lock.setCheckable(True);lock.setFixedSize(44,20);lock.setStyleSheet('padding:1px 5px;')
-            lock.clicked.connect(partial(self.toggle_lock,i));grid.addWidget(lock,i+1,7);self.lock_buttons.append(lock)
+            lock.clicked.connect(partial(self.toggle_lock,i));grid.addWidget(lock,i+1,8);self.lock_buttons.append(lock)
         grid.setColumnStretch(1,1)
+        grid.setContentsMargins(2,2,4,2);grid.setSpacing(0)
         scroll.setWidget(grid_widget);layout.addWidget(scroll)
         row=QHBoxLayout();self.pleno_match_label=QLabel();self.pleno_match_label.setWordWrap(True);self.pleno_match_label.setStyleSheet('color:#ffc83d; font-weight:bold;');row.addWidget(self.pleno_match_label)
         self.pleno_combos=[]
@@ -3773,12 +3779,7 @@ class MainWindow(QMainWindow):
         self.normal_generator.download_matrix_button.setText('1 · Descargar porcentajes')
         self.normal_generator.fill_base_button.setParent(None)
         self.normal_generator.fill_base_button.setText('3 · Rellenar base')
-        generate_here=QPushButton('4 · Generar apuestas')
-        generate_here.setObjectName('primary')
-        generate_here.clicked.connect(lambda:self.safe(self.start_generation))
-        save_here=QPushButton('5 · Guardar apuestas (TXT)')
-        save_here.clicked.connect(lambda:self.safe(self.export_txt))
-        for button in (self.normal_generator.download_matrix_button,self.normal_generator.fill_base_button,generate_here,save_here):
+        for button in (self.normal_generator.download_matrix_button,self.normal_generator.fill_base_button):
             action_row.addWidget(button)
         layout.addLayout(action_row)
         self.normal_generator.base_group.setParent(None);layout.addWidget(self.normal_generator.base_group)
@@ -3793,9 +3794,6 @@ class MainWindow(QMainWindow):
         note=QLabel('La fuente de esta fila solo se usa para diferenciación y Pleno. La matriz de arriba determina la base. Las ponderaciones auxiliares se aplican únicamente con «Aplicar ponderaciones a la matriz». La diferenciación actualiza el boleto automáticamente cuando hay datos de mercado y público.')
         note.setWordWrap(True);note.setObjectName('muted');layout.addWidget(note)
         layout=left_layout
-        row=QHBoxLayout();self.generate_button=self.button('Generar',self.start_generation,row,primary=True,editable=True)
-        self.cancel_button=self.button('Cancelar',self.cancel_generation,row);self.cancel_button.setEnabled(False)
-        self.progress=QProgressBar();self.progress.setValue(0);row.addWidget(self.progress,1);layout.addLayout(row)
         layout.addStretch(1)
         preview=self.page_layout(1)
         self.preview_info=QLabel();self.preview_info.setWordWrap(True);preview.addWidget(self.preview_info)
@@ -3805,6 +3803,13 @@ class MainWindow(QMainWindow):
         self.full_export_button=self.data_button('Guardar todas las combinaciones…',self.export_development,preview)
         self.normal_generator.actions_group.hide()
         self.preview_view.setMaximumHeight(220)
+        generation_row=QHBoxLayout()
+        self.generate_button=self.button('4 · Generar apuestas',self.start_generation,generation_row,primary=True,editable=True)
+        save_button=QPushButton('5 · Guardar apuestas (TXT)');save_button.clicked.connect(lambda:self.safe(self.export_txt));generation_row.addWidget(save_button)
+        self.cancel_button=self.button('Cancelar',self.cancel_generation,generation_row);self.cancel_button.setEnabled(False)
+        self.progress=QProgressBar();self.progress.setValue(0);generation_row.addWidget(self.progress,1)
+        preview.addLayout(generation_row)
+        preview.addSpacing(18)
 
     def rename(self):
         if self.system and self.name_input.text().strip()!=self.system.name:
@@ -3963,7 +3968,6 @@ class MainWindow(QMainWindow):
         self.template_timer.stop()
         if not self.system:raise ValueError('Pulsa Nuevo para crear una quiniela.')
         kind=self.ranking_source.currentData()
-        from quiniela_ai_studio.domain.normal_generation import best_base
         frozen=self.frozen_round();snapshot=frozen.snapshot(kind)
         has_pleno=bool(snapshot and snapshot.pleno_values)
         if self.differentiation.value():
@@ -3977,7 +3981,7 @@ class MainWindow(QMainWindow):
                 probabilities=self.normal_generator._matrix_values()
             elif snapshot:probabilities=snapshot.values
             else:raise ValueError('La jornada no tiene porcentajes disponibles; importa una fuente o rellena la matriz 1/X/2 antes de aplicar la selección automática.')
-        base,report=best_base(probabilities,self.normal_generator.triples.value(),self.normal_generator.doubles.value(),self.system.locks,self.system.base)
+        base,report=self.normal_generator.build_recommended_base(probabilities)
         parameters=json.loads(self.system.parameters)
         matrix_origin=self.normal_generator.matrix_origin
         if self.differentiation.value() or matrix_origin.startswith('snapshot:'):
@@ -4012,12 +4016,14 @@ class MainWindow(QMainWindow):
 
     def update_source_status(self,*_):
         snapshot=self.frozen_round().snapshot(self.ranking_source.currentData())
-        self.prob_heading.setText('Modelo %' if self.ranking_source.currentData()=='sport' else 'Jugado %')
-        self.prob_heading.setToolTip('Porcentajes 1 / X / 2 de la fuente seleccionada. Mercado y popularidad son datos diferentes; no son una IA propia.')
-        for i,label in enumerate(self.prob_labels):
-            values=' / '.join(f'{100*v:.0f}' for v in snapshot.values[i]) if snapshot else '—'
-            label.setText(values)
-            label.setToolTip(f'{snapshot.source}\n1 / X / 2: {values}' if snapshot else 'Sin porcentajes disponibles de esta fuente.')
+        source_name='Modelo' if self.ranking_source.currentData()=='sport' else 'Jugado'
+        for index,header in enumerate(self.prob_headers):
+            header.setToolTip(f'{source_name} · porcentaje del signo {"1X2"[index]}. Mercado y popularidad son datos diferentes; no son una IA propia.')
+        for i,labels in enumerate(self.prob_labels):
+            values=[f'{100*value:.0f}%' for value in snapshot.values[i]] if snapshot else ['—']*3
+            for index,label in enumerate(labels):
+                label.setText(values[index])
+                label.setToolTip(f'{snapshot.source} · {"1X2"[index]}: {values[index]}' if snapshot else 'Sin porcentajes disponibles de esta fuente.')
         for side,labels in enumerate(self.goal_percentages):
             for i,goal in enumerate('012M'):
                 labels[goal].setText(f'{snapshot.pleno_values[side][i]:.1%}' if snapshot and snapshot.pleno_values else '—')
@@ -4620,7 +4626,7 @@ class MainWindow(QMainWindow):
     def schedule_live_filter(self):
         if self.configuring_filters or not self.system or self.close_pending or not self.round.editable:return
         if not self.system.bets and not json.loads(self.system.parameters).get('filter_spec'):
-            self.filter_feedback.setText('Primero pulsa Generar debajo del boleto.');return
+            self.filter_feedback.setText('Primero pulsa «Generar apuestas» al final de la pestaña Normal.');return
         self.filter_epoch+=1
         if self.filter_job:self.filter_job.cancel_event.set()
         self.filter_timer.start()
@@ -5080,7 +5086,7 @@ class MainWindow(QMainWindow):
         busy=self.export_busy() or self.template_timer.isActive()
         ready=bool(self.system and self.system.bets and not busy)
         self.export_button.setEnabled(ready)
-        self.export_button.setToolTip('Guarda las apuestas exactas de la quiniela abierta, con sus Plenos.' if ready else 'Espera a que termine el cálculo.' if busy else 'Abre una quiniela con apuestas o pulsa Generar debajo del boleto.')
+        self.export_button.setToolTip('Guarda las apuestas exactas de la quiniela abierta, con sus Plenos.' if ready else 'Espera a que termine el cálculo.' if busy else 'Abre una quiniela con apuestas o genéralas al final de Normal.')
         index=self.system_view.currentIndex()
         selected=self.listed_systems[index.row()] if index.isValid() and index.row()<len(getattr(self,'listed_systems',())) else None
         self.selected_txt_button.setEnabled(bool(selected and selected.bets and not busy))
@@ -5417,7 +5423,14 @@ class MainWindow(QMainWindow):
                     scrutiny['prizes']={int(key):value for key,value in scrutiny['prizes'].items()}
                     source=candidate.get('source','Escrutinio publicado guardado')
             if not scrutiny:
-                self.clear_scrutiny_awards()
+                # A live refresh calls this while its previous evaluation is
+                # still displayed. Clear award UI without dropping that table
+                # or its selected bet; render_scrutiny will replace the rows.
+                self.published_scrutiny=None
+                self.prize_card.hide()
+                self.prize_detail_card.hide()
+                self.prize_total.clear()
+                self.prize_notice.show()
                 self.prize_notice.setText(self.prize_cache_error or 'Premios pendientes de escrutinio publicado.')
                 return False
         self.prize_cache_error=''

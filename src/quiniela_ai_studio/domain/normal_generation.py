@@ -316,6 +316,148 @@ def best_base(
                              decisions=decisions)
 
 
+def historical_base(
+    probabilities: Sequence[Sequence[float]],
+    history: Sequence[str],
+    target_coverage: float = 0.7,
+    column_limit: int = 100_000,
+    locks: Sequence[bool] = (False,) * 14,
+    locked_base: Sequence[str] | None = None,
+    eligible_positions: Sequence[int] | None = None,
+) -> tuple[tuple[str, ...], dict]:
+    """Grow a base until it covers the requested share of selected results.
+
+    At each step this greedy, deterministic procedure expands the unlocked
+    position with the largest increase in soft historical coverage per added
+    column. The percentages rank signs inside each expanded match; historical
+    results determine which matches to widen. This is descriptive, not a
+    forecast.
+    """
+    rows = validate_percentages(probabilities)
+    if not history or any(not isinstance(result, str) or len(result) != 14 or any(sign not in SIGNS for sign in result) for result in history):
+        raise ValueError("Selecciona temporadas con resultados históricos válidos.")
+    if not isinstance(target_coverage, (int, float)) or not 0 < target_coverage <= 1:
+        raise ValueError("La cobertura histórica debe estar entre 1% y 100%.")
+    if type(column_limit) is not int or column_limit < 1:
+        raise ValueError("El límite técnico debe ser al menos una columna.")
+    if len(locks) != 14 or any(type(value) is not bool for value in locks):
+        raise ValueError("Se requieren 14 estados de bloqueo válidos.")
+    previous = normalize_base(locked_base or ("1",) * 14)
+    eligible = set(range(14) if eligible_positions is None else eligible_positions)
+    if any(type(index) is not int or not 0 <= index < 14 for index in eligible):
+        raise ValueError("Posición de partido inválida.")
+    orders = [tuple(sorted(range(3), key=lambda sign: (-row[sign], sign))) for row in rows]
+    base = [previous[index] if locks[index] else SIGNS[orders[index][0]] for index in range(14)]
+    widths = [len(signs) for signs in base]
+    columns = math.prod(widths)
+    if columns > column_limit:
+        raise ValueError("Los partidos bloqueados superan el límite técnico de columnas.")
+
+    # Track each historical row's soft weight and number of uncovered signs.
+    # Updating these incrementally keeps the greedy search fast even when the
+    # selected seasons contain many thousands of results.
+    misses = [sum(result[index] not in base[index] for index in range(14)) for result in history]
+    terms = [0.1 ** missing for missing in misses]
+    covered = sum(missing == 0 for missing in misses)
+    score = math.fsum(terms)
+    while covered / len(history) + 1e-12 < target_coverage:
+        choice = None
+        for index, row in enumerate(rows):
+            width = widths[index]
+            if locks[index] or index not in eligible or width >= 3:
+                continue
+            next_columns = columns * (width + 1) // width
+            if next_columns > column_limit:
+                continue
+            added = SIGNS[orders[index][width]]
+            gain = 9.0 * math.fsum(
+                terms[row_index] for row_index, result in enumerate(history)
+                if result[index] == added
+            )
+            cost = next_columns - columns
+            candidate = (gain / cost, gain, index, added, next_columns)
+            if choice is None or candidate[0] > choice[0] + 1e-15 or (
+                abs(candidate[0] - choice[0]) <= 1e-15 and (gain > choice[1] or (gain == choice[1] and index < choice[2]))
+            ):
+                choice = candidate
+        if choice is None or choice[1] <= 0:
+            break
+        _, gain, index, added, columns = choice
+        for row_index, result in enumerate(history):
+            if result[index] == added:
+                was_covered = misses[row_index] == 0
+                terms[row_index] *= 10
+                misses[row_index] -= 1
+                if misses[row_index] == 0 and not was_covered:
+                    covered += 1
+        score += gain
+        base[index] = "".join(sign for sign in SIGNS if sign in base[index] or sign == added)
+        widths[index] += 1
+
+    coverage = covered / len(history)
+    report = {
+        "criteria": "maximizar_cobertura_historica_greedy_v1",
+        "triples": widths.count(3), "doubles": widths.count(2), "fixed": widths.count(1),
+        "columns": columns, "historical_coverage": coverage, "history_rows": len(history),
+        "target_coverage": float(target_coverage), "target_reached": coverage + 1e-12 >= target_coverage,
+        "decisions": [dict(match=index + 1, width=widths[index], signs=base[index],
+                            locked=locks[index]) for index in range(14)],
+    }
+    return tuple(base), report
+
+
+def apply_surprise(
+    base: Sequence[str],
+    probabilities: Sequence[Sequence[float]],
+    level: int = 0,
+    locks: Sequence[bool] = (False,) * 14,
+    locked_base: Sequence[str] | None = None,
+) -> tuple[tuple[str, ...], dict]:
+    """Move existing doubles/triples toward matches with more favorite-failure risk."""
+    from quiniela_ai_studio.domain.engine import normalize_base
+
+    original = normalize_base(base)
+    rows = validate_percentages(probabilities)
+    previous = normalize_base(locked_base or original)
+    if type(level) is not int or not 0 <= level <= 10:
+        raise ValueError("El factor sorpresa debe estar entre 0 y 10.")
+    if len(locks) != 14 or any(type(value) is not bool for value in locks):
+        raise ValueError("Se requieren 14 estados de bloqueo válidos.")
+    widths = [len(row) for row in original]
+    target_triples, target_doubles = widths.count(3), widths.count(2)
+    risk_order = sorted(range(14), key=lambda index: (max(rows[index]), index))
+    preferred = risk_order[:min(14, 4 + level)]
+    ranks = [tuple(sorted(range(3), key=lambda sign: (-row[sign], sign))) for row in rows]
+    assigned = [1] * 14
+    used = set()
+    for index, locked in enumerate(locks):
+        if locked:
+            assigned[index] = len(previous[index])
+            used.add(index)
+    original_triples = [index for index, width in enumerate(widths) if width == 3]
+    original_doubles = [index for index, width in enumerate(widths) if width == 2]
+
+    def fill(width: int, target: int, specific: list[int]) -> None:
+        already = sum(locked and assigned[index] == width for index, locked in enumerate(locks))
+        need = max(0, target - already)
+        candidates = list(dict.fromkeys([*preferred, *specific, *risk_order]))
+        candidates = [index for index in candidates if index not in used]
+        if len(candidates) < need:
+            raise ValueError("No hay suficientes partidos disponibles para distribuir la base.")
+        for index in candidates[:need]:
+            assigned[index] = width
+            used.add(index)
+
+    fill(3, target_triples, original_triples)
+    fill(2, target_doubles, original_doubles)
+    result = tuple(previous[index] if locks[index] else "".join(
+        SIGNS[sign] for sign in ranks[index][:assigned[index]]) for index in range(14))
+    columns = math.prod(assigned)
+    return result, {"triples": assigned.count(3), "doubles": assigned.count(2),
+                    "fixed": assigned.count(1), "columns": columns, "surprise_level": level,
+                    "risk_order": [index + 1 for index in risk_order]}
+
+
 def best_base_under_limit(
     probabilities: Sequence[Sequence[float]],
     max_columns: int,

@@ -1,27 +1,14 @@
 # 12 · Matriz de trazabilidad de requisitos
 
-RF-ESC-010 (v1.0.34): el adaptador del marcador combina Dataradar y ESPN por
-partido; una fila sin cobertura de ESPN nunca sustituye un resultado válido de
-la fuente primaria. Se normalizan variantes de los nombres de Almería, Oviedo,
-Logroño y Badalona. Pruebas: `test_preferred_espn_does_not_hide_primary_results_for_uncovered_matches`
-y `test_espn_resolves_quiniela_names_for_almeria_oviedo_and_logrono_badalona`.
-
-RF-RED-020 (v1.0.35): Distancias define la medida máxima entre apariciones,
-indica que se combina con el resto de condiciones y distingue la alcanzabilidad
-en la base de la disponibilidad tras filtrar. Cuando el cruce queda vacío, el
-mensaje sugiere revisar filtros o recuperar apuestas. Pruebas:
-`test_sign_distances_subtab_filters_and_restores_without_changing_figures` y
-`test_distances_are_index_differences_and_variants_share_a_family`.
-
-RF-UX-030 (v1.0.35): Optimizar presenta tres pasos —preparar candidatas,
-definir presupuesto/prioridad y revisar la propuesta—, explica el sentido del
-nivel rápido y deja explícito que las apuestas no cambian hasta aplicar.
-Prueba: `test_72_proposal_apply_and_audit`.
-
-RF-DAT-008 (v1.0.35): reconoce únicamente la errata «Sevila (F)» del PRE de
-WIN1X2 frente a «Sevilla (F)» en el XML de Quinielista para permitir la
-descarga completa de porcentajes de J18. La prueba verifica la equivalencia y
-que un equipo diferente continúa rechazándose: `test_win1x2_sevila_typo_matches_quinielista_sevilla_femenino`.
+RF-NOR-006/007 y RF-UX-029 (v1.0.35): la base automática usa temporadas
+seleccionadas, cobertura objetivo y porcentajes de jornada, con límite técnico
+interno comunicado; dobles/triples Auto/Manual se manejan por separado. El
+factor sorpresa redistribuye las selecciones anchas existentes. Normal muestra
+porcentajes alineados con cada signo, reduce la altura del boleto y deja
+generación/guardado al final de la pestaña. Pruebas: `test_historical_base_*`,
+`test_normal_generator_automatic_selects_counts_from_history_and_percentages`,
+`test_count_modes_toggle_independently_and_hide_column_limit` y
+`test_normal_ballot_uses_compact_per_sign_percentages`.
 
 RF-RED-020 (v1.0.35): Distancias define la medida máxima entre apariciones,
 indica que se combina con el resto de condiciones y distingue la alcanzabilidad
