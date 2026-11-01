@@ -1,5 +1,12 @@
 # Cambios
 
+## 2.0.5 — espacio del resumen de Escrutinio
+
+- El separador de Escrutinio reserva espacio para la previsión y el estado
+  pendiente aunque todavía no haya premios oficiales.
+- Ajusta el espacio según si las tarjetas aparecen en columnas o apiladas y
+  recalcula al actualizar la previsión.
+
 ## 2.0.4 — visibilidad completa de las tarjetas
 
 - Reserva altura suficiente para que las categorías de premios no se oculten.

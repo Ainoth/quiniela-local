@@ -6,7 +6,7 @@ Aplicación de Quiniela para escritorio y Android. La versión de escritorio
 puede leer los datos instalados por WIN1X2; ambas versiones descargan datos,
 porcentajes y marcadores directamente de sus proveedores públicos.
 
-## Quiniela AI Studio — v2.0.4
+## Quiniela AI Studio — v2.0.5
 
 ## Quiniela AI Studio — v1.0.37
 

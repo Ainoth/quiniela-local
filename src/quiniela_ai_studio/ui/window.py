@@ -3430,12 +3430,26 @@ class MainWindow(QMainWindow):
         if self.manual_mode.isChecked():
             complete = self.manual_container.maximumHeight()
         available = self.scrutiny_splitter.height() - self.scrutiny_splitter.handleWidth()
-        if self.prize_card.isVisible() or self.prize_detail_card.isVisible():
-            if self.prize_cards_layout.direction()==QBoxLayout.Direction.TopToBottom:reserve=385
-            else:reserve=260 if self.width()<1700 else 220
-        else:reserve=160
+        reserve=self.scrutiny_lower_reserve()
         upper = min(complete, max(80, available - reserve))
         self.scrutiny_splitter.setSizes([upper, max(100, available - upper)])
+
+    def scrutiny_lower_reserve(self):
+        """Minimum splitter space for visible prize cards, summary and bet table."""
+        estimate_height=(max(self.estimate_prize_card.minimumHeight(),self.estimate_prize_card.sizeHint().height())
+                         if not self.estimate_prize_card.isHidden() else 0)
+        official_widgets=(self.prize_card,self.prize_detail_card,self.prize_notice)
+        official_height=sum(max(widget.minimumHeight(),widget.sizeHint().height())
+                             for widget in official_widgets if not widget.isHidden())
+        if not estimate_height and not official_height:
+            return 160
+        if self.prize_cards_layout.direction()==QBoxLayout.Direction.TopToBottom:
+            cards_height=estimate_height+official_height+8
+        else:
+            cards_height=max(estimate_height,official_height)
+        summary_height=max(self.eval_summary.minimumHeight(),self.eval_summary.sizeHint().height())
+        table_header=self.eval_view.horizontalHeader().sizeHint().height()
+        return cards_height+summary_height+table_header+40
 
     def start_session(self):
         """Offer to resume once, or create a separate ballot for the current round."""
@@ -5649,6 +5663,8 @@ class MainWindow(QMainWindow):
 
     def render_prize_forecast(self,outcome=None):
         """Paint a clearly separate scenario estimate; official awards keep priority."""
+        if self.navigation.currentRow()==4:
+            QTimer.singleShot(0,self.fit_scrutiny_tables)
         bets=self.scrutiny_bets()
         if not bets:
             self.estimate_prize_card.show()
