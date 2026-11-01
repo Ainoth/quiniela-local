@@ -3,11 +3,9 @@
 from __future__ import annotations
 
 import json
-import re
 import shutil
 import sqlite3
 import tempfile
-import unicodedata
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
@@ -24,6 +22,11 @@ from quiniela_ai_studio.domain.models import (
     round_dict,
     utcnow,
 )
+from quiniela_ai_studio.domain.team_identity import (
+    same_fixtures,
+    team_key,  # noqa: F401 — re-exported for compatibility with the older module
+    uniquely_matches_team,
+)
 from quiniela_ai_studio.infrastructure.files import read_bytes
 from quiniela_ai_studio.infrastructure.providers import (
     load_win1x2,
@@ -31,68 +34,37 @@ from quiniela_ai_studio.infrastructure.providers import (
     text,
 )
 
-# Variantes nominales documentadas, sin coincidencia difusa ni orden implícito.
-TEAM_ALIASES = {
-    "ANDORRAFC": "ANDORRA",
-    "ATHCLUBBILBAO": "ATHCLUB",
-    "ATHLETICCLUB": "ATHCLUB",
-    "ATHLETICBILBAO": "ATHCLUB",
-    "ATLETICOMADRID": "ATMADRID",
-    "ATLETICODEMADRID": "ATMADRID",
-    "RAYOVALLECANO": "RAYO",
-    "REALSOCIEDAD": "RSOCIEDAD",
-    "REALOVIEDO": "ROVIEDO",
-    "REALMADRID": "RMADRID",
-    "RACING": "RACINGS",
-    "RACINGSANTANDER": "RACINGS",
-    "DEPORTIVOCORUNA": "DEPORTIVO",
-    "DEPORTIVOLACORUNA": "DEPORTIVO",
-    "MANCHUNITED": "MANUNITED",
-    "MANCHESTERUNITED": "MANUNITED",
-    "BAYERNMUNICH": "BMUNICH",
-    "BORDORTMUND": "BDORTMUND",
-    "BORUSSIADORTMUND": "BDORTMUND",
-    "MANCHESTCITY": "MANCITY",
-    "MANCHESTERCITY": "MANCITY",
-    "CSUCRAIOVA": "UCRAIOVA",
-    # En algunos PRE de WIN1X2 aparece «Madrid CCF» para el mismo equipo
-    # que Quinielista publica como «Madrid CFF».
-    "MADRIDCCFF": "MADRIDCFFF",
-    # Variantes observadas en el XML de porcentajes de Quinielista frente al
-    # fichero de jornada WIN1X2 (incluye una errata histórica en PSV Eindhoven).
-    "PSV": "PSVEINDHOVEN",
-    "PSVEIDHOVEN": "PSVEINDHOVEN",
-    "SHAKTARDONETSK": "SHAKHTARDONETSK",
-    "RBLEIPZIG": "LEIPZIG",
-    # Errata del PRE WIN1X2 de J18: «Sevila (F)» por «Sevilla (F)».
-    "SEVILAF": "SEVILLAF",
-}
-
-
-def team_key(name: str) -> str:
-    plain = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode()
-    key = re.sub("[^A-Z0-9]", "", plain.upper())
-    key = TEAM_ALIASES.get(key, key)
-    # Quinielista añade a veces W al nombre del equipo femenino antes de (F),
-    # por ejemplo «Badalona W.(F)» frente a «Badalona (F)» en WIN1X2.
-    if key.endswith("WF"):
-        key = key[:-2] + "F"
-    return TEAM_ALIASES.get(key, key)
-
-
-def validate_teams(round_: Round, teams: list[tuple[str, str]]) -> None:
+def validate_teams(
+    round_: Round,
+    teams: list[tuple[str, str]],
+    *,
+    allow_missing_gender: bool = False,
+) -> None:
+    """Validate ordered fixtures using the shared, conservative team matcher."""
     if len(teams) != 15:
         raise ValueError("La fuente no contiene los 15 partidos.")
-    for match, (home, away) in zip(round_.matches, teams):
+    expected_homes = [match.home for match in round_.matches]
+    expected_aways = [match.away for match in round_.matches]
+    for match, pair in zip(round_.matches, teams):
+        if not isinstance(pair, (tuple, list)) or len(pair) != 2:
+            raise ValueError("La fuente contiene un partido sin local o visitante.")
+        home, away = pair
         if (
             not home
             or not away
-            or (team_key(home), team_key(away))
-            != (team_key(match.home), team_key(match.away))
+            or not _unique_team_match(match.home, home, expected_homes, allow_missing_gender)
+            or not _unique_team_match(match.away, away, expected_aways, allow_missing_gender)
         ):
             raise ValueError(
-                f"Los equipos de la fuente no coinciden en el partido {match.number}: {home} – {away}."
+                f"Los equipos de la fuente no coinciden en el partido {match.number}: "
+                f"recibidos {home} – {away}; jornada {match.home} – {match.away}."
             )
+
+
+def _unique_team_match(expected, actual, candidates, allow_missing_gender):
+    return uniquely_matches_team(
+        expected, actual, candidates, allow_missing_gender=allow_missing_gender
+    )
 
 
 def public_snapshot(
@@ -102,7 +74,8 @@ def public_snapshot(
     rows = data_updater._validated_percentages(payload, round_.season, round_.number)
     matches = ElementTree.fromstring(payload).findall(".//partido")
     validate_teams(
-        round_, [(m.get("local", ""), m.get("visitante", "")) for m in matches]
+        round_, [(m.get("local", ""), m.get("visitante", "")) for m in matches],
+        allow_missing_gender=True,
     )
     snapshot = ProbabilitySnapshot(
         "public",
@@ -298,9 +271,11 @@ def reconcile_import(prepared: PreparedImport, existing: list[Round]) -> Prepare
                     f"{incoming.key}: datos manuales conservados; no se reemplazan."
                 )
                 continue
-            same = [(m.home_id, m.away_id) for m in incoming.matches] == [
-                (m.home_id, m.away_id) for m in previous.matches
-            ]
+            same = same_fixtures(
+                [(m.home, m.away) for m in previous.matches],
+                [(m.home, m.away) for m in incoming.matches],
+                allow_missing_gender=True,
+            )
             snapshots = incoming.snapshots
             if same:
                 snapshots += tuple(
@@ -362,6 +337,30 @@ def live_for_round(round_: Round, preferred_source: str = "") -> tuple[LiveMatch
         validate_teams(round_, [(m.home, m.away) for m in matches])
         return matches
 
+    def align(rows):
+        """Keep results only for positionally confirmed fixtures; localize labels."""
+        if len(rows) != 15 or [row.number for row in rows] != list(range(1, 16)):
+            raise ValueError("El marcador no contiene los 15 partidos en orden.")
+        aligned = []
+        mismatch = False
+        homes = [m.home for m in round_.matches]
+        aways = [m.away for m in round_.matches]
+        for fixture, row in zip(round_.matches, rows):
+            confirmed = (
+                _unique_team_match(fixture.home, row.home, homes, True)
+                and _unique_team_match(fixture.away, row.away, aways, True)
+            )
+            if confirmed:
+                aligned.append(replace(row, home=fixture.home, away=fixture.away))
+            else:
+                mismatch = True
+                aligned.append(replace(
+                    row, home=fixture.home, away=fixture.away, score="—", sign="", pleno="",
+                    status=f"Identidad sin confirmar · proveedor: {row.home} – {row.away}",
+                    final=False,
+                ))
+        return tuple(aligned), mismatch
+
     try:
         matches = fetch_live_results(round_.season, round_.number)
     except (ConnectionError, ValueError) as primary_error:
@@ -369,15 +368,14 @@ def live_for_round(round_: Round, preferred_source: str = "") -> tuple[LiveMatch
         # interpretarse la respuesta, se prueba ESPN. La identidad de equipos
         # se valida después, fuera de este bloque, sin ocultar cruces.
         try:
-            return fetch_espn()
+            rows, _ = align(fetch_espn())
+            return rows
         except (ConnectionError, ValueError) as fallback_error:
             raise ConnectionError(
                 "No se pudo conectar con el marcador público ni con ESPN: "
                 f"{primary_error}; {fallback_error}"
             ) from fallback_error
-    # Una respuesta estructurada con equipos distintos se rechaza directamente;
-    # no se oculta como un simple fallo de red ni se cambia de jornada.
-    validate_teams(round_, [(m.home, m.away) for m in matches])
+    matches, identity_mismatch = align(matches)
 
     # Algunos proveedores contestan correctamente, pero aún dejan vacíos los
     # partidos cuyo horario ya pasó. En ese caso consultar ESPN evita mantener
@@ -385,14 +383,14 @@ def live_for_round(round_: Round, preferred_source: str = "") -> tuple[LiveMatch
     # sustituyen filas sin signo por resultados alternativos confirmados.
     now = datetime.now().astimezone()
     primary_by_number = {match.number: match for match in matches}
-    has_missing_started_match = preferred_source == "ESPN (alternativa)" or any(
+    has_missing_started_match = identity_mismatch or preferred_source == "ESPN (alternativa)" or any(
         (fixture.number not in primary_by_number or not primary_by_number[fixture.number].sign)
         and _kickoff_has_passed(fixture.kickoff, now)
         for fixture in round_.matches[:14]
     )
     if has_missing_started_match:
         try:
-            alternate = fetch_espn()
+            alternate, _ = align(fetch_espn())
         except (ConnectionError, ValueError):
             return tuple(matches)
         alternate_by_number = {match.number: match for match in alternate}

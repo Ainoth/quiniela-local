@@ -1,5 +1,18 @@
 # 12 · Matriz de trazabilidad de requisitos
 
+RF-DAT-008 (v1.0.37): una capa de dominio normaliza nombres de equipos en
+porcentajes, importaciones, marcadores, escrutinios y reconciliación. Acepta
+variantes de formato y erratas únicas de un carácter, sin cruzar local/visitante,
+filiales o competiciones. El marcador deja sin confirmar únicamente la fila
+ambigua y mantiene resultados válidos de otros partidos. Pruebas: `test_team_aliases.py`,
+`test_espn_live.py`, `test_normal_generation.py`, `test_published_scrutiny.py` y
+`test_integration.py`.
+
+RF-ESC-011 (v1.0.36): `team_key` normaliza la errata local «Sevila» y la
+compara con el nombre correcto «Sevilla» sin afectar a otros equipos. Evita
+que una sola discrepancia de calendario bloquee el marcador de toda la jornada.
+Prueba: `test_win1x2_sevilla_typo_does_not_reject_valid_live_round`.
+
 RF-ESC-010 (v1.0.34): el adaptador del marcador combina Dataradar y ESPN por
 partido; una fila sin cobertura de ESPN nunca sustituye un resultado válido de
 la fuente primaria. Se normalizan variantes de los nombres de Almería, Oviedo,

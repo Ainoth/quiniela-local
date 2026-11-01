@@ -3,6 +3,12 @@ from datetime import UTC, datetime
 import pytest
 
 from quiniela_ai_studio.domain.models import Match, Round
+from quiniela_ai_studio.domain.team_identity import (
+    same_fixtures,
+    same_team_name,
+    same_team_pair,
+    uniquely_matches_team,
+)
 from quiniela_ai_studio.infrastructure.integration import team_key, validate_teams
 
 
@@ -79,9 +85,8 @@ def test_quinielista_w_marker_matches_feminine_win1x2_team():
         validate_teams(round_, source_teams)
 
 
-def test_win1x2_sevila_typo_matches_quinielista_sevilla_femenino():
+def test_win1x2_sevilla_typo_does_not_reject_valid_live_round():
     assert team_key('Sevila (F)') == team_key('Sevilla (F)')
-
     matches = tuple(
         Match(index, f'Local {index}', f'Visitante {index}')
         for index in range(1, 13)
@@ -93,11 +98,48 @@ def test_win1x2_sevila_typo_matches_quinielista_sevilla_femenino():
     round_ = Round(
         '26-27', 18, matches, 'current', 'WIN1X2', datetime.now(UTC).isoformat(),
     )
-    teams = [(match.home, match.away) for match in matches]
-    teams[12] = ('SEVILLA (F)', 'R.MADRID (F)')
+    source_teams = [(match.home, match.away) for match in matches]
+    source_teams[12] = ('SEVILLA (F)', 'R.MADRID (F)')
 
-    validate_teams(round_, teams)
+    validate_teams(round_, source_teams)
 
-    teams[12] = ('SEVILLA B (F)', 'R.MADRID (F)')
+    source_teams[12] = ('OTRO EQUIPO (F)', 'R.MADRID (F)')
     with pytest.raises(ValueError, match='partido 13'):
-        validate_teams(round_, teams)
+        validate_teams(round_, source_teams)
+
+
+@pytest.mark.parametrize(('left', 'right'), [
+    ('Sevila (F)', 'Sevilla (F)'),
+    ('PSV Eidhoven', 'PSV Eindhoven'),
+    ('R. Madrid', 'Real Madrid'),
+    ('Atletico Madrid', 'At. Madrid'),
+    ('Athletic Club Bilbao', 'Ath.Club'),
+    ('Racing Santander', 'Racing S.'),
+    ('Shaktar Donetsk', 'Shakhtar Donetsk'),
+    ('Alaves', 'Alavés'),
+    ('Badalona W.(F)', 'FC Badalona (F)'),
+])
+def test_team_identity_accepts_known_spelling_and_format_variants(left, right):
+    assert same_team_name(left, right, allow_missing_gender=True)
+
+
+@pytest.mark.parametrize(('left', 'right'), [
+    ('Barcelona', 'Barcelona B'),
+    ('Manchester City', 'Manchester United'),
+    ('U Craiova', 'FC U Craiova'),
+    ('Rayo Vallecano', 'Real Valladolid'),
+    ('Athletic Club (F)', 'Athletic Club (M)'),
+])
+def test_team_identity_keeps_distinct_clubs_and_competitions_separate(left, right):
+    assert not same_team_name(left, right, allow_missing_gender=True)
+
+
+def test_team_identity_preserves_home_away_order():
+    assert not same_team_pair(('Sevilla', 'Rayo'), ('Rayo', 'Sevilla'))
+    assert same_fixtures([('Sevilla', 'Rayo')], [('Sevila', 'Rayo')])
+    assert not same_fixtures([('Sevilla', 'Rayo')], [('Rayo', 'Sevilla')])
+
+
+def test_typo_must_resolve_to_one_team_in_the_round():
+    assert uniquely_matches_team('Malaga', 'Malag', ['Malaga', 'Rayo'])
+    assert not uniquely_matches_team('Malaga', 'Malag', ['Malaga', 'Malage'])

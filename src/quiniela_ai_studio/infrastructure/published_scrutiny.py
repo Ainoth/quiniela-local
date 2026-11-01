@@ -13,7 +13,7 @@ from decimal import Decimal
 from urllib.request import Request, urlopen
 
 from quiniela_ai_studio.domain.models import Round
-from quiniela_ai_studio.infrastructure.integration import team_key
+from quiniela_ai_studio.domain.team_identity import same_team_name, team_key
 
 SOURCE = "Comprobar Lotería · escrutinio SELAE reproducido"
 BASE_URL = "https://comprobarloteria.com/quiniela/{date}/"
@@ -74,7 +74,16 @@ def parse_published_scrutiny(payload: str, round_: Round) -> dict:
             raise ValueError("El orden de partidos del escrutinio no coincide.")
         teams_text = _plain(re.sub(r"<span[^>]*>—</span>", "|", teams_html))
         pair = teams_text.split("|", 1)
-        if len(pair) != 2 or (_team(pair[0]), _team(pair[1])) != (_team(expected.home, stored=True), _team(expected.away, stored=True)):
+        if len(pair) != 2:
+            raise ValueError(f"Los equipos del escrutinio no coinciden en el partido {number}.")
+        actual_pair = (_team(pair[0]), _team(pair[1]))
+        expected_pair = (_team(expected.home, stored=True), _team(expected.away, stored=True))
+        if any(
+            actual_gender != expected_gender
+            or not same_team_name(actual_name, expected_name, ignore_gender=True)
+            for (actual_name, actual_gender), (expected_name, expected_gender)
+            in zip(actual_pair, expected_pair)
+        ):
             raise ValueError(f"Los equipos del escrutinio no coinciden en el partido {number}.")
         score = re.fullmatch(r"(\d+)\s*-\s*(\d+)", _plain(score_html))
         sign = _plain(sign_html).upper()

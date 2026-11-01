@@ -11,6 +11,7 @@ from quiniela_ai_studio.domain.models import (
     round_from_dict,
     utcnow,
 )
+from quiniela_ai_studio.domain.team_identity import same_fixtures
 
 
 class SystemService:
@@ -167,7 +168,11 @@ class SystemService:
         """Adopta fuentes actualizadas mediante versión explícita sin cambiar apuestas/precio."""
         current = self._editable(system)
         frozen = round_from_dict(json.loads(system.round_snapshot)) if system.round_snapshot else current
-        if tuple((m.home_id, m.away_id) for m in frozen.matches) != tuple((m.home_id, m.away_id) for m in current.matches):
+        if not same_fixtures(
+            [(m.home, m.away) for m in frozen.matches],
+            [(m.home, m.away) for m in current.matches],
+            allow_missing_gender=True,
+        ):
             raise ValueError('Los equipos han cambiado. Crea un sistema nuevo para revisarlos.')
         updated = replace(current, price_cents=frozen.price_cents, rules_version=frozen.rules_version)
         return self.version(system, round_snapshot=json.dumps(round_dict(updated)),

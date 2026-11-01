@@ -6,17 +6,17 @@ marcador partidos cuyo horario ya pasó.
 """
 from __future__ import annotations
 
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime
 import json
 import re
 import time
-import unicodedata
 import urllib.error
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime
 
 from live_results import LiveMatch
 from quiniela_ai_studio.domain.models import Match
+from quiniela_ai_studio.domain.team_identity import same_team_name
 
 ESPN_SCOREBOARD_URL = (
     "https://site.api.espn.com/apis/site/v2/sports/soccer/{league}/scoreboard?dates={day}"
@@ -26,36 +26,6 @@ LEAGUE_WOMEN = ("esp.w.1",)
 SOURCE_NAME = "ESPN (alternativa)"
 REQUEST_TIMEOUT_SECONDS = 4
 MAX_RESPONSE_BYTES = 2 * 1024 * 1024
-
-# Diferencias de nombres entre los horarios PRE locales y el marcador ESPN.
-TEAM_ALIASES = {
-    "ATHCLUBBILBAO": "ATHCLUB",
-    "ATHLETICCLUB": "ATHCLUB",
-    "ATHLETICBILBAO": "ATHCLUB",
-    "ATLETICOMADRID": "ATMADRID",
-    "ATLETICODEMADRID": "ATMADRID",
-    "RAYOVALLECANO": "RAYO",
-    "REALSOCIEDAD": "RSOCIEDAD",
-    "REALMADRID": "RMADRID",
-    "DEPORTIVOCORUNA": "DEPORTIVO",
-    "DEPORTIVOLACORUNA": "DEPORTIVO",
-    "MADRIDCCF": "MADRIDCFF",
-    "REALBETIS": "BETIS",
-    "REALBETISBALOMPIE": "BETIS",
-    "CELTAVIGO": "CELTA",
-    "RCCELTADEVIGO": "CELTA",
-    "CDCASTELLON": "CASTELLON",
-    "CDSABADELL": "SABADELL",
-    "RCDMALLORCA": "MALLORCA",
-    "CDTENERIFE": "TENERIFE",
-    "UDALMERIA": "ALMERIA",
-    "REALOVIEDO": "ROVIEDO",
-    "DUXLOGRONO": "LOGRONO",
-    "LOGRONOUNITED": "LOGRONO",
-    "FCBADALONA": "BADALONA",
-    "LEVANTEBADALONA": "BADALONA",
-}
-
 
 def _scheduled_date(match: Match) -> str | None:
     """Return the local fixture date as ESPN's YYYYMMDD query value."""
@@ -71,17 +41,8 @@ def _scheduled_date(match: Match) -> str | None:
 
 
 def _is_women_match(match: Match) -> bool:
-    return any(re.search(r"\((?:F|FEMENINO)\)\s*$", name, re.IGNORECASE)
+    return any(re.search(r"\((?:F|FEM|FEMENINO|W|WOMEN)\)\s*$", name, re.IGNORECASE)
                for name in (match.home, match.away))
-
-
-def _team_key(name: str) -> str:
-    # Los equipos de Liga F se identifican por la competición. El sufijo (F)
-    # solo aclara la etiqueta local y no forma parte del nombre ESPN.
-    clean = re.sub(r"\s*\((?:F|FEMENINO)\)\s*$", "", name, flags=re.IGNORECASE)
-    plain = unicodedata.normalize("NFKD", clean).encode("ascii", "ignore").decode()
-    key = re.sub(r"[^A-Z0-9]", "", plain.upper())
-    return TEAM_ALIASES.get(key, key)
 
 
 def _score_value(value) -> int | None:
@@ -170,8 +131,6 @@ def parse_espn_scoreboard(payload: bytes, league: str, day: str) -> list[dict]:
             "league": league,
             "home": home_name,
             "away": away_name,
-            "home_key": _team_key(home_name),
-            "away_key": _team_key(away_name),
             "score": score,
             "sign": sign,
             "pleno": pleno,
@@ -240,10 +199,10 @@ def fetch_espn_live_scores(fixtures: tuple[Match, ...] | list[Match]) -> tuple[L
             by_fixture[match.number] = None
             continue
         league_set = LEAGUE_WOMEN if _is_women_match(match) else LEAGUES_MEN
-        expected_pair = (_team_key(match.home), _team_key(match.away))
         by_fixture[match.number] = next((event for event in events
             if event["day"] == day and event["league"] in league_set
-            and (event["home_key"], event["away_key"]) == expected_pair), None)
+            and same_team_name(match.home, event["home"], ignore_gender=True)
+            and same_team_name(match.away, event["away"], ignore_gender=True)), None)
 
     now = int(time.time())
     result = []

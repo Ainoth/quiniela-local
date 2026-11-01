@@ -283,16 +283,29 @@ def test_live_strict_identity_and_no_other_round_fallback(tmp_path, monkeypatch)
 
     round_ = load_win1x2(data_folder(tmp_path / "source"))[-1]
     matches = [
-        LiveMatch(n, "Equipo A", "Equipo B", "—", "", "", "Pendiente", False, 0)
-        for n in range(1, 16)
+        LiveMatch(
+            n, fixture.home, fixture.away, "1 - 0" if n < 15 else "1 - 1",
+            "1", "1M" if n == 15 else "", "Finalizado", True, 1,
+        )
+        for n, fixture in enumerate(round_.matches, 1)
     ]
     monkeypatch.setattr(
         integration, "fetch_live_results", lambda season, number: matches
     )
-    assert not any(m.sign for m in live_for_round(round_))
+    assert all(m.sign for m in live_for_round(round_))
     matches[0] = replace(matches[0], home="Incorrecto")
-    with pytest.raises(ValueError):
-        live_for_round(round_)
+    monkeypatch.setattr(
+        "quiniela_ai_studio.infrastructure.espn_live.fetch_espn_live_scores",
+        lambda fixtures: tuple(
+            LiveMatch(m.number, m.home, m.away, "—", "", "", "Sin cobertura", False, 0)
+            for m in fixtures
+        ),
+    )
+    aligned = live_for_round(round_)
+    assert not aligned[0].sign
+    assert "Identidad sin confirmar" in aligned[0].status
+    assert all(match.sign for match in aligned[1:])
+    assert all(match.home == fixture.home for match, fixture in zip(aligned, round_.matches))
 
 
 def test_provider_team_aliases_are_explicit():
