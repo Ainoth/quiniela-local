@@ -6,7 +6,7 @@ de que toda la especificación esté terminada.
 
 Desarrollo reanudado en casa el 13/10/2026. El registro siguiente de pausa se
 conserva como contexto; las correcciones posteriores están documentadas en
-`STUDIO_V1_0.md`, `STUDIO_VALIDACION.md` y el plan de optimización.
+`STUDIO_V2_0.md`, `STUDIO_VALIDACION.md` y el plan de optimización.
 Se han corregido comparaciones de cardinalidad, auditoría de cancelación/error,
 informes obsoletos al editar/restaurar, desbordamientos numéricos y ranking de
 probabilidades diminutas, además del acceso a opciones avanzadas y cancelación.
@@ -21,7 +21,7 @@ Pleno manual por defecto y agrupación de boletos por Pleno sin cambiarlo.
 Exportación TXT/CSV propia con relectura; no se afirma importación automática
 en TuLotero ni se realizan pagos. Android no se ha modificado.
 
-Documentación: `docs/STUDIO_V1_0.md`; plan y diagnóstico anterior:
+Documentación: `docs/STUDIO_V2_0.md`; plan y diagnóstico anterior:
 `docs/planes/V1_OPTIMIZACION.md`.
 
 ## Validación realizada antes de pausar

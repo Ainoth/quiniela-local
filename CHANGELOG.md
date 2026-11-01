@@ -1,5 +1,21 @@
 # Cambios
 
+## 2.0.0 — escritorio y móvil en una edición convergente
+
+- Integra en el generador de escritorio los controles recientes de la app móvil:
+  base histórica por temporadas y cobertura, modos Auto/Manual independientes
+  para dobles y triples, factor sorpresa separado, resumen persistente y boleto
+  compacto con generación al final de la pestaña.
+- Reducciones reúne Optimizar y retira la pestaña Reducidas visible. Distancias
+  ya no deja el desarrollo vacío cuando no hay apuestas compatibles, y apagar
+  Optimizar restaura la revisión previa a la propuesta.
+- Escrutinio admite TXT clásico, TXT agrupado y CSV agrupado preparados para
+  TuLotero, sin guardar el fichero en Mis Sistemas.
+- Corrige la cobertura ESPN para Almería/UD Almería, R. Oviedo/Real Oviedo y
+  Logroño/Badalona. Cuando el proveedor alternativo no cubre un encuentro,
+  conserva el resultado válido del proveedor primario.
+- Sube la versión del paquete de escritorio a 2.0.0.
+
 ## 1.0.35 — controles automáticos por histórico y boleto compacto
 
 - RF-RED-020 / RF-UX-030: Distancias explica que las selecciones se cruzan con
@@ -474,7 +490,7 @@
 - RF-ARC-009: asistente manual TuLotero 2–8 por boleto, Pleno común, reglas
   configurables, TXT/CSV con relectura. Sin importación automática/envío/pago.
 - Sin cambios destructivos de datos/esquema ni nuevas dependencias pesadas.
-  Documentación y límites: `docs/STUDIO_V1_0.md`.
+  Documentación y límites: `docs/STUDIO_V2_0.md`.
 ## 0.1.13 — 13/10/2026 · Normal y Reducidas independientes
 
 - RF-QUI-005/006: dos constructores independientes por jornada; Normal y

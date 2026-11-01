@@ -6,7 +6,7 @@ Aplicación de Quiniela para escritorio y Android. La versión de escritorio
 puede leer los datos instalados por WIN1X2; ambas versiones descargan datos,
 porcentajes y marcadores directamente de sus proveedores públicos.
 
-## Quiniela AI Studio — v1.0.35
+## Quiniela AI Studio — v2.0.0
 
 Interfaz gráfica en español que conserva la experiencia visual de Quiniela Local:
 fondo azul, boleto fijo compacto con partido y porcentajes junto a 1/X/2,
@@ -39,7 +39,14 @@ El verificador independiente comprueba las columnas reales de las reducidas.
 **TuLotero** prepara boletos de Pleno común y TXT/CSV para introducir manualmente:
 no sube archivos, envía apuestas ni cobra. El Pleno es **Manual** por defecto;
 elige **Automático** explícitamente si quieres que lo modifiquen las barras.
-[Manual y límites v1.0.2](docs/STUDIO_V1_0.md).
+[Manual y límites](docs/STUDIO_V2_0.md).
+
+En **Escrutinio** puedes abrir un TXT clásico o un TXT/CSV agrupado preparado
+para TuLotero y evaluarlo frente al resultado manual, en directo o publicado.
+El archivo se asigna explícitamente a la jornada y se mantiene fuera de Mis
+Sistemas. Si ESPN no cubre un partido, la app conserva los datos primarios y
+normaliza alias conocidos como Almería/UD Almería, R. Oviedo/Real Oviedo y
+Logroño/Badalona para completar el marcador alternativo cuando está disponible.
 
 La pestaña **Reducciones** usa matrices gráficas 1/X/2 para elegir referencias,
 patrones de 2–5 partidos consecutivos y columnas de frecuencia. No requiere
@@ -156,15 +163,11 @@ funciona sin conexión con la demo y los datos ya importados. Windows:
    nivel 10 los 16. Puedes ajustar las casillas después. Si faltan datos conserva
    tu Pleno con aviso. El contador muestra columnas × parejas del Pleno y coste;
    generación y TXT incluyen todas las parejas seleccionadas.
-8. **Reducidas** tiene una base independiente de Normal. Elige entre seis tipos
-   de tablas BOE 2009: se proponen fijos/dobles/triples propios por porcentajes,
-   se muestran columnas y coste con el Pleno y puedes ajustar las casillas.
-   **Generar reducida** produce sus apuestas exactas sin tocar la normal.
-   Cambiar entre Normal y Reducidas recupera cada sistema por jornada.
-   **Diferenciación del público** (0–10), disponible en ambos modos, compara
-   mercado y popularidad de Quinielista: un criterio original de selección,
-   no una probabilidad ni cálculo de rentabilidad. Puede reducir aciertos y
-   no garantiza premios mayores. Requiere ambas fuentes y seleccionar Mercado.
+8. **Reducciones** reúne los filtros gráficos, históricos y de Distancias, junto
+   con **Optimizar**. Las pestañas se activan de forma independiente; al retirar
+   una condición se vuelve al desarrollo de origen. Si una distancia no deja
+   ninguna apuesta, se conserva el desarrollo anterior y se explica cómo
+   ajustar la selección. Desactivar Optimizar restaura la revisión previa.
 9. **Guardar apuestas (TXT)**, en la cabecera, guarda las apuestas de la quiniela
    abierta. En Mis Sistemas puedes guardar directamente la fila elegida. Al
    terminar aparecen la ruta, el número de apuestas y los pasos para cargar
@@ -187,9 +190,10 @@ RUN_PC_GUI_TESTS=1 python3 -m unittest discover -q
 [Índice](docs/00_INDICE.md)
 
 Se conserva `python3 app.py` y el acceso Quiniela Local como respaldo.
-No se declara paridad completa, IA entrenada, garantías económicas ni soporte
-nativo Windows comprobado. Las garantías combinatorias se etiquetan por universo
-y método de verificación. Android queda fuera de este desarrollo.
+No se declara IA entrenada, garantías económicas ni soporte nativo Windows
+comprobado. Las garantías combinatorias se etiquetan por universo y método de
+verificación. Esta versión de escritorio incorpora los controles de generación
+histórica y Auto/Manual desarrollados recientemente para la app móvil.
 
 ## Aplicación Android autónoma
 

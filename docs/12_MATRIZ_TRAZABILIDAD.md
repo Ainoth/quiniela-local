@@ -338,7 +338,7 @@ v1.0.0: RF-RED-002 carteras por objetivo; RF-GAR-001/002/003 verificador
 independiente y métricas por universo; RF-PRO-005 masa deportiva; RF-QUI-002
 Pleno explícito/manual/diversificado; RF-ARC-009 preparación TuLotero con
 relectura; RF-AUD-001 auditoría. Pruebas en `test_portfolio.py` y `test_v1_gui.py`.
-Alcance/métodos/pendientes: `STUDIO_V1_0.md`. Valor esperado, IA calibrada,
+Alcance/métodos/pendientes: `STUDIO_V2_0.md`. Valor esperado, IA calibrada,
 solver externo e importación oficial TuLotero NO se declaran implementados.
 
 Revisión 0.1.13: RF-QUI-005/006 separan Normal y Reducidas por sistemas propios;

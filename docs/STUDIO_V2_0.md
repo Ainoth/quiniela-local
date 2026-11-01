@@ -1,4 +1,4 @@
-# Quiniela AI Studio — v1.0.35
+# Quiniela AI Studio — v2.0.0
 
 ## Normal: base histórica, controles independientes y boleto compacto
 

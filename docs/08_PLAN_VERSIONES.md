@@ -16,7 +16,7 @@ capturas de comparación. Consulta
 **Entrega v1.0.21:** Interrupciones añade la matriz de cambios y
 Distancias como filtros independientes, sin sustituir SSeguidos ni FSSeguidos.
 Las transiciones son los 13 pares consecutivos de los primeros 14 signos.
-Consulta `docs/planes/Interrupciones_V1_0_21.md` y `docs/STUDIO_V1_0.md`.
+Consulta `docs/planes/Interrupciones_V1_0_21.md` y `docs/STUDIO_V2_0.md`.
 
 ## v0.1 · Núcleo ejecutable offline — PRIMERA SESIÓN
 
