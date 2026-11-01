@@ -570,12 +570,45 @@ def test_sign_distances_subtab_filters_and_restores_without_changing_figures(win
     assert any(row['kind']=='allowed_sign_distance' and row['sign']=='1'
                and row['allowed_values']==[3] and row['active']
                for row in saved['reduction_rules'])
+    window.reduction_activation_buttons[18].setChecked(False)
+    for _ in range(200):
+        QTest.qWait(10)
+        if not window.filter_timer.isActive() and window.filter_job is None:
+            break
+    assert window.filter_spec().apply(bets) == bets
+    assert window.system.bets == bets
+    window.reduction_activation_buttons[18].setChecked(True)
+    for _ in range(200):
+        QTest.qWait(10)
+        if not window.filter_timer.isActive() and window.filter_job is None:
+            break
+    assert window.system.bets == (accepted,)
+    window.sign_distance_squares[('1',3)].setChecked(False)
+    assert not window.sign_distance_apply['1'].isChecked()
+    for _ in range(200):
+        QTest.qWait(10)
+        if not window.filter_timer.isActive() and window.filter_job is None:
+            break
+    assert window.system.bets == bets
+    window.sign_distance_squares[('1',3)].setChecked(True)
+    window.sign_distance_apply['1'].setChecked(True)
+    for _ in range(200):
+        QTest.qWait(10)
+        if not window.filter_timer.isActive() and window.filter_job is None:
+            break
+    assert window.system.bets == (accepted,)
+    window.sign_distance_apply['1'].setChecked(False)
+    for _ in range(200):
+        QTest.qWait(10)
+        if not window.filter_timer.isActive() and window.filter_job is None:
+            break
+    assert window.system.bets == bets
     window.restore_filter_controls()
     assert window.sign_distance_squares[('1',3)].isChecked()
-    assert window.sign_distance_apply['1'].isChecked()
-    window.sign_distance_apply['1'].setChecked(False)
+    assert not window.sign_distance_apply['1'].isChecked()
+    window.sign_distance_squares[('1',3)].setChecked(False)
     assert window.filter_spec().apply(bets) == bets
-    assert window.sign_distance_squares[('1',3)].isChecked()
+    assert not window.sign_distance_apply['1'].isChecked()
 
 
 def test_automatic_mode_refuses_synthetic_history_and_uses_joint_profiles(window):
