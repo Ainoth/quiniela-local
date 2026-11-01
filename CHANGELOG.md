@@ -1,5 +1,10 @@
 # Cambios
 
+## 2.0.4 — visibilidad completa de las tarjetas
+
+- Reserva altura suficiente para que las categorías de premios no se oculten.
+- Compacta la descripción del escenario y conserva los detalles en ayudas.
+
 ## 2.0.3 — tarjetas de escrutinio legibles
 
 - Reorganiza las categorías de la previsión en seis tarjetas compactas para

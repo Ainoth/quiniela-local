@@ -4897,7 +4897,7 @@ class MainWindow(QMainWindow):
         detail_layout.addWidget(self.prize_detail_total,8,4)
         self.prize_card.hide();self.prize_detail_card.hide()
         self.estimate_prize_card=QFrame();self.estimate_prize_card.setObjectName('estimatePrizeCard')
-        self.estimate_prize_card.setMinimumWidth(0)
+        self.estimate_prize_card.setMinimumWidth(0);self.estimate_prize_card.setMinimumHeight(205)
         estimate_layout=QVBoxLayout(self.estimate_prize_card);estimate_layout.setContentsMargins(10,7,10,7);estimate_layout.setSpacing(3)
         estimate_top=QHBoxLayout();estimate_top.setContentsMargins(0,0,0,0);estimate_top.setSpacing(8)
         self.estimate_headline=QLabel('≈ PREVISIÓN ORIENTATIVA');self.estimate_headline.setObjectName('estimateHeadline')
@@ -4910,8 +4910,8 @@ class MainWindow(QMainWindow):
         estimate_grid=QGridLayout();estimate_grid.setContentsMargins(0,0,0,0);estimate_grid.setHorizontalSpacing(4);estimate_grid.setVerticalSpacing(3)
         self.estimate_category_rows={}
         for index,category in enumerate((15,14,13,12,11,10)):
-            label=QLabel('Pleno al 15 · — apuestas · — €/u. · — total' if category==15 else f'{category} aciertos · — apuestas · — €/u. · — total')
-            label.setObjectName('estimateCategoryTile');label.setMinimumWidth(0)
+            label=QLabel('P15 · — ap. · — €/u. · — total' if category==15 else f'{category} · — ap. · — €/u. · — total')
+            label.setObjectName('estimateCategoryTile');label.setMinimumWidth(0);label.setWordWrap(True)
             estimate_grid.addWidget(label,index//3,index%3)
             self.estimate_category_rows[category]=label
         for column in range(3):estimate_grid.setColumnStretch(column,1)
@@ -4922,7 +4922,7 @@ class MainWindow(QMainWindow):
         self.estimate_prize_card.hide()
         self.prize_notice=QLabel('Premios pendientes de escrutinio publicado.');self.prize_notice.setObjectName('prizeNoticeCard')
         self.prize_cache_error=''
-        self.prize_notice.setWordWrap(True);self.prize_notice.setMinimumWidth(0)
+        self.prize_notice.setWordWrap(True);self.prize_notice.setMinimumWidth(0);self.prize_notice.setMinimumHeight(205)
         self.official_prize_column=QWidget();official_layout=QVBoxLayout(self.official_prize_column)
         official_layout.setContentsMargins(0,0,0,0);official_layout.setSpacing(5)
         self.official_prize_column.setMinimumWidth(0)
@@ -4991,7 +4991,8 @@ class MainWindow(QMainWindow):
             self.prize_headline.setText('PREMIO REAL · PENDIENTE')
             self.prize_total.clear()
             self.prize_fine_print.setText('El importe real aparecerá cuando se publique y valide el escrutinio. La previsión orientativa queda a la izquierda.')
-            self.prize_notice.setText(message)
+            self.prize_notice.setText('Premios reales pendientes de publicación.')
+            self.prize_notice.setToolTip(message)
             return
         if total==0:
             self.prize_headline.setText('PREMIO REAL · ESCRUTINIO OFICIAL')
@@ -5679,15 +5680,18 @@ class MainWindow(QMainWindow):
         updated=datetime.fromtimestamp(captured).astimezone().strftime('%H:%M') if captured else '—'
         self.estimate_context_label(
             f"Escenario {len(result_signs)}/14 · recaudación {prize_money(estimate['revenue_cents'])} · "
-            f"bote {prize_money(estimate['jackpot_cents'])} · {estimate['public_entries']:,} apuestas públicas · datos {updated}."
+            f"bote {prize_money(estimate['jackpot_cents'])} · {estimate['public_entries']:,} apuestas · {updated}."
         )
-        self.estimate_source_label.setText(estimate['source']+' · aproximación no oficial · pendientes: favorito del mercado.')
+        self.estimate_scenario_label.setToolTip('Los partidos pendientes se proyectan con el favorito del mercado.')
+        self.estimate_source_label.setText(estimate['source']+' · aproximación no oficial.')
+        self.estimate_source_label.setToolTip('Los partidos pendientes se proyectan con el favorito del mercado. No es un premio oficial.')
         for row in estimate['rows']:
             labels=self.estimate_category_rows[row['category']]
-            category='Pleno al 15' if row['category']==15 else f"{row['category']} aciertos"
+            category='P15' if row['category']==15 else str(row['category'])
             unit=prize_money(row['unit_cents']) if row['unit_cents'] else '—'
             subtotal=prize_money(row['subtotal_cents']) if row['subtotal_cents'] else '—'
-            labels.setText(f"{category} · {row['own_bets']:,} apuestas · {unit}/u. · {subtotal} total")
+            labels.setText(f"{category} · {row['own_bets']:,} ap. · {unit}/u. · {subtotal}")
+            labels.setToolTip(f"{category}: {row['own_bets']:,} apuestas · {unit} por apuesta · {subtotal} subtotal")
 
     def fetch_live(self):
         if self.live_worker is not None or self.round.season=='DEMO':return

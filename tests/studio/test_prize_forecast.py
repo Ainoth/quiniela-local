@@ -102,5 +102,6 @@ def test_desktop_shows_live_progress_and_golden_forecast_card(window):
     assert not window.estimate_prize_card.isHidden()
     assert window.estimate_total.text() != "—"
     assert "aproximación no oficial" in window.estimate_source_label.text()
+    assert window.estimate_prize_card.minimumHeight() >= 200
     assert len(window.estimate_category_rows) == 6
-    assert all("apuestas" in label.text() for label in window.estimate_category_rows.values())
+    assert all(" ap. " in label.text() for label in window.estimate_category_rows.values())
