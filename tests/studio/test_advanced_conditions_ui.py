@@ -611,6 +611,28 @@ def test_sign_distances_subtab_filters_and_restores_without_changing_figures(win
     assert not window.sign_distance_apply['1'].isChecked()
 
 
+def test_unmatched_distance_keeps_existing_development_instead_of_saving_zero(window):
+    from quiniela_ai_studio.domain.filters import BasicFilters
+    from quiniela_ai_studio.domain.models import Bet
+    from quiniela_ai_studio.domain.reduction_rules import ReductionRule
+
+    bets=(Bet('X'+'1'*13,'M0'),Bet('1'*13+'X','M0'))
+    system=window.service.imported(window.round,'Distancia sin candidatas',bets)
+    window.set_system(system)
+    spec=BasicFilters(
+        reduction_rules=(ReductionRule('sign-distance-X','allowed_sign_distance',0,13,
+            sign='X',allowed_values=(13,),tab_index=18),),
+        reduction_tabs_enabled=(18,),
+    )
+    assert spec.apply(bets)==()
+
+    window.live_filter_done((window.filter_epoch,system,spec,bets,None),())
+
+    assert window.system==system
+    assert window.system.bets==bets
+    assert 'desarrollo anterior se conserva' in window.filter_feedback.text()
+
+
 def test_automatic_mode_refuses_synthetic_history_and_uses_joint_profiles(window):
     from quiniela_ai_studio.domain.reduction_rules import ReductionRule
     from quiniela_ai_studio.domain.streak_statistics import (

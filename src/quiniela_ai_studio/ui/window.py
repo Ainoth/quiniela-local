@@ -4291,6 +4291,13 @@ class MainWindow(QMainWindow):
                     'Cambia la distancia, desactiva otra condición o pulsa «Recuperar apuestas anteriores».')
         return 'No quedan apuestas. Sube el nivel o cambia las condiciones.'
 
+    @staticmethod
+    def _has_active_distance_filter(spec):
+        enabled=set(spec.reduction_tabs_enabled)
+        return any(rule.active and rule.tab_index in enabled
+                   and rule.kind in ('allowed_sign_distance','allowed_interruption_figure')
+                   for rule in spec.reduction_rules)
+
     def update_filter_controls(self):
         """Make activation explicit; inactive limits remain editable only after selection."""
         for check in self.filter_checks.values():
@@ -4593,6 +4600,11 @@ class MainWindow(QMainWindow):
         candidates=self.service.origin_bets(self.system)[1]
         before=sum(b.quantity for b in candidates)
         bets=spec.apply(candidates)
+        if not bets and self._has_active_distance_filter(spec):
+            message=self._empty_filter_message(spec)+' El desarrollo anterior se conserva; ajusta o desactiva Distancias.'
+            self.filter_feedback.setText(message)
+            self.statusBar().showMessage(message,15000)
+            return
         parameters=json.loads(self.system.parameters)
         serialized_spec=json.loads(json.dumps(spec.parameters()))
         from quiniela_ai_studio.domain.advanced_conditions import AdvancedConditions
@@ -4640,6 +4652,11 @@ class MainWindow(QMainWindow):
         epoch,system,spec,candidates,level=context
         if self.close_pending or epoch!=self.filter_epoch or self.system!=system:return
         try:
+            if not bets and self._has_active_distance_filter(spec):
+                message=self._empty_filter_message(spec)+' El desarrollo anterior se conserva; ajusta o desactiva Distancias.'
+                self.filter_feedback.setText(message)
+                self.statusBar().showMessage(message,15000)
+                return
             parameters=json.loads(system.parameters)
             if bets!=system.bets or parameters.get('filter_spec')!=json.loads(json.dumps(spec.parameters())) or parameters.get('quick_level')!=level:
                 self.set_system(self.service.save_filtered(system,spec,bets,candidates,quick_level=level,allow_empty=True))
