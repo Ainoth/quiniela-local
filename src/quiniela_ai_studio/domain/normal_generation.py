@@ -111,6 +111,24 @@ def validate_percentages(values: Sequence[Sequence[float]]) -> tuple[tuple[float
     return tuple(rows)
 
 
+def historical_position_percentages(columns: Sequence[str]) -> tuple[tuple[float, float, float], ...]:
+    """Return observed 1/X/2 frequencies by quiniela position.
+
+    This is a descriptive, provisional baseline: it does not account for team
+    strength, competitions, or bookmaker calibration.
+    """
+    if not columns:
+        raise ValueError("Selecciona temporadas con resultados finales.")
+    counts = [[0, 0, 0] for _ in range(14)]
+    for column in columns:
+        if not isinstance(column, str) or len(column) != 14 or any(sign not in SIGNS for sign in column):
+            raise ValueError("Cada resultado histórico debe contener 14 signos 1/X/2.")
+        for index, sign in enumerate(column):
+            counts[index][SIGNS.index(sign)] += 1
+    total = len(columns)
+    return normalize_percentages(tuple(tuple(count / total for count in row) for row in counts), 2)
+
+
 def import_probability_source(
     data: bytes,
     *,

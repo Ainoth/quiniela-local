@@ -130,9 +130,16 @@ class Round:
 
     @property
     def editable(self):
-        return self.mode == "simulation" or (self.mode == "current" and (
-            date.today() <= date.fromisoformat(self.editable_until) if self.editable_until
-            else not self.nominal_date or date.fromisoformat(self.nominal_date) == date.today()))
+        if self.mode == "simulation":
+            return True
+        if self.mode not in ("current", "future"):
+            return False
+        if self.editable_until:
+            return date.today() <= date.fromisoformat(self.editable_until)
+        if self.nominal_date:
+            nominal = date.fromisoformat(self.nominal_date)
+            return date.today() <= nominal if self.mode == "future" else nominal == date.today()
+        return self.mode == "current"
 
     def snapshot(self, kind):
         return next((s for s in self.snapshots if s.kind == kind), None)

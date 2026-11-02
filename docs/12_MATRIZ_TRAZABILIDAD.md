@@ -1,6 +1,23 @@
 # 12 · Matriz de trazabilidad de requisitos
 
+RF-ESC-016 (v2.0.8): Escrutinio compara la mejor apuesta con los catorce signos
+finales y reconstruye la primera revisión de filtros que quitó la combinación
+ganadora, si aparece en su entrada y no en la salida. Nombra la pestaña y
+muestra valor observado frente a condición permitida. Si no puede demostrar la
+causa, informa el límite sin atribuir el fallo a una reducción. El panel es
+plegable y la tabla de apuestas queda cerrada al entrar. Pruebas:
+`test_scrutiny_diagnostics.py`, `test_scrutiny_failure_panel_explains_missed_matches_and_reduction` y
+`test_scrutiny_diagnostic_panel_is_collapsed_until_requested`.
+
 RF-ESC-015 (v2.0.1): Escrutinio consulta en segundo plano recaudación, bote y porcentajes de Quinielista; estima por categoría las apuestas propias en un escenario de marcadores recibidos y favoritos pendientes. La tarjeta dorada de previsión se oculta cuando hay reparto definitivo. Un resumen muestra aciertos confirmados/provisionales, fallos y pendientes. Pruebas: `test_prize_forecast.py`.
+
+RF-DAT-009 / RF-NOR-008 (v2.0.7): permite preparar jornadas futuras todavía
+abiertas y descargar para temporada+jornada los porcentajes jugados y la
+probabilidad de mercado de Quinielista. Normal ofrece además «Histórico ·
+frecuencias por partido», que calcula 1/X/2 por posición a partir de las
+temporadas seleccionadas. Este método es descriptivo y provisional; no considera
+equipos ni competiciones. Pruebas: `test_probability_sources.py`,
+`test_normal_generation.py` y `test_normal_generator_ui.py`.
 
 RF-NOR-006/007 y RF-UX-029 (v1.0.35): la base automática usa temporadas
 seleccionadas, cobertura objetivo y porcentajes de jornada, con límite técnico
@@ -50,8 +67,7 @@ que un equipo diferente continúa rechazándose: `test_win1x2_sevila_typo_matche
 
 RF-DAT-007 (v1.0.34): la identidad de clubes femeninos tolera la marca `W`
 que Quinielista añade antes de `(F)` y mantiene el rechazo de clubes distintos.
-La descarga en línea de porcentajes se limita a la jornada en curso, porque el
-endpoint consulta por número de jornada y no acepta temporada. Pruebas:
+La descarga histórica continúa ligada a la temporada/jornada exactas. Pruebas:
 `test_quinielista_w_marker_matches_feminine_win1x2_team` y
 `test_historical_round_does_not_download_current_season_percentages`.
 
@@ -643,3 +659,13 @@ ayuda tras guardar. Pruebas de exportar una fila distinta de la abierta,
 reducción con Plenos múltiples, cancelación, filtros pendientes y navegación
 externa solo por clic. RF-ARC-001 y RF-AUD-001 siguen parciales; RF-BOL-005
 continúa pendiente: abrir la web no implementa envío, pago ni recibo.
+RF-UX-031 (v2.0.9): la pestaña Normal se muestra como «Quiniela»; el estado
+indica si las ponderaciones auxiliares están aplicadas a la matriz y si cambiaron
+después de aplicarse. Las temporadas históricas disponibles se pueden elegir y
+se incluyen todas por defecto en una configuración nueva. Pruebas:
+`test_normal_generator_ui.py`.
+
+RF-ESC-017 (v2.0.9): la previsión reúne metadatos y fuente en un pie compacto;
+la tarjeta oficial usa el mismo diseño por categorías, con paleta verde, y
+muestra el desglose oficial complementario. Pruebas: `test_prize_forecast.py`,
+`test_ui.py`.

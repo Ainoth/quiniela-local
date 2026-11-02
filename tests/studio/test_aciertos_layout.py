@@ -52,8 +52,13 @@ def test_all_fourteen_results_and_pleno_fit_above_smaller_bet_table(window):
     for row in (13, 14):
         rectangle = window.live_view.visualRect(window.live_model.index(row, 0))
         assert rectangle.bottom() < window.live_view.viewport().height()
-    assert window.eval_view.height() < window.live_view.height()
+    assert window.eval_view.isHidden()
+    assert window.eval_detail_button.isEnabled()
+    window.eval_detail_button.click();QTest.qWait(20)
+    assert window.eval_view.isVisible()
     window.eval_view.setCurrentIndex(window.eval_model.index(20, 0))
+    window.eval_detail_button.click();QTest.qWait(20)
+    assert window.eval_view.isHidden()
     window.resize(1200, 975);QTest.qWait(50)
     assert window.live_view.verticalScrollBar().maximum() == 0
     assert window.eval_view.currentIndex().row() == 20
@@ -96,3 +101,38 @@ def test_classic_table_does_not_invent_missing_percentages_or_schedules(window):
     window.repository.save_round(round_);window.load_rounds(round_.key);window.new_system()
     assert all(label.text()=='—' for row in window.prob_labels for label in row)
     assert all(not label.toolTip().splitlines()[1].strip() for label in window.match_labels)
+
+
+def test_scrutiny_failure_panel_explains_missed_matches_and_reduction(window):
+    from quiniela_ai_studio.domain.filters import BasicFilters
+    from quiniela_ai_studio.domain.models import Bet
+    from quiniela_ai_studio.domain.reduction_rules import ReductionRule
+
+    winning = '1' * 14
+    surviving = 'X' + '1' * 13
+    source = window.service.imported(window.round, 'Diagnóstico', (Bet(winning, '00'), Bet(surviving, '00')))
+    window.set_system(source)
+    spec = BasicFilters(
+        reduction_rules=(ReductionRule('fss-current-X', 'allowed_count', 0, 14,
+                                       sign='X', allowed_values=(1,), tab_index=17),),
+        reduction_tabs_enabled=(17,),
+    )
+    candidates = source.bets
+    filtered = spec.apply(candidates)
+    window.set_system(window.service.save_filtered(source, spec, filtered, candidates))
+    outcome = __import__('quiniela_ai_studio.domain.engine', fromlist=['evaluate']).evaluate(
+        window.system.bets, winning, '00', finalized=(True,) * 14,
+    )
+    text = window.scrutiny_diagnostic_text(winning, outcome)
+    assert 'Mejor apuesta (13/14)' in text
+    assert f"1. {window.round.matches[0].home}" in text
+    assert 'eliminó en la revisión' in text
+    assert 'FSSeguidos' in text
+    assert 'salió 0' in text and 'valores 1' in text
+
+
+def test_scrutiny_diagnostic_panel_is_collapsed_until_requested(window):
+    assert window.scrutiny_diagnostic_panel.isHidden()
+    window.toggle_scrutiny_diagnostics()
+    assert not window.scrutiny_diagnostic_panel.isHidden()
+    assert window.scrutiny_diagnostic_button.text().startswith('Ocultar')

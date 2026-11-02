@@ -138,20 +138,93 @@ def probability_snapshots(round_: Round, payload: bytes, captured_at: str | None
 
 
 def fetch_round_sources(round_: Round, cache: Path, *, cancelled=lambda: False) -> Round:
-    """Descarga exclusivamente la jornada solicitada, validando también sus equipos."""
+    """Descarga los porcentajes de la temporada/jornada solicitada y valida equipos."""
     if round_.season == "DEMO":
         raise ValueError("La demo es ficticia. Descarga partidos y selecciona una jornada real.")
-    if round_.mode != "current":
-        raise ValueError(
-            "Quinielista solo publica porcentajes para la jornada en curso; "
-            "no se pueden descargar para otra temporada o jornada."
+    if round_.mode not in ("current", "future"):
+        raise ValueError("Solo se pueden descargar porcentajes para jornadas actuales o futuras.")
+    season_year = 2000 + int(round_.season.split("-")[1])
+    endpoints = (
+        ("public", data_updater.SEASON_PUBLIC_PERCENTAGES),
+        ("sport", data_updater.SEASON_MARKET_PERCENTAGES),
+    )
+    snapshots = []
+    downloaded = []
+    checkpoint(cancelled)
+    for kind, endpoint in endpoints:
+        url = endpoint.format(round_no=round_.number, season_year=season_year)
+        payload = data_updater._download(url)
+        snapshots.append(_season_percentage_snapshot(round_, payload, kind, season_year))
+        downloaded.append((kind, payload))
+        checkpoint(cancelled)
+    for kind, payload in downloaded:
+        data_updater._atomic_write(
+            cache / f"porcentajes_{round_.season}_J{round_.number:02d}_{kind}.xml",
+            payload,
         )
-    checkpoint(cancelled)
-    payload = data_updater._download(data_updater.QUINIELISTA_PERCENTAGES.format(round_no=round_.number))
-    updated = probability_snapshots(round_, payload)
-    checkpoint(cancelled)
-    data_updater._atomic_write(cache / f"porcentajes_{round_.season}_J{round_.number:02d}.xml", payload)
-    return updated
+    return replace(
+        round_,
+        snapshots=tuple(s for s in round_.snapshots if s.kind not in {"public", "sport"})
+        + tuple(snapshots),
+    )
+
+
+def _season_percentage_snapshot(round_: Round, payload: bytes, kind: str, season_year: int):
+    """Parsea el XML moderno de temporada, comprobando jornada y los 15 partidos."""
+    import math
+
+    root = ElementTree.fromstring(payload)
+    header = root if root.tag == "porcentajes" else root.find(".//porcentajes")
+    if (
+        header is None
+        or header.get("temporada") != str(season_year)
+        or header.get("jornada") != str(round_.number)
+        or header.get("activo", "si").casefold() not in {"si", "sí", "1", "true"}
+    ):
+        raise ValueError("La fuente no identifica exactamente la temporada y jornada solicitadas.")
+    matches = root.findall(".//partido")
+    if len(matches) != 15 or any(m.get("num") != str(i) for i, m in enumerate(matches, 1)):
+        raise ValueError("La fuente no contiene los 15 partidos en el orden esperado.")
+    validate_teams(
+        round_, [(m.get("local", ""), m.get("visitante", "")) for m in matches],
+        allow_missing_gender=True,
+    )
+    value_rows = []
+    signs = ("1", "X", "2")
+    for match in matches[:14]:
+        fields = tuple(
+            (f"porcDec_{sign}" if kind == "sport" and f"porcDec_{sign}" in match.attrib else f"porc_{sign}")
+            for sign in signs
+        )
+        try:
+            values = tuple(float(match.attrib[field]) for field in fields)
+        except (ValueError, KeyError) as exc:
+            raise ValueError("La fuente de porcentajes está incompleta o contiene valores inválidos.") from exc
+        total = sum(values)
+        if any(not math.isfinite(v) or not 0 <= v <= 100 for v in values) or not 99 <= total <= 101:
+            raise ValueError("Los porcentajes de un partido no son válidos o no suman 100.")
+        value_rows.append(tuple(v / total for v in values))
+
+    pleno = ()
+    final_match = matches[-1]
+    prefix = "porc_15"
+    fields = tuple(tuple(f"{prefix}{side}_{goal}" for goal in "012M") for side in ("L", "V"))
+    if all(field in final_match.attrib for row in fields for field in row):
+        rows = []
+        for side_fields in fields:
+            values = tuple(float(final_match.attrib[field]) for field in side_fields)
+            total = sum(values)
+            if any(not math.isfinite(v) or not 0 <= v <= 100 for v in values) or not 99 <= total <= 101:
+                raise ValueError("Los porcentajes del Pleno no son válidos.")
+            rows.append(tuple(v / total for v in values))
+        pleno = tuple(rows)
+
+    source = (
+        "Quinielista · porcentajes jugados"
+        if kind == "public"
+        else "Quinielista · probabilidad real (casas de apuestas)"
+    )
+    return ProbabilitySnapshot(kind, source, utcnow(), tuple(value_rows), "porcentajes publicados", pleno)
 
 
 @dataclass(frozen=True)

@@ -15,6 +15,7 @@ from quiniela_ai_studio.domain.normal_generation import (
     combine_action_columns,
     generate_base_action,
     historical_base,
+    historical_position_percentages,
     import_probability_source,
     iter_ranked_columns,
     normalize_percentages,
@@ -116,6 +117,18 @@ def test_historical_base_grows_to_selected_sample_coverage_using_percentages():
     assert report["triples"] == 0
     assert base[0] == "1X"
     assert report["columns"] == 2
+
+
+def test_historical_position_percentages_are_empirical_and_position_specific():
+    values = historical_position_percentages(("1X2" + "1" * 11, "X12" + "X" * 11))
+    assert values[0] == (.5, .5, 0)
+    assert values[1] == (.5, .5, 0)
+    assert values[2] == (0, 0, 1)
+    assert all(math.isclose(sum(row), 1.0) for row in values)
+    with pytest.raises(ValueError, match="resultados finales"):
+        historical_position_percentages(())
+    with pytest.raises(ValueError, match="14 signos"):
+        historical_position_percentages(("1X",))
 
 
 def test_historical_base_preserves_locks_and_respects_technical_limit():

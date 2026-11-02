@@ -1,9 +1,10 @@
 import json
 
 import pytest
+
 from live_results import LiveMatch
-from quiniela_ai_studio.domain.models import Bet
 from quiniela_ai_studio.domain import engine
+from quiniela_ai_studio.domain.models import Bet
 from quiniela_ai_studio.domain.prize_forecast import estimate_prizes
 from quiniela_ai_studio.infrastructure.prize_estimate import parse_prize_estimate
 from tests.studio.test_published_scrutiny import reference_round
@@ -102,14 +103,16 @@ def test_desktop_shows_live_progress_and_golden_forecast_card(window):
     assert not window.estimate_prize_card.isHidden()
     assert window.estimate_total.text() != "—"
     assert "aproximación no oficial" in window.estimate_source_label.text()
-    assert 135 <= window.estimate_prize_card.minimumHeight() <= 155
+    assert window.estimate_prize_card.minimumHeight() >= 190
     assert len(window.estimate_category_rows) == 6
     assert window.estimate_rows_layout.count() == 6
     assert all(" apuestas · " in label.text() and not label.wordWrap() for label in window.estimate_category_rows.values())
     assert not window.estimate_prize_card.isHidden()
     assert not window.prize_notice.isHidden()
+    assert window.prize_notice.minimumHeight() >= 190
     assert window.scrutiny_lower_reserve() >= (
-        window.estimate_prize_card.minimumHeight()
-        + window.prize_notice.minimumHeight()
+        max(window.estimate_prize_card.minimumHeight(), window.prize_notice.minimumHeight())
         + window.eval_summary.minimumHeight()
     )
+    assert all('No publicado' in line for line in window.prize_notice.text().splitlines()[1:])
+    assert all(label.font().pointSize() <= 11 for label in window.estimate_category_rows.values())

@@ -39,6 +39,7 @@ from quiniela_ai_studio.domain.normal_generation import (
     apply_surprise,
     best_base,
     historical_base,
+    historical_position_percentages,
     import_probability_source,
     normalize_percentages,
     parse_columns_file,
@@ -93,6 +94,7 @@ class NormalGenerator(QWidget):
         self.matrix_origin = "manual"
         self.count_modes = {"triples": "automatic", "doubles": "automatic"}
         self.selected_history_seasons: set[str] = set()
+        self.applied_aux_weights: dict[str, int] | None = None
         self.history_recommendation = None
         self._build()
 
@@ -159,13 +161,17 @@ class NormalGenerator(QWidget):
         weight_hint = QLabel("Los pesos no afectan a la base hasta pulsar «Aplicar ponderaciones». Con 0% o sin datos importados, se usa la matriz mostrada.")
         weight_hint.setWordWrap(True); weight_hint.setObjectName("muted")
         right.addWidget(weight_hint)
+        self.weight_application_status = QLabel("Combinación auxiliar sin aplicar: la base usa la fuente elegida arriba.")
+        self.weight_application_status.setWordWrap(True)
+        self.weight_application_status.setStyleSheet("color:#ffd45b;font-weight:bold;font-size:10px;")
+        right.addWidget(self.weight_application_status)
 
         controls_box = QGroupBox("2 · Elegir dobles y triples")
         controls = QGridLayout(controls_box)
         controls.setContentsMargins(6, 8, 6, 5); controls.setHorizontalSpacing(5); controls.setVerticalSpacing(3)
-        self.history_button = QPushButton("Elegir temporadas…")
+        self.history_button = QPushButton("Temporadas históricas…")
         self.history_button.clicked.connect(lambda: self.window.safe(self._choose_history_seasons))
-        self.history_summary = QLabel("Histórico: últimas 6 temporadas")
+        self.history_summary = QLabel("Todas las temporadas disponibles")
         self.history_summary.setObjectName("muted")
         controls.addWidget(QLabel("HISTÓRICO"), 0, 0)
         controls.addWidget(self.history_button, 0, 1)
@@ -275,7 +281,7 @@ class NormalGenerator(QWidget):
         self._apply_local_styles()
 
     def _refresh_matrix_sources(self):
-        """List only real snapshots and imported profiles for this round."""
+        """List real snapshots and the selected seasons' descriptive baseline."""
         selected = self.matrix_origin
         self.matrix_source.blockSignals(True)
         self.matrix_source.clear()
@@ -284,6 +290,12 @@ class NormalGenerator(QWidget):
             label = ("Mercado" if key == "snapshot:sport" else
                      "Popularidad" if key == "snapshot:public" else source.kind.capitalize())
             self.matrix_source.addItem(f"{label} · {source.source}", key)
+        history = self._history_rows()
+        if history:
+            self.matrix_source.addItem(
+                f"Histórico · frecuencias por partido ({len(self.selected_history_seasons)} temporadas)",
+                "history:positions",
+            )
         if selected == "weighted":
             self.matrix_source.addItem("Media ponderada aplicada", "weighted")
         index = self.matrix_source.findData(selected)
@@ -296,6 +308,20 @@ class NormalGenerator(QWidget):
         if self._loading or not self.current_round:
             return
         key = self.matrix_source.currentData()
+        if key == "history:positions":
+            values = historical_position_percentages(self._history_rows())
+            self._populate_probability_table(values)
+            self.matrix_origin = key
+            seasons = len(self.selected_history_seasons)
+            rows = len(self._history_rows())
+            message = (
+                f"Histórico descriptivo: {rows:,} jornadas de {seasons} temporadas · "
+                "frecuencias 1/X/2 por posición del boleto; no es un pronóstico."
+            ).replace(",", ".")
+            self.base_status.setText(message)
+            self._matrix_edited()
+            self._refresh_historical_recommendation()
+            return
         source = self.probability_sources.get(key)
         if source is None:
             if key == "manual":
@@ -410,6 +436,9 @@ class NormalGenerator(QWidget):
         self._populate_probability_table(values)
         for key, spin in self.weight_spin.items():
             spin.setValue(int(config.get("weights", {}).get(key, 50)))
+        self.applied_aux_weights = config.get("applied_aux_weights")
+        if self.matrix_origin == "weighted" and self.applied_aux_weights is None:
+            self.applied_aux_weights = {key: spin.value() for key, spin in self.weight_spin.items()}
         initial_base = system.base if system and self.window.system_mode(system) == "normal" else ("1",) * 14
         self.triples.setValue(int(config.get("triples", sum(len(value) == 3 for value in initial_base))))
         self.doubles.setValue(int(config.get("doubles", sum(len(value) == 2 for value in initial_base))))
@@ -430,13 +459,15 @@ class NormalGenerator(QWidget):
         available_seasons = sorted(inventory, reverse=True)
         saved_seasons = config.get("history_seasons")
         self.selected_history_seasons = (set(saved_seasons) & set(available_seasons)
-                                         if saved_seasons is not None else set(available_seasons[:6]))
+                                         if saved_seasons is not None else set(available_seasons))
         self.keep_duplicates.setChecked(bool(config.get("keep_duplicates", False)))
         self.intersection.setChecked(bool(config.get("intersection", False)))
         self._load_action_rows(config.get("actions"))
         self._loading = False
         self._refresh_availability(system)
         self._refresh_matrix_sources()
+        if self.matrix_origin == "history:positions":
+            self._source_selected(self.matrix_source.currentIndex())
         self._matrix_edited()
         self._update_theoretical_count()
         self._refresh_count_modes()
@@ -477,11 +508,22 @@ class NormalGenerator(QWidget):
         self._configuration_changed()
         try:
             self._matrix_values()
-            self.base_status.setText("Matriz válida: cada fila suma 100%.")
+            if self.matrix_origin == "history:positions":
+                rows = len(self._history_rows())
+                seasons = len(self.selected_history_seasons)
+                message = (
+                    f"Histórico descriptivo: {rows:,} jornadas de {seasons} temporadas · "
+                    "frecuencias 1/X/2 por posición; no es un pronóstico. Matriz válida."
+                ).replace(",", ".")
+                self.base_status.setText(message)
+            else:
+                self.base_status.setText("Matriz válida: cada fila suma 100%.")
             system = self.window.system
             self.fill_base_button.setEnabled(bool(system and self.window.round.editable and self.window.system_mode(system) == "normal"))
         except ValueError as exc:
             self.base_status.setText(str(exc)); self.fill_base_button.setEnabled(False)
+        if hasattr(self, "weight_application_status"):
+            self._refresh_weight_application_status()
 
     def _matrix_user_edited(self, *_):
         self.matrix_origin = "manual"
@@ -490,7 +532,9 @@ class NormalGenerator(QWidget):
         self._refresh_historical_recommendation()
 
     def _configuration_changed(self, *_):
-        if not self._loading: self._save_configuration()
+        if not self._loading:
+            self._save_configuration()
+            self._refresh_weight_application_status()
 
     def _refresh_count_modes(self):
         for which, slider, button, label in (
@@ -519,6 +563,21 @@ class NormalGenerator(QWidget):
         rows = sum(inventory.get(season, 0) for season in self.selected_history_seasons)
         self.history_summary.setText(f"{len(self.selected_history_seasons)} temporadas · {rows:,} jornadas".replace(",", ".")
                                      if rows else "Selecciona temporadas con resultados")
+        self.history_button.setText(f"Temporadas históricas… ({len(self.selected_history_seasons)}/{len(inventory)})")
+
+    def _refresh_weight_application_status(self):
+        current = {key: spin.value() for key, spin in self.weight_spin.items()}
+        if self.matrix_origin == "weighted" and self.applied_aux_weights == current:
+            message = "Combinación aplicada a la matriz visible · pulsa «Rellenar quiniela base» para usarla en tu boleto."
+            color = "#73e7b1"
+        elif self.matrix_origin == "weighted":
+            message = "Los pesos cambiaron desde la última aplicación · vuelve a aplicar para actualizar la matriz."
+            color = "#ffd45b"
+        else:
+            message = "Combinación auxiliar sin aplicar: la base usa la fuente elegida arriba."
+            color = "#ffd45b"
+        self.weight_application_status.setText(message)
+        self.weight_application_status.setStyleSheet(f"color:{color};font-weight:bold;font-size:10px;")
 
     def _choose_history_seasons(self):
         inventory = self._history_inventory()
@@ -537,6 +596,9 @@ class NormalGenerator(QWidget):
         if dialog.exec() == QDialog.DialogCode.Accepted:
             self.selected_history_seasons = picker.selected_seasons()
             self._refresh_history_summary()
+            self._refresh_matrix_sources()
+            if self.matrix_origin == "history:positions":
+                self._source_selected(self.matrix_source.currentIndex())
             self._refresh_historical_recommendation()
             self._save_configuration()
 
@@ -613,6 +675,7 @@ class NormalGenerator(QWidget):
         except AttributeError: percentages = None
         data = dict(percentages=percentages,
                     weights={key: spin.value() for key, spin in self.weight_spin.items()},
+                    applied_aux_weights=self.applied_aux_weights,
                     triples=self.triples.value(), doubles=self.doubles.value(),
                     triples_mode=self.count_modes["triples"], doubles_mode=self.count_modes["doubles"],
                     assignment_mode="automatic" if all(mode == "automatic" for mode in self.count_modes.values()) else "manual",
@@ -855,9 +918,11 @@ class NormalGenerator(QWidget):
             raise ValueError("No hay fuentes auxiliares importadas. Elige Mercado o Popularidad en la fuente de porcentajes y pulsa Rellenar quiniela base.")
         values = weighted_probabilities(sources)
         self._populate_probability_table(values); self.matrix_origin = "weighted"; self._matrix_edited()
+        self.applied_aux_weights = {key: spin.value() for key, spin in self.weight_spin.items()}
         self._refresh_matrix_sources()
         self._refresh_historical_recommendation()
         self.base_status.setText("Porcentajes recalculados como media ponderada de las fuentes importadas. Se normalizó cada fila a 100%.")
+        self._refresh_weight_application_status()
         self._save_configuration()
 
     def _fill_base(self):

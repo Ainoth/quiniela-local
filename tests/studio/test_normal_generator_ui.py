@@ -2,6 +2,7 @@ pytest_plugins = ("test_ui",)
 
 import json
 from dataclasses import replace
+from datetime import date, timedelta
 
 from PySide6.QtTest import QTest
 from test_pleno_probabilities import with_goals
@@ -47,6 +48,8 @@ def test_normal_generator_automatic_selects_counts_from_history_and_percentages(
     window.new_system(); panel = window.normal_generator
     assert not panel.triples.isEnabled() and not panel.doubles.isEnabled()
     assert panel.selected_history_seasons
+    assert panel.selected_history_seasons == set(panel._history_inventory())
+    assert "Temporadas históricas" in panel.history_button.text()
     panel._historical_choice()
     panel._refresh_historical_recommendation()
     assert panel.history_recommendation is not None
@@ -61,6 +64,32 @@ def test_normal_generator_automatic_selects_counts_from_history_and_percentages(
     assert report["columns"] == 3 ** report["triples"] * 2 ** report["doubles"]
     assert sum(len(signs) == 3 for signs in window.system.base) == report["triples"]
     assert sum(len(signs) == 2 for signs in window.system.base) == report["doubles"]
+
+
+def test_historical_percentages_source_uses_selected_season_results(window):
+    window.new_system()
+    panel = window.normal_generator
+    index = panel.matrix_source.findData("history:positions")
+    assert index >= 0
+    panel.matrix_source.setCurrentIndex(index)
+    from quiniela_ai_studio.domain.normal_generation import historical_position_percentages
+    expected = historical_position_percentages(panel._history_rows())
+    assert panel._matrix_values() == expected
+    assert "no es un pronóstico" in panel.base_status.text()
+
+
+def test_future_round_can_be_opened_for_preparation(window):
+    today = date.today()
+    round_ = replace(
+        with_goals(), season="26-27", number=19, mode="future",
+        nominal_date=(today + timedelta(days=2)).isoformat(),
+        editable_until=(today + timedelta(days=3)).isoformat(), snapshots=(),
+    )
+    window.repository.save_round(round_)
+    window.load_rounds(round_.key)
+    assert window.round.editable
+    window.new_system()
+    assert window.system.round_key == round_.key
 
 
 def test_numeric_limits_matrix_normalization_and_saved_percentages(window):

@@ -1,5 +1,32 @@
 # Quiniela AI Studio — v2.0.0
 
+## Revisión v2.0.8 — Escrutinio y análisis de fallos
+
+Escrutinio compacta los controles, conserva más área para los marcadores y
+presenta las tarjetas de previsión y premios pendientes a tamaño legible. La
+tabla de apuestas queda plegada al abrir la pestaña. El nuevo panel
+«¿Dónde se produjo el fallo?» enumera los partidos fallados de la mejor
+apuesta y revisa las versiones guardadas para averiguar si la combinación
+ganadora desapareció en una reducción. Cuando puede demostrarlo, identifica la
+pestaña y condición concreta (por ejemplo Cuenta o SSeguidos), con el dato
+observado y el permitido. Si la combinación no estaba en el desarrollo
+original, o si el historial no contiene suficiente información, el informe lo
+indica y no adjudica la causa a un filtro. Los TXT externos permiten analizar
+partidos fallados, pero no conservan el historial local de reducciones.
+La explicación describe las reglas guardadas por esta aplicación y no afirma
+equivalencia con WIN1X2.
+
+## Revisión v2.0.7 — jornadas futuras y porcentajes históricos
+
+Las jornadas futuras con fecha límite vigente se pueden abrir y preparar.
+La validación de venta externa sigue bloqueada hasta que la jornada esté en
+curso. La descarga de porcentajes consulta temporada y jornada explícitas en
+la API de Eduardo Losilla y comprueba el calendario antes de guardar los datos.
+En Normal, «Histórico · frecuencias por partido» calcula las frecuencias
+observadas de 1/X/2 por posición para las temporadas seleccionadas. Es una
+referencia descriptiva provisional, no una predicción calibrada ni un cálculo
+basado en la identidad de los equipos.
+
 ## Normal: base histórica, controles independientes y boleto compacto
 
 En la pestaña Normal se pueden seleccionar las temporadas de resultados y una

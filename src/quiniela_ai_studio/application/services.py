@@ -17,6 +17,7 @@ from quiniela_ai_studio.domain.team_identity import same_fixtures
 class SystemService:
     def __init__(self, repository):
         self.repository = repository
+        self._origin_bets_cache = {}
 
     def new(self, round_, name='Mi quiniela', *, mode='normal'):
         if mode not in ('normal', 'reduced'):
@@ -202,6 +203,11 @@ class SystemService:
 
     def origin_bets(self, system):
         """Read the original exact bets without creating a new saved version."""
+        parameters = json.loads(system.parameters)
+        cacheable = parameters.get('input_revision') is not None
+        cache_key = (system.system_id, system.revision, system.parameters)
+        if cacheable and cache_key in self._origin_bets_cache:
+            return self._origin_bets_cache[cache_key]
         source = system
         while True:
             parameters = json.loads(source.parameters)
@@ -215,7 +221,12 @@ class SystemService:
         else:
             bets = source.bets
         if not bets: raise ValueError('No hay un desarrollo de origen disponible en esta versión.')
-        return source, bets
+        result = (source, bets)
+        if cacheable:
+            if len(self._origin_bets_cache) >= 8:
+                self._origin_bets_cache.pop(next(iter(self._origin_bets_cache)))
+            self._origin_bets_cache[cache_key] = result
+        return result
 
     def restore_origin(self, system):
         self._editable(system)

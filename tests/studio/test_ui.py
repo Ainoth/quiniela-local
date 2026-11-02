@@ -238,7 +238,7 @@ def test_cached_scrutiny_shows_prize_breakdown_and_clears_on_round_change(window
     window.navigation.setCurrentRow(4)
     application.processEvents()
 
-    assert window.prize_card.isVisible()
+    assert window.prize_notice.isVisible()
     assert window.prize_layout.direction()==QBoxLayout.Direction.TopToBottom
     assert window.prize_total.text()=='14,00 €'
     assert window.prize_category_rows[15][1].text()=='2'
@@ -255,25 +255,25 @@ def test_cached_scrutiny_shows_prize_breakdown_and_clears_on_round_change(window
     from live_results import LiveMatch
     incomplete=[LiveMatch(m.number,m.home,m.away,'—','','','Pendiente',False,0) for m in historical.matches]
     window.display_live(incomplete,'2026-10-20T12:00:00+00:00',cached=False)
-    assert window.prize_card.isVisible()
+    assert window.prize_notice.isVisible()
     assert window.live_model.rows[0][5]=='Escrutinio publicado'
 
     window.set_system(window.service.imported(historical,'Sin aciertos',(Bet('2'*14,'00'),)))
     assert not window.prize_card.isVisible()
     window.set_system(winning_system)
-    assert window.prize_card.isVisible()
+    assert window.prize_notice.isVisible()
 
     window.repository.set_setting('data_directory',None)
     window.evaluate_live()
     assert not window.prize_card.isVisible()
     window.repository.set_setting('data_directory',str(folder))
     assert window.show_cached_scrutiny()
-    assert window.prize_card.isVisible()
+    assert window.prize_notice.isVisible()
     window.read_cached_scrutiny()
     assert window.manual_mode.isChecked()
     assert window.prize_total.text()=='14,00 €'
     window.manual_mode.setChecked(False)
-    assert window.prize_card.isVisible()
+    assert window.prize_notice.isVisible()
 
     window.load_rounds('DEMO/J01')
     assert not window.prize_card.isVisible()
@@ -297,7 +297,7 @@ def test_switching_system_in_mis_sistemas_clears_previous_prize_before_aciertos(
     window.set_system(winner)
     window.auto_live.setChecked(False)
     window.navigation.setCurrentRow(4);application.processEvents()
-    assert window.prize_card.isVisible()
+    assert window.prize_notice.isVisible()
     assert window.prize_detail_card.isVisible()
 
     window.navigation.setCurrentRow(5)
@@ -350,7 +350,7 @@ def test_published_page_cache_displays_real_j14_prize_when_pre_is_provisional(wi
     window.navigation.setCurrentRow(4)
     application.processEvents()
 
-    assert window.prize_card.isVisible()
+    assert window.prize_notice.isVisible()
     assert window.prize_total.text() == '2,22 €'
     assert window.prize_detail_card.isVisible()
     assert window.prize_category_rows[11][1].text() == '1'
@@ -380,7 +380,8 @@ def test_cached_scrutiny_with_wrong_teams_never_announces_a_prize(window,tmp_pat
     application.processEvents()
 
     assert not window.prize_card.isVisible()
-    assert 'equipos' in window.prize_notice.text()
+    assert 'No publicado' in window.prize_notice.text()
+    assert 'equipos' in window.prize_notice.toolTip()
 
 
 def test_waiting_marker_uses_schedule_without_claiming_unknown_result(window):

@@ -73,10 +73,11 @@ Línea de columna propia: `SSSSSSSSSSSSSS;GH;GA`, con 14 caracteres de signos y 
 
 ## 5. Fuentes y conectores externos
 
-La descarga de porcentajes de Quinielista identifica la petición por número de
-jornada, sin parámetro de temporada. Por ello solo se usa para la jornada en
-curso; para temporadas pasadas se conserva el porcentaje ya guardado o se
-importan datos ligados explícitamente a esa jornada. La identidad de equipos
+La consulta antigua de Quinielista identifica la petición solo por número de
+jornada. La descarga actual usa la API de Eduardo Losilla con temporada y
+jornada explícitas, valida sus 15 partidos y permite cargar porcentajes de
+jornadas actuales o futuras. Las pasadas se conservan desde su captura local o
+se importan ligadas explícitamente a esa jornada. La identidad de equipos
 se resuelve centralmente en `domain.team_identity`: normaliza acentos,
 puntuación y sufijos de entidad; reconoce abreviaturas documentadas y permite
 una errata de edición en un token significativo si la coincidencia es única en

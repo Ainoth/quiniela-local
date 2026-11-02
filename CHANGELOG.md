@@ -1,5 +1,38 @@
 # Cambios
 
+## 2.0.9 — tarjetas y controles más claros
+
+- Unifica la tarjeta verde de premios oficiales con las filas compactas de la
+  previsión dorada; la tarjeta oficial conserva el desglose ampliado.
+- Reúne metadatos y fuente de la previsión en una sola línea inferior y reduce
+  su tipografía para aprovechar el espacio.
+- La pestaña visible «Quiniela» aclara cuándo los datos auxiliares están
+  aplicados a la matriz y cuándo hay que volver a aplicarlos.
+- El selector histórico incluye por defecto todas las temporadas disponibles;
+  se puede abrir para elegir cualquier conjunto.
+
+## 2.0.8 — Escrutinio claro y diagnóstico de fallos
+
+- Compacta los controles de marcador y mueve el estado a una línea breve;
+  reduce el resumen de mejor apuesta.
+- Da más espacio a las tarjetas de previsión y premios pendientes y muestra
+  «No publicado» en cada categoría.
+- Oculta la tabla de apuestas al entrar y permite abrirla cuando se necesite.
+- Añade un panel plegable con los partidos fallados y la revisión/condiciones
+  de Reducciones que excluyeron la combinación ganadora, si el historial lo
+  permite demostrar.
+- Distingue la combinación ausente del desarrollo original de una apuesta
+  realmente eliminada por un filtro.
+
+## 2.0.7 — preparar jornadas futuras y fuente histórica
+
+- Permite crear y preparar quinielas de jornadas futuras con plazo vigente.
+- Descarga porcentajes jugados y probabilidad de mercado mediante el endpoint
+  de temporada+jornada de Eduardo Losilla y valida los 15 equipos.
+- Añade a Fuente una matriz descriptiva de frecuencias 1/X/2 por posición,
+  calculada según las temporadas seleccionadas.
+- La fuente histórica no es un pronóstico calibrado ni considera los equipos.
+
 ## 2.0.6 — previsión en filas compactas
 
 - Presenta Pleno 15 y las categorías 14–10 en una fila cada una.

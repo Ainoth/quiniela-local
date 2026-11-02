@@ -1,6 +1,7 @@
 """Fuentes verificables y descarga explícita sin confundir mercado y público."""
 import json
 from dataclasses import replace
+from datetime import date, timedelta
 
 import pytest
 from test_integration import data_folder, load_win1x2, xml
@@ -17,6 +18,22 @@ pytest_plugins = ('test_ui',)
 
 def market_xml():
     return xml().replace(b'p_jugados_1="50"', b'p_bf_1desc="20" p_bf_Xdesc="30" p_bf_2desc="50" p_jugados_1="50"')
+
+
+def seasonal_xml(round_, kind='public', *, wrong_round=False):
+    season_year = 2000 + int(round_.season.split('-')[1])
+    number = round_.number + int(wrong_round)
+    rows = []
+    for match in round_.matches[:14]:
+        attrs = ' porc_1="50" porc_X="30" porc_2="20"'
+        if kind == 'sport':
+            attrs += ' porcDec_1="60" porcDec_X="25" porcDec_2="15"'
+        rows.append(f'<partido num="{match.number}" local="{match.home}" visitante="{match.away}"{attrs}/>')
+    final = round_.matches[14]
+    p15 = ''.join(f' porc_15{side}_{goal}="25"' for side in ('L', 'V') for goal in '012M')
+    rows.append(f'<partido num="15" local="{final.home}" visitante="{final.away}"{p15}/>')
+    return (f'<quinielista><porcentajes jornada="{number}" temporada="{season_year}" activo="si">'
+            + ''.join(rows) + '</porcentajes></quinielista>').encode()
 
 
 def test_market_and_popularity_are_distinct(tmp_path):
@@ -92,15 +109,22 @@ def test_exact_round_download_and_cache_preservation(tmp_path, monkeypatch):
     urls = []
     def download(url):
         urls.append(url)
-        return market_xml()
+        return seasonal_xml(round_, 'sport' if 'probabilidad_real' in url else 'public')
     monkeypatch.setattr(data_updater, '_download', download)
     cache = tmp_path / 'cache'
     updated = fetch_round_sources(round_, cache)
-    assert urls == [data_updater.QUINIELISTA_PERCENTAGES.format(round_no=12)]
-    assert updated.snapshot('sport')
-    path = cache / 'porcentajes_26-27_J12.xml'
+    assert urls == [
+        data_updater.SEASON_PUBLIC_PERCENTAGES.format(round_no=12, season_year=2027),
+        data_updater.SEASON_MARKET_PERCENTAGES.format(round_no=12, season_year=2027),
+    ]
+    assert updated.snapshot('public').values[0] == (.5, .3, .2)
+    assert updated.snapshot('sport').values[0] == (.6, .25, .15)
+    assert updated.snapshot('public').pleno_values[0] == (.25, .25, .25, .25)
+    path = cache / 'porcentajes_26-27_J12_public.xml'
     before = path.read_bytes()
-    monkeypatch.setattr(data_updater, '_download', lambda url: market_xml().replace(b'jornada="12"', b'jornada="11"'))
+    monkeypatch.setattr(data_updater, '_download', lambda url: seasonal_xml(
+        round_, 'sport' if 'probabilidad_real' in url else 'public', wrong_round='probabilidad_real' in url
+    ))
     with pytest.raises(ValueError):
         fetch_round_sources(round_, cache)
     assert path.read_bytes() == before
@@ -114,8 +138,28 @@ def test_historical_round_does_not_download_current_season_percentages(tmp_path,
         lambda _url: pytest.fail('No debe pedir porcentajes sin filtro de temporada.'),
     )
 
-    with pytest.raises(ValueError, match='solo publica porcentajes para la jornada en curso'):
+    with pytest.raises(ValueError, match='actuales o futuras'):
         fetch_round_sources(historical, tmp_path / 'cache')
+
+
+def test_future_round_can_be_prepared_and_fetches_season_specific_sources(tmp_path, monkeypatch):
+    round_ = load_win1x2(data_folder(tmp_path / 'source'))[-1]
+    future = replace(round_, mode='future', editable_until=(date.today() + timedelta(days=3)).isoformat())
+    assert future.editable
+    urls = []
+    def download(url):
+        urls.append(url)
+        return seasonal_xml(future, 'sport' if 'probabilidad_real' in url else 'public')
+    monkeypatch.setattr(data_updater, '_download', download)
+    updated = fetch_round_sources(future, tmp_path / 'cache')
+    assert updated.snapshot('public') and updated.snapshot('sport')
+    assert all('jornada=12&temporada=2027' in url for url in urls)
+
+
+def test_future_round_after_close_is_read_only(tmp_path):
+    round_ = load_win1x2(data_folder(tmp_path / 'source'))[-1]
+    future = replace(round_, mode='future', editable_until=(date.today() - timedelta(days=1)).isoformat())
+    assert not future.editable
 
 
 def test_download_adopts_sources_without_changing_bets(window, tmp_path, monkeypatch):

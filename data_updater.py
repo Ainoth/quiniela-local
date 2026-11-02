@@ -13,6 +13,8 @@ from xml.etree import ElementTree
 
 WIN1X2_ZIP = "https://www.win1x2.com/datos/actudato.zip"
 QUINIELISTA_PERCENTAGES = "https://www.quinielista.es/xml2/porcentajes_completo.asp?jornada={round_no}"
+SEASON_PUBLIC_PERCENTAGES = "https://api.eduardolosilla.es/servicios/v1/porcentajes_quinielista?jornada={round_no}&temporada={season_year}"
+SEASON_MARKET_PERCENTAGES = "https://api.eduardolosilla.es/servicios/v1/probabilidad_real?jornada={round_no}&temporada={season_year}"
 MAX_DOWNLOAD = 25 * 1024 * 1024
 MAX_UNPACKED = 60 * 1024 * 1024
 
