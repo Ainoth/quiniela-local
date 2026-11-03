@@ -61,6 +61,22 @@ def test_quinielista_market_names_match_win1x2_aliases_for_champions_round():
     validate_teams(round_, source_teams)
 
 
+def test_quinielista_ol_lyon_alias_matches_win1x2_lyon():
+    assert team_key('OL. LYON') == team_key('Lyon')
+    matches = tuple(
+        Match(index, f'Local {index}', f'Visitante {index}')
+        for index in range(1, 16)
+    )
+    matches = list(matches)
+    matches[11] = Match(12, 'R.Sociedad', 'Lyon')
+    round_ = Round(
+        '26-27', 19, tuple(matches), 'current', 'WIN1X2', datetime.now(UTC).isoformat(),
+    )
+    teams = [(match.home, match.away) for match in matches]
+    teams[11] = ('R.SOCIEDAD', 'OL. LYON')
+    validate_teams(round_, teams)
+
+
 def test_quinielista_w_marker_matches_feminine_win1x2_team():
     matches = tuple(
         Match(index, f'Local {index}', f'Visitante {index}')

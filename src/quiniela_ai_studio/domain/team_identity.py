@@ -40,6 +40,10 @@ TEAM_ALIASES = {
     "CSUCRAIOVA": "UCRAIOVA",
     "PSV": "PSVEINDHOVEN",
     "PSVEIDHOVEN": "PSVEINDHOVEN",
+    # Quinielista shortens Olympique Lyonnais to "OL. LYON" in its fixture XML.
+    "OLLYON": "LYON",
+    "OLYMPIQUELYON": "LYON",
+    "OLYMPIQUEDELYON": "LYON",
     "SHAKTARDONETSK": "SHAKHTARDONETSK",
     "RBLEIPZIG": "LEIPZIG",
     "REALBETIS": "BETIS",

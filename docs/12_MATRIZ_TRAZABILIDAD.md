@@ -9,6 +9,19 @@ plegable y la tabla de apuestas queda cerrada al entrar. Pruebas:
 `test_scrutiny_diagnostics.py`, `test_scrutiny_failure_panel_explains_missed_matches_and_reduction` y
 `test_scrutiny_diagnostic_panel_is_collapsed_until_requested`.
 
+RF-ESC-018 (v2.0.10): el detalle de fallos se organiza partido por partido;
+las apuestas cargadas se pueden abrir antes de recibir marcadores y aparecen
+pendientes. El análisis solo se activa al tener los 14 signos. Las tarjetas
+dorada y verde comparten altura, conservan una fila por categoría y ya no
+repiten la lista de categorías en el pie oficial. RF-DAT-010 / RF-NOR-009:
+valida el alias «OL. LYON» de Quinielista como «Lyon» para no descartar las
+fuentes públicas de esa jornada; Normal aclara las fuentes ausentes y las
+ponderaciones auxiliares que requieren importación. Pruebas:
+`test_quinielista_ol_lyon_alias_matches_win1x2_lyon`,
+`test_evaluated_bets_can_be_opened_before_any_live_result_arrives`,
+`test_scrutiny_cards_are_equal_and_compact_at_desktop_width` y
+`test_probability_sources.py`.
+
 RF-ESC-015 (v2.0.1): Escrutinio consulta en segundo plano recaudación, bote y porcentajes de Quinielista; estima por categoría las apuestas propias en un escenario de marcadores recibidos y favoritos pendientes. La tarjeta dorada de previsión se oculta cuando hay reparto definitivo. Un resumen muestra aciertos confirmados/provisionales, fallos y pendientes. Pruebas: `test_prize_forecast.py`.
 
 RF-DAT-009 / RF-NOR-008 (v2.0.7): permite preparar jornadas futuras todavía

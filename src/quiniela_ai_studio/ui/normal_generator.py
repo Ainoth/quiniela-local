@@ -140,7 +140,7 @@ class NormalGenerator(QWidget):
         upper.addWidget(self.probability_table, 4)
 
         right = QVBoxLayout()
-        weight_box = QGroupBox("Opcional · combinar datos auxiliares importados")
+        weight_box = QGroupBox("Datos auxiliares · solo si los importas")
         weight_layout = QGridLayout(weight_box)
         weight_layout.setContentsMargins(6, 8, 6, 6)
         weight_layout.setHorizontalSpacing(5)
@@ -158,7 +158,7 @@ class NormalGenerator(QWidget):
             weight_layout.addWidget(title, row, 0); weight_layout.addWidget(spin, row, 1); weight_layout.addWidget(status, row, 2)
             self.weight_spin[key], self.weight_status[key] = spin, status
         right.addWidget(weight_box)
-        weight_hint = QLabel("Los pesos no afectan a la base hasta pulsar «Aplicar ponderaciones». Con 0% o sin datos importados, se usa la matriz mostrada.")
+        weight_hint = QLabel("Clasificación, últimos resultados e historial se cargan en «Gestionar fuentes…». Si no hay datos, su peso queda bloqueado. Para combinarlos con la matriz, asigna los pesos y pulsa «Aplicar ponderaciones».")
         weight_hint.setWordWrap(True); weight_hint.setObjectName("muted")
         right.addWidget(weight_hint)
         self.weight_application_status = QLabel("Combinación auxiliar sin aplicar: la base usa la fuente elegida arriba.")
@@ -303,6 +303,30 @@ class NormalGenerator(QWidget):
             self.matrix_origin = "manual"
         self.matrix_source.setCurrentIndex(max(0, index))
         self.matrix_source.blockSignals(False)
+        available = set(self.probability_sources)
+        has_market = "snapshot:sport" in available
+        has_public = "snapshot:public" in available
+        if not has_market and not has_public:
+            self.source_explanation.setText(
+                "Mercado (casas de apuestas) y Quinielista (porcentajes jugados) aún no están descargados para esta jornada. "
+                "Pulsa «1 · Descargar porcentajes» arriba; solo se muestran fuentes recibidas y validadas."
+            )
+        else:
+            sources = []
+            if has_market:
+                sources.append("Mercado disponible")
+            if has_public:
+                sources.append("Quinielista disponible")
+            missing = []
+            if not has_market:
+                missing.append("Mercado")
+            if not has_public:
+                missing.append("Quinielista")
+            detail = f"; falta {', '.join(missing)}" if missing else ""
+            self.source_explanation.setText(
+                f"{', '.join(sources)}{detail}. Se listan solo fuentes descargadas y validadas. "
+                "La matriz elegida arriba es la que se usa para rellenar la base."
+            )
 
     def _source_selected(self, _index):
         if self._loading or not self.current_round:

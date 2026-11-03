@@ -94,13 +94,19 @@ class PrizeStatusCard(QFrame):
         self._text = str(text)
         if not hasattr(self, "footer"):
             return
-        self.footer.setText(self._text.replace("\n", " · "))
-        if "sin premios" in self._text.lower():
+        normalized=self._text.casefold()
+        if "sin premios" in normalized:
+            self.footer.setText("Escrutinio publicado · no hay premios en estas apuestas.")
             self.headline.setText("PREMIOS REALES · ESCRUTINIO PUBLICADO")
             self.total.setText("0,00 €")
             for row in self.rows.values():
                 row.setText(row.text().split(" · ")[0] + " · 0 apuestas · 0,00 €/u. · 0,00 € total")
         else:
+            self.footer.setText(
+                "Importes oficiales pendientes de publicación."
+                if "pendiente" in normalized or "no publicado" in normalized
+                else "Importes oficiales publicados para esta quiniela."
+            )
             self.headline.setText(self._text.splitlines()[0] if self._text else "PREMIOS REALES")
             self.total.setText("—")
             for category, row in self.rows.items():
@@ -488,6 +494,11 @@ class MainWindow(QMainWindow):
         self.export_button = self.button('Guardar apuestas (TXT)', self.export_txt, bar, primary=True)
         self.button('TuLotero',self.open_tulotero,bar)
         self.button('Mis sistemas', lambda: self.navigation.setCurrentRow(5), bar)
+        self.system_label = QLabel(); self.system_label.setObjectName('muted')
+        self.system_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        self.system_label.setMaximumWidth(230)
+        self.system_label.setToolTip('Sistema y versión abiertos')
+        bar.addWidget(self.system_label)
         root.addWidget(hero)
         self.tabs = QTabBar(); self.tabs.setExpanding(False)
         for name in self.TAB_ORDER:self.tabs.addTab('Quiniela' if name == 'Normal' else name)
@@ -501,7 +512,7 @@ class MainWindow(QMainWindow):
         bar.addWidget(self.round_picker)
         self.button('Siguiente ›', lambda:self.move_round(1), bar)
         self.button('En curso',self.go_current,bar);bar.addStretch()
-        self.system_label = QLabel(); bar.addWidget(self.system_label);root.addLayout(bar)
+        root.addLayout(bar)
         self.metadata = QLabel(); self.metadata.setObjectName('muted'); self.metadata.setWordWrap(True); root.addWidget(self.metadata)
         self.splitter=QSplitter(Qt.Orientation.Horizontal)
         self.ballot=QWidget();self.ballot.setFixedWidth(550);QVBoxLayout(self.ballot)
@@ -3447,9 +3458,17 @@ class MainWindow(QMainWindow):
             if hasattr(self,'prize_grid_widget'):
                 self.prize_grid_widget.setVisible(not compact)
             if hasattr(self,'prize_cards_layout'):
+                compact=self.width()<1100
                 self.prize_cards_layout.setDirection(
-                    QBoxLayout.Direction.TopToBottom if self.width()<1100 else QBoxLayout.Direction.LeftToRight
+                    QBoxLayout.Direction.TopToBottom if compact else QBoxLayout.Direction.LeftToRight
                 )
+                for card in (self.estimate_prize_card,self.prize_notice):
+                    if compact:
+                        card.setMinimumHeight(0);card.setMaximumHeight(270)
+                        card.setSizePolicy(QSizePolicy.Policy.Expanding,QSizePolicy.Policy.Maximum)
+                    else:
+                        card.setSizePolicy(QSizePolicy.Policy.Expanding,QSizePolicy.Policy.Fixed)
+                        card.setFixedHeight(225)
         if hasattr(self, 'scrutiny_splitter') and self.navigation.currentRow() == 4:
             QTimer.singleShot(0, self.fit_scrutiny_tables)
 
@@ -4859,7 +4878,8 @@ class MainWindow(QMainWindow):
         return '\n'.join((headline, *(f'{category} · No publicado' for category in categories)))
 
     def toggle_scrutiny_bets(self):
-        visible = not self.eval_view.isVisible()
+        visible = self.eval_view.isHidden()
+        self.eval_view.setMaximumHeight(16777215 if visible else 0)
         self.eval_view.setVisible(visible)
         self.eval_detail_button.setText('Ocultar apuestas evaluadas ▴' if visible else 'Ver apuestas evaluadas ▾')
         QTimer.singleShot(0, self.fit_scrutiny_tables)
@@ -4878,11 +4898,16 @@ class MainWindow(QMainWindow):
         best = max(outcome['rows'], key=lambda row: (row['hits'], row['maximum']))
         round_ = self.frozen_round()
         misses = [
-            f"{index + 1}. {match.home} – {match.away}: tu signo {best['column'][index]}, salió {actual_result[index]}"
+            f"{index + 1}. {match.home} – {match.away} · marcaste {best['column'][index]} · salió {actual_result[index]}"
             for index, match in enumerate(round_.matches[:14])
             if best['column'][index] != actual_result[index]
         ]
-        lines = [f"Mejor apuesta ({best['hits']}/14): " + ('; '.join(misses) if misses else 'acertó los 14 signos.')]
+        lines = [f"Mejor apuesta ({best['hits']}/14)"]
+        if misses:
+            lines.append('Partidos fallados:')
+            lines.extend(misses)
+        else:
+            lines.append('Acertó los 14 signos.')
         if self.external_scrutiny_bets is not None:
             lines.append('El fichero externo no tiene historial de reducciones en esta aplicación; solo se muestran los partidos fallados.')
             return '\n'.join(lines)
@@ -4919,10 +4944,10 @@ class MainWindow(QMainWindow):
             revision, spec = removed_at
             from quiniela_ai_studio.domain.scrutiny_diagnostics import explain_filter_rejections
             failures = explain_filter_rejections(winning, spec)
-            lines.append(f'La combinación ganadora estaba en el desarrollo de origen y se eliminó en la revisión v{revision} al aplicar Reducciones:')
+            lines.append(f'REDUCCIÓN QUE LA DESCARTÓ · se eliminó en la revisión v{revision}')
             if failures:
                 for failure in failures:
-                    lines.append(f"• {failure['reduction']} · {failure['condition']}: salió {failure['observed']}; se permitía {failure['expected']}.")
+                    lines.append(f"{failure['reduction']} · {failure['condition']}: salió {failure['observed']}; permitido {failure['expected']}.")
             else:
                 lines.append('Se localizó la revisión que la descartó, pero la configuración guardada no permite reconstruir qué condición concreta falló.')
         except (ValueError, KeyError, TypeError, json.JSONDecodeError) as exc:
@@ -4932,6 +4957,7 @@ class MainWindow(QMainWindow):
     def build_evaluation(self):
         layout=self.page_layout(4)
         layout.setContentsMargins(5,0,5,4);layout.setSpacing(4)
+        self.pages.widget(4).layout().setContentsMargins(5,0,5,0)
         self.published_scrutiny=None
         self.external_scrutiny_bets=None;self.external_scrutiny_name=''
         self.live_worker=None;self.live_context=None
@@ -5039,7 +5065,8 @@ class MainWindow(QMainWindow):
         detail_layout.addWidget(self.prize_detail_total,8,4)
         self.prize_card.hide();self.prize_detail_card.hide()
         self.estimate_prize_card=QFrame();self.estimate_prize_card.setObjectName('estimatePrizeCard')
-        self.estimate_prize_card.setMinimumWidth(0);self.estimate_prize_card.setMinimumHeight(196)
+        self.estimate_prize_card.setMinimumWidth(0)
+        self.estimate_prize_card.setSizePolicy(QSizePolicy.Policy.Expanding,QSizePolicy.Policy.Preferred)
         estimate_layout=QVBoxLayout(self.estimate_prize_card);estimate_layout.setContentsMargins(10,7,10,7);estimate_layout.setSpacing(3)
         estimate_top=QHBoxLayout();estimate_top.setContentsMargins(0,0,0,0);estimate_top.setSpacing(6)
         self.estimate_headline=QLabel('≈ PREVISIÓN ORIENTATIVA');self.estimate_headline.setObjectName('estimateHeadline')
@@ -5060,16 +5087,16 @@ class MainWindow(QMainWindow):
             self.estimate_category_rows[category]=label
         estimate_layout.addLayout(self.estimate_rows_layout)
         self.estimate_source_label=self.estimate_scenario_label
-        self.estimate_source_label.setWordWrap(False)
-        self.estimate_source_label.setMinimumHeight(16)
+        self.estimate_source_label.setWordWrap(True)
+        self.estimate_source_label.setMaximumHeight(32)
         self.estimate_source_label.setStyleSheet('font-size:9px; color:#e4d5a2;')
         estimate_layout.addWidget(self.estimate_source_label)
         self.estimate_worker=None;self.estimate_round_key=None;self.estimate_model=None
         self.estimate_prize_card.hide()
         self.prize_notice=PrizeStatusCard();self.prize_notice.setObjectName('prizeNoticeCard')
         self.prize_cache_error=''
-        self.prize_notice.setMinimumWidth(0);self.prize_notice.setMinimumHeight(196)
-        self.prize_notice.setSizePolicy(QSizePolicy.Policy.Expanding,QSizePolicy.Policy.Expanding)
+        self.prize_notice.setMinimumWidth(0)
+        self.prize_notice.setSizePolicy(QSizePolicy.Policy.Expanding,QSizePolicy.Policy.Preferred)
         notice_layout=QVBoxLayout(self.prize_notice);notice_layout.setContentsMargins(10,7,10,7);notice_layout.setSpacing(3)
         notice_top=QHBoxLayout();notice_top.setSpacing(6)
         self.prize_notice_headline=QLabel('PREMIOS REALES · PENDIENTES DE PUBLICACIÓN');self.prize_notice_headline.setObjectName('estimateHeadline')
@@ -5081,7 +5108,7 @@ class MainWindow(QMainWindow):
             name='Pleno 15' if category==15 else f'{category} aciertos'
             row=QLabel(f'{name} · No publicado');row.setObjectName('estimateCategoryTile');row.setMinimumWidth(0)
             notice_layout.addWidget(row);self.prize_notice_rows[category]=row
-        self.prize_notice_footer=QLabel('');self.prize_notice_footer.setObjectName('estimateDisclaimer');self.prize_notice_footer.setWordWrap(False)
+        self.prize_notice_footer=QLabel('');self.prize_notice_footer.setObjectName('estimateDisclaimer');self.prize_notice_footer.setWordWrap(True);self.prize_notice_footer.setMaximumHeight(32)
         notice_layout.addWidget(self.prize_notice_footer)
         self.prize_notice.headline=self.prize_notice_headline
         self.prize_notice.total=self.prize_notice_total
@@ -5108,7 +5135,7 @@ class MainWindow(QMainWindow):
         for column in range(1,8):self.eval_view.horizontalHeader().setSectionResizeMode(column,QHeaderView.ResizeMode.ResizeToContents)
         self.eval_view.selectionModel().currentRowChanged.connect(self.display_match_comparison)
         self.eval_view.setToolTip('Aciertos y fallos actuales pueden cambiar en partidos en juego. Máximo usa solo fallos definitivos. El Pleno exige 14 aciertos más los goles del partido 15.')
-        self.eval_view.hide();self.eval_detail_button.setEnabled(False)
+        self.eval_view.hide();self.eval_view.setMaximumHeight(0);self.eval_detail_button.setEnabled(False)
         self.manual_eval_timer=QTimer(self);self.manual_eval_timer.setSingleShot(True);self.manual_eval_timer.setInterval(150);self.manual_eval_timer.timeout.connect(self.refresh_manual_evaluation)
         self.result_input.textChanged.connect(self.schedule_manual_evaluation);self.result_pleno.textChanged.connect(self.schedule_manual_evaluation);self.final_check.toggled.connect(self.schedule_manual_evaluation)
         self.auto_live.toggled.connect(self.ensure_live_updates);self.manual_mode.toggled.connect(self.switch_scrutiny_mode);self.live_interval.currentIndexChanged.connect(self.ensure_live_updates)
@@ -5228,7 +5255,7 @@ class MainWindow(QMainWindow):
         self.eval_model.update_rows(rows)
         self.eval_detail_button.setEnabled(bool(rows))
         if not rows:
-            self.eval_view.hide()
+            self.eval_view.hide();self.eval_view.setMaximumHeight(0)
             self.eval_detail_button.setText('Ver apuestas evaluadas ▾')
         if old_key:
             selected=next((i for i,row in enumerate(rows) if row[:2]==old_key),0)
@@ -5254,7 +5281,8 @@ class MainWindow(QMainWindow):
         self._render_prize_detail(outcome,scrutiny)
         self.render_prize_forecast(outcome)
         self.scrutiny_diagnostic_text_label.setText(self.scrutiny_diagnostic_text(actual_result, outcome))
-        self.scrutiny_diagnostic_button.setEnabled(bool(outcome['rows']))
+        complete_result=(len(actual_result)==14 and '-' not in actual_result and not set(actual_result)-set('1X2'))
+        self.scrutiny_diagnostic_button.setEnabled(bool(outcome['rows']) and complete_result)
         self.eval_summary.setText(
             f'{outcome["known"]}/14 resultados · mejor: {best} aciertos · '
             f'{outcome["counts"][15]} Plenos · marcadores en juego pueden cambiar; sin premios calculados.'
@@ -5716,8 +5744,14 @@ class MainWindow(QMainWindow):
         """Restore cached awards or the current live comparison on page entry."""
         if self.live_matches:
             self.evaluate_live()
-        else:
-            self.show_cached_scrutiny()
+        elif not self.show_cached_scrutiny():
+            bets=self.scrutiny_bets()
+            if bets:
+                outcome=engine.evaluate(bets,'-'*14,'',finalized=(False,)*14)
+                self.render_scrutiny(outcome,'',False,'',actual_result='-'*14)
+                self.eval_summary.setText('Apuestas cargadas · esperando resultados para calcular aciertos y fallos.')
+            else:
+                self.eval_detail_button.setEnabled(False)
 
     def maybe_fetch_published_scrutiny(self):
         """Look up published payouts in a worker after all scores are final."""

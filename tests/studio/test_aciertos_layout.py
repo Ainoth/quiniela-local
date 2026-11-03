@@ -136,3 +136,34 @@ def test_scrutiny_diagnostic_panel_is_collapsed_until_requested(window):
     window.toggle_scrutiny_diagnostics()
     assert not window.scrutiny_diagnostic_panel.isHidden()
     assert window.scrutiny_diagnostic_button.text().startswith('Ocultar')
+
+
+def test_evaluated_bets_can_be_opened_before_any_live_result_arrives(window):
+    system = window.service.imported(window.round, 'Pendiente', generate(('1X',) + ('1',) * 13, 'M0'))
+    window.set_system(system)
+    window.auto_live.setChecked(False)
+    window.navigation.setCurrentRow(4);QTest.qWait(20)
+    window.refresh_scrutiny_page()
+    assert window.eval_detail_button.isEnabled()
+    assert window.eval_model.rowCount() == len(system.bets)
+    assert 'esperando resultados' in window.eval_summary.text()
+    window.eval_detail_button.click();QTest.qWait(20)
+    assert window.eval_view.isVisible()
+    assert window.eval_model.rows[0][3] == 0
+    assert window.eval_model.rows[0][5] == 14
+    assert not window.scrutiny_diagnostic_button.isEnabled()
+
+
+def test_scrutiny_cards_are_equal_and_compact_at_desktop_width(window):
+    system = window.service.imported(window.round, 'Tarjetas compactas', generate(('1',) * 14, 'M0'))
+    window.set_system(system)
+    window.auto_live.setChecked(False)
+    window.resize(1920, 1080)
+    window.navigation.setCurrentRow(4);QTest.qWait(30)
+    title = window.pages.widget(4).layout().itemAt(0).widget()
+    assert title.text() == 'Escrutinio' and title.geometry().y() == 0
+    assert window.estimate_prize_card.height() == window.prize_notice.height() == 225
+    assert window.eval_detail_button.isEnabled()
+    window.prize_notice.setText(window.prize_pending_text())
+    assert window.prize_notice.footer.text() == 'Importes oficiales pendientes de publicación.'
+    assert 'Pleno 15' not in window.prize_notice.footer.text()

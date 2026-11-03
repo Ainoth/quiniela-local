@@ -1,5 +1,19 @@
 # Cambios
 
+## 2.0.10 — fuentes y Escrutinio
+
+- Corrige la validación de «OL. LYON» frente al nombre «Lyon» de WIN1X2. La
+  descarga de la jornada 19 vuelve a incorporar Quinielista y mercado.
+- Aclara en Normal cuándo falta descargar Mercado/Quinielista, dónde se
+  importan las fuentes auxiliares y por qué no se pueden ponderar sin datos.
+- Ajusta las tarjetas dorada y verde a una altura común, acorta el pie oficial
+  repetido y permite que los textos secundarios ocupen dos líneas.
+- Lleva el nombre del sistema a la cabecera, compacta el margen superior de
+  Escrutinio y muestra las apuestas como pendientes antes de recibir resultados.
+- Da formato por partido al análisis de fallos y solo lo activa con los 14
+  resultados completos. La lista de apuestas se abre y cierra sin reservar
+  espacio cuando está plegada.
+
 ## 2.0.9 — tarjetas y controles más claros
 
 - Unifica la tarjeta verde de premios oficiales con las filas compactas de la
