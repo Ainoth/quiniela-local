@@ -97,7 +97,7 @@ class PrizeStatusCard(QFrame):
         normalized=self._text.casefold()
         if "sin premios" in normalized:
             self.footer.setText("Escrutinio publicado · no hay premios en estas apuestas.")
-            self.headline.setText("PREMIOS REALES · ESCRUTINIO PUBLICADO")
+            self.headline.setText("≈ PREMIOS OFICIALES")
             self.total.setText("0,00 €")
             for row in self.rows.values():
                 row.setText(row.text().split(" · ")[0] + " · 0 apuestas · 0,00 €/u. · 0,00 € total")
@@ -107,11 +107,11 @@ class PrizeStatusCard(QFrame):
                 if "pendiente" in normalized or "no publicado" in normalized
                 else "Importes oficiales publicados para esta quiniela."
             )
-            self.headline.setText(self._text.splitlines()[0] if self._text else "PREMIOS REALES")
+            self.headline.setText("≈ PREMIOS OFICIALES")
             self.total.setText("—")
             for category, row in self.rows.items():
                 name = "Pleno 15" if category == 15 else f"{category} aciertos"
-                row.setText(f"{name} · No publicado")
+                row.setText(f"{name} · — apuestas · — €/u. · — total")
 
     def text(self):
         return self._text
@@ -187,7 +187,10 @@ QFrame#prizeBreakdownCard QLabel {background:transparent; border:none;}
 QFrame#estimatePrizeCard {background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 #493c17,stop:0.55 #24364b,stop:1 #17304a); border:2px solid #d8ae38; border-radius:7px;}
 QFrame#estimatePrizeCard QLabel {background:transparent; border:none;}
 QFrame#prizeNoticeCard {background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 #104a33,stop:0.55 #103b35,stop:1 #12354a); border:2px solid #37c878; border-radius:7px;}
-QFrame#prizeNoticeCard QLabel {background:transparent; border:none; color:#b8f2ca;}
+QFrame#prizeNoticeCard QLabel {background:transparent; border:none;}
+QFrame#prizeNoticeCard QLabel#estimateHeadline {color:#a9f1bd;}
+QFrame#prizeNoticeCard QLabel#estimateTotal {color:#b8f2ca;}
+QFrame#prizeNoticeCard QLabel#estimateDisclaimer {color:#c2e9d0;}
 QFrame#scrutinySummaryCard {background:qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #104968,stop:1 #102c49); border:1px solid #36b5d3; border-radius:6px;}
 QFrame#scrutinySummaryCard QLabel {background:transparent; border:none;}
 QFrame#scrutinyDiagnosticPanel {background:#102f49; border:1px solid #3d88b8; border-radius:5px;}
@@ -211,7 +214,7 @@ QLabel#estimateTotal {font-size:22px; font-weight:bold; color:#ffe17a;}
 QLabel#estimateDisclaimer {font-size:10px; color:#e4d5a2;}
 QLabel#estimateCategoryTile {background:#102f49; color:#e7f5fa; border:1px solid #315d79; border-radius:3px; padding:2px 5px; font-size:11px;}
 QFrame#estimatePrizeCard QLabel#estimateCategoryTile {background:#102f49; border:1px solid #315d79;}
-QFrame#prizeNoticeCard QLabel#estimateCategoryTile {background:#104337; border:1px solid #398063; color:#d9ffe6;}
+QFrame#prizeNoticeCard QLabel#estimateCategoryTile {background:#102f49; border:1px solid #315d79; color:#e7f5fa;}
 QLabel#scrutinySummaryValue {font-size:17px; font-weight:bold; color:#e7f8ff;}
 QLabel#scrutinySummaryCaption {font-size:9px; color:#a9e8f4; font-weight:bold;}
 QWidget#ballot QLabel[ballotPercentage="true"] {color:#124675; background:#e8f6ff; border:1px solid #a6cde6; border-radius:3px; font-size:10px; font-weight:bold;}
@@ -5069,7 +5072,9 @@ class MainWindow(QMainWindow):
         self.estimate_prize_card.setMinimumWidth(0)
         self.estimate_prize_card.setSizePolicy(QSizePolicy.Policy.Expanding,QSizePolicy.Policy.Preferred)
         estimate_layout=QVBoxLayout(self.estimate_prize_card);estimate_layout.setContentsMargins(10,7,10,7);estimate_layout.setSpacing(3)
+        self.estimate_layout=estimate_layout
         estimate_top=QHBoxLayout();estimate_top.setContentsMargins(0,0,0,0);estimate_top.setSpacing(6)
+        self.estimate_top_layout=estimate_top
         self.estimate_headline=QLabel('≈ PREVISIÓN ORIENTATIVA');self.estimate_headline.setObjectName('estimateHeadline')
         self.estimate_total=QLabel('—');self.estimate_total.setObjectName('estimateTotal')
         self.estimate_scenario_label=QLabel('');self.estimate_scenario_label.setObjectName('estimateDisclaimer');self.estimate_scenario_label.setWordWrap(True)
@@ -5099,16 +5104,28 @@ class MainWindow(QMainWindow):
         self.prize_notice.setMinimumWidth(0)
         self.prize_notice.setSizePolicy(QSizePolicy.Policy.Expanding,QSizePolicy.Policy.Preferred)
         notice_layout=QVBoxLayout(self.prize_notice);notice_layout.setContentsMargins(10,7,10,7);notice_layout.setSpacing(3)
-        notice_top=QHBoxLayout();notice_top.setSpacing(6)
-        self.prize_notice_headline=QLabel('PREMIOS REALES · PENDIENTES DE PUBLICACIÓN');self.prize_notice_headline.setObjectName('estimateHeadline')
+        self.prize_notice_layout=notice_layout
+        notice_top=QHBoxLayout();notice_top.setContentsMargins(0,0,0,0);notice_top.setSpacing(6)
+        self.prize_notice_top_layout=notice_top
+        self.prize_notice_headline=QLabel('≈ PREMIOS OFICIALES');self.prize_notice_headline.setObjectName('estimateHeadline')
         self.prize_notice_total=QLabel('—');self.prize_notice_total.setObjectName('estimateTotal')
         notice_top.addWidget(self.prize_notice_headline);notice_top.addStretch(1);notice_top.addWidget(self.prize_notice_total)
+        self.prize_notice_refresh_button=QPushButton('↻');self.prize_notice_refresh_button.setFixedWidth(34)
+        self.prize_notice_refresh_button.setToolTip('Actualizar resultados y premios oficiales')
+        self.prize_notice_refresh_button.clicked.connect(self.fetch_live)
+        notice_top.addWidget(self.prize_notice_refresh_button)
         notice_layout.addLayout(notice_top)
+        self.prize_notice_rows_layout=QVBoxLayout()
+        self.prize_notice_rows_layout.setContentsMargins(0,0,0,0)
+        self.prize_notice_rows_layout.setSpacing(1)
         self.prize_notice_rows={}
         for category in (15,14,13,12,11,10):
             name='Pleno 15' if category==15 else f'{category} aciertos'
             row=QLabel(f'{name} · No publicado');row.setObjectName('estimateCategoryTile');row.setMinimumWidth(0)
-            notice_layout.addWidget(row);self.prize_notice_rows[category]=row
+            row.setWordWrap(False)
+            font=row.font();font.setPointSize(10);row.setFont(font)
+            self.prize_notice_rows_layout.addWidget(row);self.prize_notice_rows[category]=row
+        notice_layout.addLayout(self.prize_notice_rows_layout)
         self.prize_notice_footer=QLabel('');self.prize_notice_footer.setObjectName('estimateDisclaimer');self.prize_notice_footer.setWordWrap(True);self.prize_notice_footer.setMaximumHeight(32)
         notice_layout.addWidget(self.prize_notice_footer)
         self.prize_notice.headline=self.prize_notice_headline
@@ -5221,7 +5238,7 @@ class MainWindow(QMainWindow):
             self.prize_notice.rows[category].setText(
                 f"{name} · {payout['bets']:,} apuestas · {unit}/u. · {subtotal} total"
             )
-        self.prize_notice.headline.setText('PREMIOS REALES · ESCRUTINIO PUBLICADO')
+        self.prize_notice.headline.setText('≈ PREMIOS OFICIALES')
         self.prize_notice.total.setText(prize_money(total))
         self.prize_notice.footer.setText(f'{source} · importe oficial para tus apuestas.')
 

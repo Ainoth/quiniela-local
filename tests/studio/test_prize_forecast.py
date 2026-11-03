@@ -97,6 +97,25 @@ def test_live_refresh_keeps_forecast_card_visible_without_bets(window):
     assert "Importa apuestas" in window.estimate_scenario_label.text()
 
 
+def test_official_card_matches_forecast_card_layout_and_controls(window):
+    assert window.estimate_layout.contentsMargins() == window.prize_notice_layout.contentsMargins()
+    assert window.estimate_layout.spacing() == window.prize_notice_layout.spacing()
+    assert window.estimate_top_layout.contentsMargins() == window.prize_notice_top_layout.contentsMargins()
+    assert window.estimate_top_layout.spacing() == window.prize_notice_top_layout.spacing()
+    assert window.estimate_rows_layout.spacing() == window.prize_notice_rows_layout.spacing()
+    assert window.estimate_layout.count() == window.prize_notice_layout.count() == 3
+    assert window.estimate_refresh_button.width() == window.prize_notice_refresh_button.width() == 34
+    assert window.estimate_prize_card.minimumHeight() == window.prize_notice.minimumHeight()
+    assert len(window.estimate_category_rows) == len(window.prize_notice_rows) == 6
+    assert all(
+        forecast.font().pointSize() == official.font().pointSize()
+        and not forecast.wordWrap() and not official.wordWrap()
+        for forecast, official in zip(window.estimate_category_rows.values(), window.prize_notice_rows.values())
+    )
+    window.prize_notice.setText("Premios oficiales pendientes de publicación.")
+    assert all("— apuestas · — €/u. · — total" in row.text() for row in window.prize_notice_rows.values())
+
+
 def test_desktop_shows_live_progress_and_golden_forecast_card(window):
     assert window.prize_cards_layout.itemAt(0).widget() is window.estimate_prize_card
     assert window.prize_cards_layout.itemAt(1).widget() is window.official_prize_column

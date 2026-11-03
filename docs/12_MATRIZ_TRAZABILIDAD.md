@@ -678,6 +678,11 @@ después de aplicarse. Las temporadas históricas disponibles se pueden elegir y
 se incluyen todas por defecto en una configuración nueva. Pruebas:
 `test_normal_generator_ui.py`.
 
+RF-ESC-020 (v2.0.13): la tarjeta verde de premios oficiales comparte estructura,
+márgenes, tipografía, filas y botón de actualización con la amarilla; solo
+cambian sus acentos de color y sus datos oficiales. Prueba:
+`test_prize_forecast.py`.
+
 RF-ESC-019 (v2.0.12): las actualizaciones de resultados no ocultan la tarjeta
 amarilla cuando no hay apuestas abiertas o importadas. Prueba:
 `test_prize_forecast.py`.

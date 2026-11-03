@@ -1,5 +1,11 @@
 # Cambios
 
+## 2.0.13 — tarjetas oficiales con el mismo diseño
+
+- Iguala la estructura, márgenes, filas, tipografía y control de actualización
+  de la tarjeta verde a la amarilla; conserva únicamente los acentos verdes y
+  los datos propios de premios oficiales. Prueba: `test_prize_forecast.py`.
+
 ## 2.0.12 — conservar la previsión al actualizar resultados
 
 - Mantiene la tarjeta de previsión visible cuando se refresca el marcador y no
