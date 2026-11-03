@@ -246,17 +246,9 @@ def test_cached_scrutiny_shows_prize_breakdown_and_clears_on_round_change(window
     assert window.prize_category_rows[15][1].text()=='2'
     assert window.prize_category_rows[14][3].text()=='4,00 €'
     assert window.prize_category_rows[13][3].text()=='6,00 €'
-    assert window.prize_detail_card.isVisible()
     gold_top=window.estimate_prize_card.mapTo(window,QPoint(0,0)).y()
     green_top=window.prize_notice.mapTo(window,QPoint(0,0)).y()
-    detail_top=window.prize_detail_card.mapTo(window,QPoint(0,0)).y()
     assert abs(gold_top-green_top)<=1
-    assert detail_top>=max(gold_top+window.estimate_prize_card.height(),
-                            green_top+window.prize_notice.height())
-    assert window.prize_detail_rows[15][1].text()=='1'
-    assert window.prize_detail_rows[14][2].text()=='2,00 €'
-    assert window.prize_detail_rows[14][3].text()=='2'
-    assert window.prize_detail_total.text()=='14,00 €'
     assert window.live_model.rows[0][5]=='Escrutinio publicado'
     assert 'boleto validado' in window.prize_fine_print.text()
 
@@ -285,7 +277,6 @@ def test_cached_scrutiny_shows_prize_breakdown_and_clears_on_round_change(window
 
     window.load_rounds('DEMO/J01')
     assert not window.prize_card.isVisible()
-    assert not window.prize_detail_card.isVisible()
 
 
 def test_switching_system_in_mis_sistemas_clears_previous_prize_before_aciertos(window,tmp_path,application):
@@ -306,16 +297,13 @@ def test_switching_system_in_mis_sistemas_clears_previous_prize_before_aciertos(
     window.auto_live.setChecked(False)
     window.navigation.setCurrentRow(4);application.processEvents()
     assert window.prize_notice.isVisible()
-    assert window.prize_detail_card.isVisible()
+    assert not hasattr(window,'prize_detail_card')
 
     window.navigation.setCurrentRow(5)
     window.set_system(loser)
     assert not window.prize_card.isVisible()
-    assert not window.prize_detail_card.isVisible()
     window.navigation.setCurrentRow(4);application.processEvents()
     assert not window.prize_card.isVisible()
-    assert window.prize_detail_card.isVisible()
-    assert window.prize_detail_total.text()=='0,00 €'
 
 
 def test_published_scrutiny_with_no_award_stays_neutral(window,tmp_path,application):
@@ -360,13 +348,7 @@ def test_published_page_cache_displays_real_j14_prize_when_pre_is_provisional(wi
 
     assert window.prize_notice.isVisible()
     assert window.prize_total.text() == '2,22 €'
-    assert window.prize_detail_card.isVisible()
     assert window.prize_category_rows[11][1].text() == '1'
-    assert window.prize_detail_rows[11][2].text() == '2,22 €'
-    assert window.prize_detail_rows[11][3].text() == '1'
-    assert window.prize_detail_rows[11][4].text() == '2,22 €'
-    assert window.prize_detail_rows[10][2].text() == '0,00 €'
-    assert window.prize_detail_total.text() == '2,22 €'
     assert 'Comprobar Lotería' in window.prize_fine_print.text()
     assert window.eval_model.rows[0][3] == 11
 

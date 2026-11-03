@@ -678,6 +678,10 @@ después de aplicarse. Las temporadas históricas disponibles se pueden elegir y
 se incluyen todas por defecto en una configuración nueva. Pruebas:
 `test_normal_generator_ui.py`.
 
+RF-ESC-023 (v2.0.16): se elimina el desglose oficial separado y se conserva
+el premio total y el resumen por categoría dentro de la tarjeta verde.
+Pruebas: `test_ui.py`, `test_prize_forecast.py`.
+
 RF-ESC-022 (v2.0.15): el desglose oficial se muestra bajo las dos tarjetas,
 manteniendo su alineación cuando una jornada tiene premios publicados.
 Prueba: `test_cached_scrutiny_shows_prize_breakdown_and_clears_on_round_change`.

@@ -182,8 +182,6 @@ QProgressBar {border:1px solid #2a6698; text-align:center;}
 QProgressBar::chunk {background:#159881;}
 QFrame#prizeCard {background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 #104a33,stop:0.55 #103b35,stop:1 #12354a); border:2px solid #37c878; border-radius:7px;}
 QFrame#prizeCard QLabel {background:transparent;}
-QFrame#prizeBreakdownCard {background:#0d352b; border:1px solid #37b86f; border-radius:5px;}
-QFrame#prizeBreakdownCard QLabel {background:transparent; border:none;}
 QFrame#estimatePrizeCard {background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 #493c17,stop:0.55 #24364b,stop:1 #17304a); border:2px solid #d8ae38; border-radius:7px;}
 QFrame#estimatePrizeCard QLabel {background:transparent; border:none;}
 QFrame#prizeNoticeCard {background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 #145239,stop:0.55 #24364b,stop:1 #17304a); border:2px solid #37c878; border-radius:7px;}
@@ -195,18 +193,11 @@ QFrame#scrutinySummaryCard {background:qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:
 QFrame#scrutinySummaryCard QLabel {background:transparent; border:none;}
 QFrame#scrutinyDiagnosticPanel {background:#102f49; border:1px solid #3d88b8; border-radius:5px;}
 QFrame#scrutinyDiagnosticPanel QLabel {background:transparent; border:none; color:#e4f3fa;}
-QLabel#prizeTableGroup {color:#75e5ec; font-weight:bold; font-size:10px;}
-QLabel#prizeTableHeader {color:#a9d8e5; font-size:10px;}
-QLabel#prizeTableValue {color:#e7f5fa; font-size:10px;}
-QLabel#prizeTableOwn {color:#ffe17a; font-size:10px; font-weight:bold;}
-QLabel#prizeTableTotal {color:#ffe17a; font-size:13px; font-weight:bold;}
 QLabel#prizeHeadline {font-size:17px; font-weight:bold; color:#a9f1bd;}
 QLabel#prizeTotal {font-size:29px; font-weight:bold; color:#b8f2ca;}
 QLabel#prizeFinePrint {font-size:10px; color:#c2e9d0;}
 QFrame#prizeCard QLabel#prizeCategoryHeading {color:#9be1b0;}
 QFrame#prizeCard QLabel#prizeCategoryValue {color:#d4f9de;}
-QFrame#prizeBreakdownCard QLabel#prizeTableGroup {color:#8be8a6;}
-QFrame#prizeBreakdownCard QLabel#prizeTableOwn, QFrame#prizeBreakdownCard QLabel#prizeTableTotal {color:#a9f1bd;}
 QLabel#prizeCategoryHeading {font-size:10px; color:#8fe6e1; font-weight:bold;}
 QLabel#prizeCategoryValue {font-size:11px; color:#fff2b8;}
 QLabel#estimateHeadline {font-size:15px; font-weight:bold; color:#ffe17a;}
@@ -3498,9 +3489,7 @@ class MainWindow(QMainWindow):
         official_widgets=(self.prize_card,self.prize_notice)
         official_height=sum(max(widget.minimumHeight(),widget.sizeHint().height())
                              for widget in official_widgets if not widget.isHidden())
-        detail_height=(max(self.prize_detail_card.minimumHeight(),self.prize_detail_card.sizeHint().height())
-                       if not self.prize_detail_card.isHidden() else 0)
-        if not estimate_height and not official_height and not detail_height:
+        if not estimate_height and not official_height:
             return 160
         if self.prize_cards_layout.direction()==QBoxLayout.Direction.TopToBottom:
             cards_height=estimate_height+official_height+8
@@ -3509,7 +3498,7 @@ class MainWindow(QMainWindow):
         summary_height=max(self.eval_summary.minimumHeight(),self.eval_summary.sizeHint().height())
         table_reserve=(self.eval_view.horizontalHeader().sizeHint().height()+4*self.eval_view.verticalHeader().defaultSectionSize()
                        if self.eval_view.isVisible() else 0)
-        return cards_height+detail_height+summary_height+table_reserve+6
+        return cards_height+summary_height+table_reserve+6
 
     def start_session(self):
         """Offer to resume once, or create a separate ballot for the current round."""
@@ -3961,7 +3950,6 @@ class MainWindow(QMainWindow):
         self.published_scrutiny=None
         if hasattr(self,'prize_card'):
             self.prize_card.hide()
-            self.prize_detail_card.hide()
             self.prize_total.clear()
             self.prize_notice.show()
             self.prize_notice.setText(self.prize_pending_text())
@@ -5047,29 +5035,7 @@ class MainWindow(QMainWindow):
             self.prize_category_rows[category]=labels
         self.prize_grid_widget=QWidget();self.prize_grid_widget.setLayout(prize_grid)
         prize_layout.addWidget(self.prize_grid_widget,0)
-        self.prize_detail_card=QFrame();self.prize_detail_card.setObjectName('prizeBreakdownCard')
-        self.prize_detail_card.setMinimumHeight(125)
-        detail_layout=QGridLayout(self.prize_detail_card)
-        detail_layout.setContentsMargins(8,4,8,4)
-        detail_layout.setHorizontalSpacing(8);detail_layout.setVerticalSpacing(0)
-        for caption,column,span in (('OFICIALES',0,3),('TUS PREMIOS',3,2)):
-            label=QLabel(caption);label.setObjectName('prizeTableGroup')
-            detail_layout.addWidget(label,0,column,1,span)
-        for column,caption in enumerate(('Aciertos','Acertantes','Premio/u.','Apuestas','Importe')):
-            label=QLabel(caption);label.setObjectName('prizeTableHeader')
-            detail_layout.addWidget(label,1,column)
-        self.prize_detail_rows={}
-        for row,category in enumerate((15,14,13,12,11,10),2):
-            labels=[QLabel('Pleno 15' if category==15 else str(category))]+[QLabel() for _ in range(4)]
-            for column,label in enumerate(labels):
-                label.setObjectName('prizeTableOwn' if column==4 else 'prizeTableValue')
-                detail_layout.addWidget(label,row,column)
-            self.prize_detail_rows[category]=labels
-        total_label=QLabel('TOTAL');total_label.setObjectName('prizeTableGroup')
-        detail_layout.addWidget(total_label,8,3)
-        self.prize_detail_total=QLabel();self.prize_detail_total.setObjectName('prizeTableTotal')
-        detail_layout.addWidget(self.prize_detail_total,8,4)
-        self.prize_card.hide();self.prize_detail_card.hide()
+        self.prize_card.hide()
         self.estimate_prize_card=QFrame();self.estimate_prize_card.setObjectName('estimatePrizeCard')
         self.estimate_prize_card.setMinimumWidth(0)
         self.estimate_prize_card.setSizePolicy(QSizePolicy.Policy.Expanding,QSizePolicy.Policy.Preferred)
@@ -5141,7 +5107,6 @@ class MainWindow(QMainWindow):
         self.prize_cards_layout=QHBoxLayout();self.prize_cards_layout.setContentsMargins(0,0,0,0);self.prize_cards_layout.setSpacing(8)
         self.prize_cards_layout.addWidget(self.estimate_prize_card,1);self.prize_cards_layout.addWidget(self.official_prize_column,1)
         lower_layout.addLayout(self.prize_cards_layout)
-        lower_layout.addWidget(self.prize_detail_card)
         eval_tools=QHBoxLayout();eval_tools.setContentsMargins(0,0,0,0)
         self.eval_summary=QLabel('Abre una quiniela con apuestas para ver tus aciertos.');self.eval_summary.setWordWrap(False);self.eval_summary.setMinimumHeight(28);eval_tools.addWidget(self.eval_summary,1)
         self.eval_detail_button=QPushButton('Ver apuestas evaluadas ▾');self.eval_detail_button.setFixedHeight(25);self.eval_detail_button.clicked.connect(self.toggle_scrutiny_bets);eval_tools.addWidget(self.eval_detail_button)
@@ -5203,7 +5168,6 @@ class MainWindow(QMainWindow):
         """Show a prize only when definitive published amounts are available."""
         total=outcome['prize_cents']
         self.prize_card.hide()
-        self.prize_detail_card.setVisible(total is not None and scrutiny is not None)
         self.prize_notice.show()
         if self.navigation.currentRow()==4:QTimer.singleShot(0,self.fit_scrutiny_tables)
         if total is None:
@@ -5245,22 +5209,6 @@ class MainWindow(QMainWindow):
         self.prize_notice.total.setText(prize_money(total))
         self.prize_notice.footer.setText(f'{source} · importe oficial para tus apuestas.')
 
-    def _render_prize_detail(self,outcome,scrutiny):
-        """Show every published category beside this system's matching bets."""
-        if outcome['prize_cents'] is None or scrutiny is None:
-            self.prize_detail_card.hide()
-            return
-        winners={int(key):value for key,value in scrutiny.get('winners',{}).items()}
-        for payout in outcome['payouts']:
-            category=payout['category'];labels=self.prize_detail_rows[category]
-            count=winners.get(category)
-            labels[1].setText(f'{count:,}'.replace(',','.') if type(count) is int else '—')
-            labels[2].setText(prize_money(payout['unit_cents']))
-            labels[3].setText(str(payout['bets']))
-            labels[4].setText(prize_money(payout['subtotal_cents']))
-        self.prize_detail_total.setText(prize_money(outcome['prize_cents']))
-        self.prize_detail_card.show()
-
     def render_scrutiny(self,outcome,actual_pleno,pleno_final,source='',scrutiny=None,actual_result=''):
         selected=self.eval_view.currentIndex().row()
         old_key=self.eval_model.rows[selected][:2] if 0<=selected<len(self.eval_model.rows) else None
@@ -5299,7 +5247,6 @@ class MainWindow(QMainWindow):
         else:
             self.scrutiny_summary_hits.setText('—');self.scrutiny_summary_misses.setText('—');self.scrutiny_summary_pending.setText('14')
         self._render_prize_card(outcome,source,scrutiny)
-        self._render_prize_detail(outcome,scrutiny)
         self.render_prize_forecast(outcome)
         self.scrutiny_diagnostic_text_label.setText(self.scrutiny_diagnostic_text(actual_result, outcome))
         complete_result=(len(actual_result)==14 and '-' not in actual_result and not set(actual_result)-set('1X2'))
@@ -5745,7 +5692,6 @@ class MainWindow(QMainWindow):
                 # or its selected bet; render_scrutiny will replace the rows.
                 self.published_scrutiny=None
                 self.prize_card.hide()
-                self.prize_detail_card.hide()
                 self.prize_total.clear()
                 self.prize_notice.show()
                 self.prize_notice.setText(self.prize_pending_text(

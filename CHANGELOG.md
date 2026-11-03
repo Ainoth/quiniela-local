@@ -1,5 +1,12 @@
 # Cambios
 
+## 2.0.16 — retirar el desglose oficial adicional
+
+- Elimina la tabla separada de premios oficiales. El resumen por categorías y
+  el premio total quedan en la tarjeta verde.
+- Comprueba que las tarjetas siguen alineadas en una jornada con escrutinio
+  publicado. Pruebas: `test_ui.py`, `test_prize_forecast.py`.
+
 ## 2.0.15 — mantener las tarjetas alineadas con premios publicados
 
 - Mueve el desglose de premios oficiales debajo de las tarjetas, para que no
