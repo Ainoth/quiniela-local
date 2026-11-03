@@ -678,6 +678,10 @@ después de aplicarse. Las temporadas históricas disponibles se pueden elegir y
 se incluyen todas por defecto en una configuración nueva. Pruebas:
 `test_normal_generator_ui.py`.
 
+RF-ESC-022 (v2.0.15): el desglose oficial se muestra bajo las dos tarjetas,
+manteniendo su alineación cuando una jornada tiene premios publicados.
+Prueba: `test_cached_scrutiny_shows_prize_breakdown_and_clears_on_round_change`.
+
 RF-ESC-021 (v2.0.14): el degradado de la tarjeta verde sigue la misma mezcla
 azul y el mismo sombreado que la amarilla; el color cálido inicial se sustituye
 por verde. Verificación visual a 1920×1080.

@@ -3495,10 +3495,12 @@ class MainWindow(QMainWindow):
         """Minimum splitter space for visible prize cards, summary and bet table."""
         estimate_height=(max(self.estimate_prize_card.minimumHeight(),self.estimate_prize_card.sizeHint().height())
                          if not self.estimate_prize_card.isHidden() else 0)
-        official_widgets=(self.prize_card,self.prize_detail_card,self.prize_notice)
+        official_widgets=(self.prize_card,self.prize_notice)
         official_height=sum(max(widget.minimumHeight(),widget.sizeHint().height())
                              for widget in official_widgets if not widget.isHidden())
-        if not estimate_height and not official_height:
+        detail_height=(max(self.prize_detail_card.minimumHeight(),self.prize_detail_card.sizeHint().height())
+                       if not self.prize_detail_card.isHidden() else 0)
+        if not estimate_height and not official_height and not detail_height:
             return 160
         if self.prize_cards_layout.direction()==QBoxLayout.Direction.TopToBottom:
             cards_height=estimate_height+official_height+8
@@ -3507,7 +3509,7 @@ class MainWindow(QMainWindow):
         summary_height=max(self.eval_summary.minimumHeight(),self.eval_summary.sizeHint().height())
         table_reserve=(self.eval_view.horizontalHeader().sizeHint().height()+4*self.eval_view.verticalHeader().defaultSectionSize()
                        if self.eval_view.isVisible() else 0)
-        return cards_height+summary_height+table_reserve+6
+        return cards_height+detail_height+summary_height+table_reserve+6
 
     def start_session(self):
         """Offer to resume once, or create a separate ballot for the current round."""
@@ -5135,10 +5137,11 @@ class MainWindow(QMainWindow):
         self.official_prize_column=QWidget();official_layout=QVBoxLayout(self.official_prize_column)
         official_layout.setContentsMargins(0,0,0,0);official_layout.setSpacing(5)
         self.official_prize_column.setMinimumWidth(0)
-        official_layout.addWidget(self.prize_card);official_layout.addWidget(self.prize_detail_card);official_layout.addWidget(self.prize_notice)
+        official_layout.addWidget(self.prize_card);official_layout.addWidget(self.prize_notice)
         self.prize_cards_layout=QHBoxLayout();self.prize_cards_layout.setContentsMargins(0,0,0,0);self.prize_cards_layout.setSpacing(8)
         self.prize_cards_layout.addWidget(self.estimate_prize_card,1);self.prize_cards_layout.addWidget(self.official_prize_column,1)
         lower_layout.addLayout(self.prize_cards_layout)
+        lower_layout.addWidget(self.prize_detail_card)
         eval_tools=QHBoxLayout();eval_tools.setContentsMargins(0,0,0,0)
         self.eval_summary=QLabel('Abre una quiniela con apuestas para ver tus aciertos.');self.eval_summary.setWordWrap(False);self.eval_summary.setMinimumHeight(28);eval_tools.addWidget(self.eval_summary,1)
         self.eval_detail_button=QPushButton('Ver apuestas evaluadas ▾');self.eval_detail_button.setFixedHeight(25);self.eval_detail_button.clicked.connect(self.toggle_scrutiny_bets);eval_tools.addWidget(self.eval_detail_button)

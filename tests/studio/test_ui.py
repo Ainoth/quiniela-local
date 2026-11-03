@@ -4,7 +4,7 @@ os.environ.setdefault('QT_QPA_PLATFORM','offscreen')
 from dataclasses import replace
 
 import pytest
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QPoint, Qt
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication, QBoxLayout, QFileDialog
 
@@ -241,10 +241,18 @@ def test_cached_scrutiny_shows_prize_breakdown_and_clears_on_round_change(window
     assert window.prize_notice.isVisible()
     assert window.prize_layout.direction()==QBoxLayout.Direction.TopToBottom
     assert window.prize_total.text()=='14,00 €'
+    window.resize(1920,1080)
+    application.processEvents()
     assert window.prize_category_rows[15][1].text()=='2'
     assert window.prize_category_rows[14][3].text()=='4,00 €'
     assert window.prize_category_rows[13][3].text()=='6,00 €'
     assert window.prize_detail_card.isVisible()
+    gold_top=window.estimate_prize_card.mapTo(window,QPoint(0,0)).y()
+    green_top=window.prize_notice.mapTo(window,QPoint(0,0)).y()
+    detail_top=window.prize_detail_card.mapTo(window,QPoint(0,0)).y()
+    assert abs(gold_top-green_top)<=1
+    assert detail_top>=max(gold_top+window.estimate_prize_card.height(),
+                            green_top+window.prize_notice.height())
     assert window.prize_detail_rows[15][1].text()=='1'
     assert window.prize_detail_rows[14][2].text()=='2,00 €'
     assert window.prize_detail_rows[14][3].text()=='2'

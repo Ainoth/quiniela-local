@@ -1,5 +1,11 @@
 # Cambios
 
+## 2.0.15 — mantener las tarjetas alineadas con premios publicados
+
+- Mueve el desglose de premios oficiales debajo de las tarjetas, para que no
+  empuje hacia abajo la tarjeta verde en jornadas escrutadas. Ajusta el espacio
+  reservado para que el desglose quepa. Prueba: `test_ui.py`.
+
 ## 2.0.14 — igualar el degradado de las tarjetas
 
 - Aplica a la tarjeta verde el mismo degradado azul de la amarilla y cambia
