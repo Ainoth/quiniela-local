@@ -678,6 +678,10 @@ después de aplicarse. Las temporadas históricas disponibles se pueden elegir y
 se incluyen todas por defecto en una configuración nueva. Pruebas:
 `test_normal_generator_ui.py`.
 
+RF-ESC-021 (v2.0.14): el degradado de la tarjeta verde sigue la misma mezcla
+azul y el mismo sombreado que la amarilla; el color cálido inicial se sustituye
+por verde. Verificación visual a 1920×1080.
+
 RF-ESC-020 (v2.0.13): la tarjeta verde de premios oficiales comparte estructura,
 márgenes, tipografía, filas y botón de actualización con la amarilla; solo
 cambian sus acentos de color y sus datos oficiales. Prueba:

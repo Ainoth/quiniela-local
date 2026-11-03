@@ -186,7 +186,7 @@ QFrame#prizeBreakdownCard {background:#0d352b; border:1px solid #37b86f; border-
 QFrame#prizeBreakdownCard QLabel {background:transparent; border:none;}
 QFrame#estimatePrizeCard {background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 #493c17,stop:0.55 #24364b,stop:1 #17304a); border:2px solid #d8ae38; border-radius:7px;}
 QFrame#estimatePrizeCard QLabel {background:transparent; border:none;}
-QFrame#prizeNoticeCard {background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 #104a33,stop:0.55 #103b35,stop:1 #12354a); border:2px solid #37c878; border-radius:7px;}
+QFrame#prizeNoticeCard {background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 #145239,stop:0.55 #24364b,stop:1 #17304a); border:2px solid #37c878; border-radius:7px;}
 QFrame#prizeNoticeCard QLabel {background:transparent; border:none;}
 QFrame#prizeNoticeCard QLabel#estimateHeadline {color:#a9f1bd;}
 QFrame#prizeNoticeCard QLabel#estimateTotal {color:#b8f2ca;}

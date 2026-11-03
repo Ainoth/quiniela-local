@@ -1,5 +1,10 @@
 # Cambios
 
+## 2.0.14 — igualar el degradado de las tarjetas
+
+- Aplica a la tarjeta verde el mismo degradado azul de la amarilla y cambia
+  únicamente el tono cálido de origen por verde.
+
 ## 2.0.13 — tarjetas oficiales con el mismo diseño
 
 - Iguala la estructura, márgenes, filas, tipografía y control de actualización
