@@ -83,6 +83,20 @@ def test_forecast_card_remains_visible_without_open_or_imported_bets(window):
     assert "Importa apuestas" in window.estimate_scenario_label.text()
 
 
+def test_live_refresh_keeps_forecast_card_visible_without_bets(window):
+    window.system = None
+    window.external_scrutiny_bets = None
+    window.live_matches = tuple(
+        LiveMatch(i + 1, match.home, match.away, "", "", "", "Pendiente", False, 0)
+        for i, match in enumerate(window.round.matches)
+    )
+
+    window.evaluate_live()
+
+    assert not window.estimate_prize_card.isHidden()
+    assert "Importa apuestas" in window.estimate_scenario_label.text()
+
+
 def test_desktop_shows_live_progress_and_golden_forecast_card(window):
     assert window.prize_cards_layout.itemAt(0).widget() is window.estimate_prize_card
     assert window.prize_cards_layout.itemAt(1).widget() is window.official_prize_column

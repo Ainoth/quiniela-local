@@ -6059,7 +6059,10 @@ class MainWindow(QMainWindow):
     def evaluate_live(self):
         bets=self.scrutiny_bets()
         if not bets:
-            self.eval_model.update_rows([]);self.eval_summary.setText('Abre una quiniela o importa un fichero externo para compararlo con los resultados.');return
+            self.eval_model.update_rows([])
+            self.eval_summary.setText('Abre una quiniela o importa un fichero externo para compararlo con los resultados.')
+            self.render_prize_forecast()
+            return
         if self.show_cached_scrutiny():return
         if not self.live_matches:raise ValueError('Actualiza o recupera primero el marcador de esta jornada.')
         from quiniela_ai_studio.infrastructure.integration import validate_teams

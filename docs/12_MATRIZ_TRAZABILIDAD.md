@@ -678,6 +678,10 @@ después de aplicarse. Las temporadas históricas disponibles se pueden elegir y
 se incluyen todas por defecto en una configuración nueva. Pruebas:
 `test_normal_generator_ui.py`.
 
+RF-ESC-019 (v2.0.12): las actualizaciones de resultados no ocultan la tarjeta
+amarilla cuando no hay apuestas abiertas o importadas. Prueba:
+`test_prize_forecast.py`.
+
 RF-ESC-018 (v2.0.11): la tarjeta amarilla de previsión permanece visible al
 entrar en Escrutinio sin apuestas y explica que se deben abrir o importar
 apuestas para calcular importes. Prueba: `test_prize_forecast.py`.

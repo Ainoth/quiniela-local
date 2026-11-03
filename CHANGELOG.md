@@ -1,5 +1,10 @@
 # Cambios
 
+## 2.0.12 — conservar la previsión al actualizar resultados
+
+- Mantiene la tarjeta de previsión visible cuando se refresca el marcador y no
+  hay apuestas abiertas o importadas. Pruebas: `test_prize_forecast.py`.
+
 ## 2.0.11 — restaurar la previsión amarilla
 
 - Mantiene visible la tarjeta de previsión al entrar en Escrutinio aunque no
