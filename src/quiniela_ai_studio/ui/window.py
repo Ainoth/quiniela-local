@@ -3948,6 +3948,7 @@ class MainWindow(QMainWindow):
                     self.eval_model.update_rows([])
                     self.eval_summary.setText('Abre una quiniela con apuestas y carga resultados para ver tus aciertos.')
                     self.eval_view.hide();self.eval_detail_button.setEnabled(False)
+                self.render_prize_forecast()
             self.fetch_prize_estimate()
 
     def clear_scrutiny_awards(self):
@@ -5751,6 +5752,7 @@ class MainWindow(QMainWindow):
                 self.render_scrutiny(outcome,'',False,'',actual_result='-'*14)
                 self.eval_summary.setText('Apuestas cargadas · esperando resultados para calcular aciertos y fallos.')
             else:
+                self.render_prize_forecast()
                 self.eval_detail_button.setEnabled(False)
 
     def maybe_fetch_published_scrutiny(self):

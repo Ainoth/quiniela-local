@@ -1,5 +1,12 @@
 # Cambios
 
+## 2.0.11 — restaurar la previsión amarilla
+
+- Mantiene visible la tarjeta de previsión al entrar en Escrutinio aunque no
+  haya apuestas abiertas o importadas; muestra qué hace falta para calcularla.
+- Comprueba la visibilidad tanto al cambiar de jornada/sistema como al abrir la
+  pestaña. Prueba: `test_prize_forecast.py`.
+
 ## 2.0.10 — fuentes y Escrutinio
 
 - Corrige la validación de «OL. LYON» frente al nombre «Lyon» de WIN1X2. La

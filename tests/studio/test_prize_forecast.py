@@ -74,6 +74,15 @@ def test_estimate_applies_current_scenario_and_separates_15_from_14():
     assert estimate["total_cents"] == sum(row["subtotal_cents"] for row in estimate["rows"])
 
 
+def test_forecast_card_remains_visible_without_open_or_imported_bets(window):
+    window.system = None
+    window.external_scrutiny_bets = None
+    window.refresh_scrutiny_page()
+
+    assert not window.estimate_prize_card.isHidden()
+    assert "Importa apuestas" in window.estimate_scenario_label.text()
+
+
 def test_desktop_shows_live_progress_and_golden_forecast_card(window):
     assert window.prize_cards_layout.itemAt(0).widget() is window.estimate_prize_card
     assert window.prize_cards_layout.itemAt(1).widget() is window.official_prize_column
