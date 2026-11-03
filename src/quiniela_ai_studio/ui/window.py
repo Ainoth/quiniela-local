@@ -43,6 +43,7 @@ from PySide6.QtWidgets import (
     QSpinBox,
     QSplitter,
     QStackedWidget,
+    QStyledItemDelegate,
     QTabBar,
     QTableView,
     QTabWidget,
@@ -174,6 +175,7 @@ QGroupBox::title {color:#57d4ff;}
 QCheckBox::indicator {width:18px; height:18px; border:2px solid #86bfe8; border-radius:3px; background:#eef7ff;}
 QCheckBox::indicator:checked {background:#18864b; border-color:#35d27f;}
 QCheckBox::indicator:disabled {background:#24405b; border-color:#62768b;}
+QCheckBox#manualResultsMode:checked {background:#104a33; border:1px solid #37c878; border-radius:4px; padding:2px 6px; color:#b8f2ca; font-weight:bold;}
 QLineEdit:disabled, QSpinBox:disabled {background:#173451; color:#8ba5be; border-color:#35536e;}
 QSlider::groove:horizontal {height:7px; background:#123b65; border:1px solid #53a8d2; border-radius:3px;}
 QSlider::handle:horizontal {background:#ffc83d; width:18px; margin:-6px 0; border-radius:5px;}
@@ -236,6 +238,8 @@ class RowsModel(QAbstractTableModel):
     def __init__(self, headers, rows=()):
         super().__init__()
         self.headers, self.rows = headers, list(rows)
+        self.manual_edit_enabled=False
+        self.manual_edit_handler=None
 
     def rowCount(self, parent=QModelIndex()):
         return 0 if parent.isValid() else len(self.rows)
@@ -250,6 +254,9 @@ class RowsModel(QAbstractTableModel):
             value=str(self.rows[index.row()][index.column()])
             if value.startswith(('Acierto','Pleno acertado')):return QColor('#165c3b')
             if value.startswith(('Fallo','Goles fallados')):return QColor('#7f2338')
+        if self.manual_edit_enabled and self.headers[index.column()]=='Resultado':
+            if role==Qt.ItemDataRole.BackgroundRole:return QColor('#15543b')
+            if role==Qt.ItemDataRole.ForegroundRole:return QColor('#e0ffea')
         if role in (Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.ToolTipRole):
             value=str(self.rows[index.row()][index.column()])
             header=self.headers[index.column()]
@@ -261,6 +268,19 @@ class RowsModel(QAbstractTableModel):
     def headerData(self, section, orientation, role=Qt.ItemDataRole.DisplayRole):
         if role == Qt.ItemDataRole.DisplayRole:
             return self.headers[section] if orientation == Qt.Orientation.Horizontal else section+1
+
+    def flags(self,index):
+        flags=super().flags(index)
+        if (index.isValid() and self.manual_edit_enabled
+                and self.headers[index.column()]=='Resultado'):
+            flags|=Qt.ItemFlag.ItemIsEditable
+        return flags
+
+    def setData(self,index,value,role=Qt.ItemDataRole.EditRole):
+        if (role!=Qt.ItemDataRole.EditRole or not index.isValid() or not self.manual_edit_enabled
+                or self.headers[index.column()]!='Resultado' or not self.manual_edit_handler):
+            return False
+        return bool(self.manual_edit_handler(index.row(),str(value)))
 
     def update_rows(self, rows):
         rows = list(rows)
@@ -275,6 +295,31 @@ class RowsModel(QAbstractTableModel):
             self.beginResetModel()
             self.rows = rows
             self.endResetModel()
+
+
+class ManualResultDelegate(QStyledItemDelegate):
+    """Inline selectors for match signs and the score pair of match 15."""
+
+    def createEditor(self,parent,option,index):
+        editor=QComboBox(parent)
+        if index.row()==14:
+            editor.addItem('—')
+            editor.addItems([f'{home}–{away}' for home in '012M' for away in '012M'])
+        else:
+            editor.addItems(('—','1','X','2'))
+        editor.activated.connect(lambda _value: self.commitData.emit(editor))
+        editor.activated.connect(lambda _value: self.closeEditor.emit(editor))
+        return editor
+
+    def setEditorData(self,editor,index):
+        value=str(index.data(Qt.ItemDataRole.DisplayRole) or '—')
+        option=editor.findText(value)
+        editor.blockSignals(True)
+        editor.setCurrentIndex(max(0,option))
+        editor.blockSignals(False)
+
+    def setModelData(self,editor,model,index):
+        model.setData(index,editor.currentText(),Qt.ItemDataRole.EditRole)
 
 
 class SignMatrixWidget(QWidget):
@@ -3434,14 +3479,18 @@ class MainWindow(QMainWindow):
         """Compact weekday/time from the stored WIN1X2 schedule, without inventing it."""
         if not value:
             return '—'
+        stamp=None
         for pattern in ('%d/%m/%Y%H:%M', '%d/%m/%Y %H:%M'):
             try:
                 stamp=datetime.strptime(value,pattern)
             except ValueError:
                 continue
-            day=('LUN','MAR','MIÉ','JUE','VIE','SÁB','DOM')[stamp.weekday()]
-            return f'{day} {stamp:%H:%M}'
-        return value
+            break
+        if stamp is None:
+            try:stamp=datetime.fromisoformat(value.replace('Z','+00:00'))
+            except ValueError:return '—'
+        day=('LUN','MAR','MIÉ','JUE','VIE','SÁB','DOM')[stamp.weekday()]
+        return f'{day} {stamp:%H:%M}' if stamp.hour or stamp.minute else f'{day} —'
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
@@ -3475,8 +3524,6 @@ class MainWindow(QMainWindow):
         complete += 5  # Qt leaves a couple of pixels between the calculated height and the last row.
         if table.horizontalScrollBar().isVisible():
             complete += table.horizontalScrollBar().height()
-        if self.manual_mode.isChecked():
-            complete = self.manual_container.maximumHeight()
         available = self.scrutiny_splitter.height() - self.scrutiny_splitter.handleWidth()
         reserve=self.scrutiny_lower_reserve()
         upper = min(complete, max(80, available - reserve))
@@ -3636,7 +3683,6 @@ class MainWindow(QMainWindow):
             except ValueError as exc:self.live_status.setText(str(exc))
         else:
             self.show_live_waiting(self.frozen_round())
-        self.reset_manual_inputs()
         if self.navigation.currentRow()==4 and not self.manual_mode.isChecked():
             self.show_cached_scrutiny()
         self.ensure_live_updates()
@@ -4964,7 +5010,11 @@ class MainWindow(QMainWindow):
         self.live_interval.setFixedWidth(142);self.live_interval.setToolTip('Frecuencia de consulta del marcador automático.')
         saved_interval=self.live_interval.findData(self.repository.setting('live_interval_seconds',60))
         self.live_interval.setCurrentIndex(saved_interval if saved_interval>=0 else 1);row.addWidget(self.live_interval)
-        self.manual_mode=QCheckBox('Resultados manuales');self.manual_mode.setToolTip('Introduce o corrige los resultados a mano.');row.addWidget(self.manual_mode)
+        self.manual_mode=QCheckBox('Resultados manuales');self.manual_mode.setObjectName('manualResultsMode')
+        self.manual_mode.setToolTip('Activa la edición directa en la columna Resultado.')
+        row.addWidget(self.manual_mode)
+        self.final_check=QCheckBox('Definitivos');self.final_check.setToolTip('Marca los resultados introducidos como definitivos.')
+        self.final_check.hide();row.addWidget(self.final_check)
         self.external_scrutiny_button=QPushButton('Escrutar fichero externo (TXT/CSV)');row.addWidget(self.external_scrutiny_button)
         self.external_scrutiny_button.setFixedHeight(27)
         self.external_scrutiny_button.clicked.connect(lambda:self.safe(self.import_external_scrutiny))
@@ -4993,24 +5043,15 @@ class MainWindow(QMainWindow):
         self.scrutiny_splitter.addWidget(upper);self.scrutiny_splitter.addWidget(lower)
         self.scrutiny_splitter.setStretchFactor(0,0);self.scrutiny_splitter.setStretchFactor(1,1)
         layout.addWidget(self.scrutiny_splitter,1)
-        self.live_view,self.live_model=self.table(('Partido','Marcador','Resultado','Tu signo','Acierto / fallo','Estado'),upper_layout)
+        self.live_view,self.live_model=self.table(('Partido','Marcador','Resultado','Tu signo','Acierto / fallo','Estado','Día / hora'),upper_layout)
         self.live_view.verticalHeader().hide();self.live_view.verticalHeader().setDefaultSectionSize(21)
-        for column in range(1,6):self.live_view.horizontalHeader().setSectionResizeMode(column,QHeaderView.ResizeMode.ResizeToContents)
-        self.manual_container=QScrollArea();self.manual_container.setWidgetResizable(True);manual=QWidget();manual_layout=QGridLayout(manual);self.manual_container.setWidget(manual);self.manual_container.setMaximumHeight(270)
-        self.manual_labels=[];self.manual_signs=[]
-        for i in range(14):
-            label=QLabel();self.manual_labels.append(label);manual_layout.addWidget(label,i,0)
-            combo=QComboBox();combo.addItems(['-','1','X','2']);combo.currentIndexChanged.connect(self.manual_results_changed);self.manual_signs.append(combo);manual_layout.addWidget(combo,i,1)
-        manual_layout.addWidget(QLabel('Pleno · goles local / visitante'),14,0)
-        goal_row=QHBoxLayout();self.manual_goals=[]
-        for _ in range(2):
-            combo=QComboBox();combo.addItems(['—','0','1','2','M']);combo.currentIndexChanged.connect(self.manual_results_changed);self.manual_goals.append(combo);goal_row.addWidget(combo)
-        manual_layout.addLayout(goal_row,14,1)
+        for column in range(1,7):self.live_view.horizontalHeader().setSectionResizeMode(column,QHeaderView.ResizeMode.ResizeToContents)
+        result_column=self.live_model.headers.index('Resultado')
+        self.live_model.manual_edit_handler=self.set_manual_result_cell
+        self.live_view.setItemDelegateForColumn(result_column,ManualResultDelegate(self.live_view))
+        self.live_view.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.result_input=QLineEdit('-'*14);self.result_input.setMaxLength(14);self.result_input.hide()
         self.result_pleno=QLineEdit();self.result_pleno.setMaxLength(2);self.result_pleno.hide()
-        self.final_check=QCheckBox('Estos resultados son definitivos');manual_layout.addWidget(self.final_check,15,0,1,2)
-        self.button('Cargar resultados guardados',self.read_cached_scrutiny,manual_layout)
-        upper_layout.addWidget(self.manual_container);self.manual_container.hide()
         self.prize_card=QFrame();self.prize_card.setObjectName('prizeCard')
         prize_layout=QHBoxLayout(self.prize_card);prize_layout.setContentsMargins(12,7,12,7);prize_layout.setSpacing(18)
         self.prize_layout=prize_layout
@@ -5062,7 +5103,7 @@ class MainWindow(QMainWindow):
         estimate_layout.addLayout(self.estimate_rows_layout)
         self.estimate_source_label=self.estimate_scenario_label
         self.estimate_source_label.setWordWrap(True)
-        self.estimate_source_label.setMaximumHeight(32)
+        self.estimate_source_label.setMaximumHeight(36)
         self.estimate_source_label.setStyleSheet('font-size:9px; color:#e4d5a2;')
         estimate_layout.addWidget(self.estimate_source_label)
         self.estimate_worker=None;self.estimate_round_key=None;self.estimate_model=None
@@ -5094,7 +5135,7 @@ class MainWindow(QMainWindow):
             font=row.font();font.setPointSize(10);row.setFont(font)
             self.prize_notice_rows_layout.addWidget(row);self.prize_notice_rows[category]=row
         notice_layout.addLayout(self.prize_notice_rows_layout)
-        self.prize_notice_footer=QLabel('');self.prize_notice_footer.setObjectName('estimateDisclaimer');self.prize_notice_footer.setWordWrap(True);self.prize_notice_footer.setMaximumHeight(32)
+        self.prize_notice_footer=QLabel('');self.prize_notice_footer.setObjectName('estimateDisclaimer');self.prize_notice_footer.setWordWrap(True);self.prize_notice_footer.setMaximumHeight(36)
         notice_layout.addWidget(self.prize_notice_footer)
         self.prize_notice.headline=self.prize_notice_headline
         self.prize_notice.total=self.prize_notice_total
@@ -5126,23 +5167,32 @@ class MainWindow(QMainWindow):
         self.result_input.textChanged.connect(self.schedule_manual_evaluation);self.result_pleno.textChanged.connect(self.schedule_manual_evaluation);self.final_check.toggled.connect(self.schedule_manual_evaluation)
         self.auto_live.toggled.connect(self.ensure_live_updates);self.manual_mode.toggled.connect(self.switch_scrutiny_mode);self.live_interval.currentIndexChanged.connect(self.ensure_live_updates)
 
-    def reset_manual_inputs(self):
-        for i,combo in enumerate(self.manual_signs):
-            combo.blockSignals(True);combo.setCurrentIndex(0);combo.blockSignals(False)
-            match=self.round.matches[i];self.manual_labels[i].setText(f'{i+1:02} · {match.home} – {match.away}')
-        for combo in self.manual_goals:combo.blockSignals(True);combo.setCurrentIndex(0);combo.blockSignals(False)
-
     def set_manual_results(self,result,pleno):
-        for i,combo in enumerate(self.manual_signs):
-            combo.blockSignals(True);combo.setCurrentText(result[i]);combo.blockSignals(False)
-        for i,combo in enumerate(self.manual_goals):
-            combo.blockSignals(True);combo.setCurrentText(pleno[i] if len(pleno)==2 else '—');combo.blockSignals(False)
-        self.result_input.setText(result);self.result_pleno.setText(pleno)
+        self.result_input.setText(result[:14].upper().ljust(14,'-'))
+        normalized=(pleno or '').replace('–','').replace('-','').replace(' ','').upper()
+        self.result_pleno.setText(normalized if len(normalized)==2 and not set(normalized)-set('012M') else '')
+        self.display_match_comparison()
 
-    def manual_results_changed(self):
-        self.result_input.setText(''.join(combo.currentText() for combo in self.manual_signs))
-        goals=''.join(combo.currentText() for combo in self.manual_goals)
-        self.result_pleno.setText('' if '—' in goals else goals)
+    def set_manual_result_cell(self,row,value):
+        """Store a directly edited result and refresh the visible comparison."""
+        if not self.manual_mode.isChecked() or not 0<=row<15:return False
+        normalized=value.strip().upper().replace('–','-').replace(' ','')
+        if row<14:
+            sign='-' if normalized in ('','—','-') else normalized
+            if sign not in '1X2-':return False
+            result=list(self.result_input.text().upper().ljust(14,'-')[:14])
+            result[row]=sign
+            self.result_input.setText(''.join(result))
+        else:
+            if normalized in ('','—','-'):
+                self.result_pleno.clear()
+            else:
+                goals=normalized.replace('-','')
+                if len(goals)!=2 or set(goals)-set('012M'):return False
+                self.result_pleno.setText(goals)
+        self.display_match_comparison()
+        self.schedule_manual_evaluation()
+        return True
 
     def schedule_manual_evaluation(self):
         if self.manual_mode.isChecked():self.manual_eval_timer.start()
@@ -5153,15 +5203,37 @@ class MainWindow(QMainWindow):
         except ValueError as exc:self.eval_summary.setText(str(exc))
 
     def switch_scrutiny_mode(self):
-        manual=self.manual_mode.isChecked();self.manual_container.setVisible(manual);self.live_view.setVisible(not manual)
-        if manual:self.clear_scrutiny_awards()
+        manual=self.manual_mode.isChecked()
+        self.live_model.manual_edit_enabled=manual
+        triggers=(QAbstractItemView.EditTrigger.DoubleClicked|QAbstractItemView.EditTrigger.EditKeyPressed
+                  if manual else QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.live_view.setEditTriggers(triggers)
+        self.live_view.viewport().update()
+        self.final_check.setVisible(manual)
+        self.auto_live.setEnabled(not manual);self.live_interval.setEnabled(not manual)
+        if not manual:
+            self.manual_mode.setToolTip('Activa la edición directa en la columna Resultado.')
+            self.live_status.setStyleSheet('')
+        if manual:
+            if set(self.result_input.text())<={'-'} and not self.result_pleno.text():
+                if self.published_scrutiny:
+                    self.set_manual_results(self.published_scrutiny['result'],self.published_scrutiny['pleno'])
+                elif self.live_matches:
+                    self.set_manual_results(''.join(match.sign or '-' for match in self.live_matches[:14]),
+                                             self.live_matches[14].pleno or '')
+            self.clear_scrutiny_awards()
         self.ensure_live_updates()
-        if manual:self.schedule_manual_evaluation()
+        if manual:
+            self.manual_mode.setToolTip('MODO MANUAL ACTIVADO · doble clic en «Resultado» para editar; Pleno: marcador 0–0 a M–M.')
+            self.live_status.setText('MODO MANUAL · Doble clic en «Resultado» para cambiar un signo o el marcador del Pleno.')
+            self.live_status.setStyleSheet('color:#8ee5a7;font-weight:bold;')
+            self.display_match_comparison();self.schedule_manual_evaluation()
         elif not self.show_cached_scrutiny():
             if self.live_matches:self.evaluate_live()
             else:
                 self.prize_card.hide();self.prize_notice.show()
                 self.prize_notice.setText(self.prize_pending_text())
+                self.display_match_comparison()
         QTimer.singleShot(0,self.fit_scrutiny_tables)
 
     def _render_prize_card(self,outcome,source='',scrutiny=None):
@@ -5876,13 +5948,21 @@ class MainWindow(QMainWindow):
         self.estimate_total.setText(prize_money(estimate['total_cents']))
         captured=self.estimate_model.get('received_at')
         updated=datetime.fromtimestamp(captured).astimezone().strftime('%H:%M') if captured else '—'
-        context = (
-            f"{len(result_signs)}/14 · rec. {prize_money(estimate['revenue_cents'])} · "
-            f"bote {prize_money(estimate['jackpot_cents'])} · {estimate['public_entries']:,} ap. · "
-            f"{updated} · {estimate['source']} · aproximación no oficial"
-        )
+        pending=14-len(result_signs)
+        if not result_signs:
+            scenario='0/14 · escenario hipotético: favoritos del mercado · no es premio real'
+        elif pending:
+            scenario=f"{len(result_signs)}/14 · {pending} pendientes usan favoritos del mercado · no es premio real"
+        else:
+            scenario='14/14 · resultados recibidos · aproximación no oficial, pendiente de escrutinio'
+        metadata=(f"Recaudación {prize_money(estimate['revenue_cents'])} · bote {prize_money(estimate['jackpot_cents'])} · "
+                  f"{estimate['public_entries']:,} apuestas públicas · {updated} · {estimate['source']}")
+        context=f'{scenario} · {metadata}'
         self.estimate_context_label(context)
-        self.estimate_scenario_label.setToolTip('Una sola línea reúne estado, recaudación, bote, hora y fuente. Los partidos pendientes se proyectan con el favorito del mercado.')
+        self.estimate_scenario_label.setToolTip(
+            f'{context}. Cada partido pendiente se completa con el favorito del mercado; '
+            'es una simulación orientativa, no un premio real.'
+        )
         for row in estimate['rows']:
             labels=self.estimate_category_rows[row['category']]
             category='Pleno 15' if row['category']==15 else f"{row['category']} aciertos"
@@ -5914,7 +5994,8 @@ class MainWindow(QMainWindow):
         rows=[]
         for match in context.matches:
             state=self.waiting_marker_status(match.kickoff)
-            rows.append((f'{match.number:02} · {match.home} – {match.away}', '—', '—', '—', 'Sin comprobar', state))
+            rows.append((f'{match.number:02} · {match.home} – {match.away}', '—', '—', '—', 'Sin comprobar', state,
+                         self.kickoff_caption(match.kickoff)))
         self.live_model.update_rows(rows)
         self.live_pleno_summary.setText('Pleno actual: sin resultado recibido')
         self.eval_summary.setText('Faltan los datos del marcador. Los partidos con horario pasado aparecen como “sin resultado”, no como pendientes.')
@@ -5995,6 +6076,7 @@ class MainWindow(QMainWindow):
         matches=self.frozen_round().matches if published or self.manual_mode.isChecked() else self.live_matches
         for m in matches:
             number=m.number
+            kickoff=self.kickoff_caption(self.frozen_round().matches[number-1].kickoff)
             if published:
                 actual=published['pleno'] if number==15 else published['result'][number-1]
                 live=self.live_matches[number-1] if self.live_matches else None
@@ -6011,7 +6093,7 @@ class MainWindow(QMainWindow):
             state='Pendiente'
             if chosen and actual not in ('—','-'):
                 state=('Goles coinciden' if predicted==actual else 'Goles fallados') if number==15 else ('Acierto' if predicted==actual else 'Fallo')
-            rows.append((f'{number:02} · {m.home} – {m.away}',score,actual,predicted,state,status))
+            rows.append((f'{number:02} · {m.home} – {m.away}',score,actual,predicted,state,status,kickoff))
         self.live_model.update_rows(rows)
 
     def restore_live(self):

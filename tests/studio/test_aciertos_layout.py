@@ -1,7 +1,7 @@
 """Boleto estable y espacio de Aciertos para todos los marcadores."""
 from dataclasses import replace
 
-from PySide6.QtCore import QPoint
+from PySide6.QtCore import QPoint, Qt
 from PySide6.QtTest import QTest
 
 from live_results import LiveMatch
@@ -72,9 +72,13 @@ def test_small_screen_keeps_generation_accessible_and_manual_results_work(window
     assert window.minimumSizeHint().height() <= 768
     assert window.generate_button.mapTo(window, window.generate_button.rect().bottomRight()).y() < window.height()
     window.manual_mode.setChecked(True);QTest.qWait(30)
-    assert window.manual_container.isVisible() and not window.live_view.isVisible()
+    assert window.live_view.isVisible()
+    result_index=window.live_model.index(0,window.live_model.headers.index('Resultado'))
+    assert window.live_model.flags(result_index)&Qt.ItemFlag.ItemIsEditable
+    assert window.live_model.data(result_index,Qt.ItemDataRole.BackgroundRole).name()=='#15543b'
     window.manual_mode.setChecked(False);QTest.qWait(30)
-    assert window.live_view.isVisible() and not window.manual_container.isVisible()
+    assert window.live_view.isVisible()
+    assert not window.live_model.flags(result_index)&Qt.ItemFlag.ItemIsEditable
 
 
 def test_classic_table_shows_schedule_and_selected_source_without_changing_bets(window):
@@ -85,6 +89,9 @@ def test_classic_table_shows_schedule_and_selected_source_without_changing_bets(
     window.repository.save_round(round_);window.load_rounds(round_.key)
     original=window.service.imported(round_,'Fuentes de la tabla',generate(('1X',)+('1',)*13,'M0'))
     window.set_system(original);window.navigation.setCurrentRow(4);QTest.qWait(30)
+    assert window.live_model.headers[-1]=='Día / hora'
+    assert window.kickoff_caption('14/10/202618:45')=='MIÉ 18:45'
+    assert window.kickoff_caption('')=='—'
     assert '14/10/2026 18:45' in window.match_labels[0].toolTip()
     assert all(label.isVisible() for label in window.prob_labels[0])
     assert [label.text() for label in window.prob_labels[0]]==['26%','28%','46%']

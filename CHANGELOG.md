@@ -1,5 +1,17 @@
 # Cambios
 
+## 2.0.17 — previsión explicada y edición directa de resultados
+
+- La previsión orientativa indica cuántos partidos siguen pendientes y que
+  completa esos partidos con los favoritos del mercado. Aclara que el importe
+  es una simulación y no un premio real.
+- Añade el día y la hora de cada partido a la tabla de Escrutinio.
+- Permite editar el resultado directamente en su celda, con una marca verde
+  mientras está activo el modo manual.
+- Verifica el cálculo previo al primer partido, la edición de signos y Pleno al
+  15, y la presentación compacta de las tarjetas. Pruebas: `test_ui.py`,
+  `test_aciertos_layout.py` y `test_prize_forecast.py`.
+
 ## 2.0.16 — retirar el desglose oficial adicional
 
 - Elimina la tabla separada de premios oficiales. El resumen por categorías y

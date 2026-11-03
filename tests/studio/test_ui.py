@@ -784,13 +784,30 @@ def test_automatic_marker_refresh_updates_hits_misses_and_pleno(window,monkeypat
 def test_manual_results_selector_updates_without_check_button(window):
     window.example_system();wait_for_generation(window)
     window.navigation.setCurrentRow(4);window.manual_mode.setChecked(True)
-    for combo in window.manual_signs:combo.setCurrentText('1')
-    window.manual_goals[0].setCurrentText('M');window.manual_goals[1].setCurrentText('1')
+    result_column=window.live_model.headers.index('Resultado')
+    for row in range(14):
+        assert window.live_model.setData(window.live_model.index(row,result_column),'1')
+    assert window.live_model.setData(window.live_model.index(14,result_column),'M–1')
     window.final_check.setChecked(True)
     QTest.qWait(180)
     assert window.eval_model.rowCount()==6
     assert any(row[3]==14 and row[7]=='Pleno acertado' for row in window.eval_model.rows)
     assert not window.live_timer.isActive()
+
+
+def test_forecast_labels_market_favorite_scenario_before_any_match(window):
+    from quiniela_ai_studio.domain.models import Bet
+
+    window.system=window.service.imported(window.round,'Previsión hipotética',(Bet('1'*14,'00'),))
+    window.estimate_model={
+        'played':((1/3,1/3,1/3),)*14,'market':((.7,.2,.1),)*14,
+        'pleno_home':(.25,.25,.25,.25),'pleno_away':(.25,.25,.25,.25),
+        'revenue_cents':100_000,'jackpot_cents':5_000,'ticket_cents':75,
+        'source':'Fuente de prueba',
+    }
+    window.live_matches=()
+    window.render_prize_forecast()
+    assert '0/14 · escenario hipotético: favoritos del mercado · no es premio real' in window.estimate_source_label.text()
 
 
 def test_live_bad_identity_and_close_do_not_corrupt_cache(window,monkeypatch,application):

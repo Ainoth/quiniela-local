@@ -144,7 +144,8 @@ def test_desktop_shows_live_progress_and_golden_forecast_card(window):
     assert window.scrutiny_summary_pending.text() == "12"
     assert not window.estimate_prize_card.isHidden()
     assert window.estimate_total.text() != "—"
-    assert "aproximación no oficial" in window.estimate_source_label.text()
+    assert "12 pendientes usan favoritos del mercado" in window.estimate_source_label.text()
+    assert "no es premio real" in window.estimate_source_label.text()
     assert window.estimate_prize_card.minimumHeight() == 0
     assert len(window.estimate_category_rows) == 6
     assert window.estimate_rows_layout.count() == 6

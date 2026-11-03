@@ -1,5 +1,14 @@
 # 12 · Matriz de trazabilidad de requisitos
 
+RF-ESC-019 (v2.0.17): la previsión orientativa distingue datos observados de
+escenarios hipotéticos. Antes de que haya resultados indica que usa favoritos
+del mercado y que el importe no es un premio real; con resultados parciales
+indica cuántos partidos pendientes se completan así. RF-ESC-020: muestra día y
+hora de cada partido y permite cambiar los signos y el Pleno al 15 editando
+directamente la columna «Resultado». El modo manual resalta esa columna en
+verde y conserva la tabla de escrutinio visible. Pruebas: `test_prize_forecast.py`,
+`test_aciertos_layout.py` y `test_ui.py`.
+
 RF-ESC-016 (v2.0.8): Escrutinio compara la mejor apuesta con los catorce signos
 finales y reconstruye la primera revisión de filtros que quitó la combinación
 ganadora, si aparece en su entrada y no en la salida. Nombra la pestaña y
