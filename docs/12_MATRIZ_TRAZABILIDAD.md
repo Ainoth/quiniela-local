@@ -1,5 +1,11 @@
 # 12 · Matriz de trazabilidad de requisitos
 
+RF-ESC-021 (v2.0.18): las tarjetas de previsión orientativa y premios oficiales
+presentan cada categoría en columnas comunes para categoría, apuestas propias,
+premio unitario y total. Los importes unitarios y subtotales se alinean a la
+derecha de cada tarjeta. Pruebas: `test_prize_forecast.py` y
+`test_aciertos_layout.py`.
+
 RF-ESC-019 (v2.0.17): la previsión orientativa distingue datos observados de
 escenarios hipotéticos. Antes de que haya resultados indica que usa favoritos
 del mercado y que el importe no es un premio real; con resultados parciales

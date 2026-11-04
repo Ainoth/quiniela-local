@@ -101,7 +101,7 @@ class PrizeStatusCard(QFrame):
             self.headline.setText("≈ PREMIOS OFICIALES")
             self.total.setText("0,00 €")
             for row in self.rows.values():
-                row.setText(row.text().split(" · ")[0] + " · 0 apuestas · 0,00 €/u. · 0,00 € total")
+                row.set_values(row.category, "0 apuestas", "0,00 €/u.", "0,00 € total")
         else:
             self.footer.setText(
                 "Importes oficiales pendientes de publicación."
@@ -112,10 +112,56 @@ class PrizeStatusCard(QFrame):
             self.total.setText("—")
             for category, row in self.rows.items():
                 name = "Pleno 15" if category == 15 else f"{category} aciertos"
-                row.setText(f"{name} · — apuestas · — €/u. · — total")
+                row.set_values(name, "— apuestas", "— €/u.", "— total")
 
     def text(self):
         return self._text
+
+
+class PrizeCategoryRow(QFrame):
+    """A prize category with shared, right-aligned numeric columns."""
+
+    def __init__(self, category, parent=None):
+        super().__init__(parent)
+        self.category = category
+        self.setObjectName('estimateCategoryTile')
+        self.setMinimumWidth(0)
+        font=self.font();font.setPointSize(10);self.setFont(font)
+        self._word_wrap=False
+        layout=QHBoxLayout(self);layout.setContentsMargins(6,1,6,1);layout.setSpacing(8)
+        self.category_label=QLabel(category);self.category_label.setMinimumWidth(0)
+        self.bets_label=QLabel('— apuestas');self.bets_label.setFixedWidth(135)
+        self.unit_label=QLabel('— €/u.');self.unit_label.setFixedWidth(105)
+        self.total_label=QLabel('— total');self.total_label.setFixedWidth(115)
+        for label in (self.bets_label,self.unit_label,self.total_label):
+            label.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
+        self.total_label.setStyleSheet('font-weight:bold;')
+        layout.addWidget(self.category_label,1)
+        layout.addWidget(self.bets_label)
+        layout.addWidget(self.unit_label)
+        layout.addWidget(self.total_label)
+
+    def set_values(self,category,bets,unit,total):
+        self.category=str(category);self.category_label.setText(self.category)
+        self.bets_label.setText(str(bets));self.unit_label.setText(str(unit));self.total_label.setText(str(total))
+
+    def text(self):
+        return f'{self.category} · {self.bets_label.text()} · {self.unit_label.text()} · {self.total_label.text()}'
+
+    def wordWrap(self):
+        return self._word_wrap
+
+
+def prize_columns_header(parent):
+    header=QWidget(parent);layout=QHBoxLayout(header)
+    layout.setContentsMargins(6,0,6,0);layout.setSpacing(8)
+    labels=(('Categoría',None),('Apuestas',135),('Premio/u.',105),('Total',115))
+    for title,width in labels:
+        label=QLabel(title);label.setObjectName('estimateCategoryHeader')
+        if width:label.setFixedWidth(width);label.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
+        else:layout.addWidget(label,1);continue
+        layout.addWidget(label)
+    return header
 
 
 def coverage_footer(verification):
@@ -205,9 +251,10 @@ QLabel#prizeCategoryValue {font-size:11px; color:#fff2b8;}
 QLabel#estimateHeadline {font-size:15px; font-weight:bold; color:#ffe17a;}
 QLabel#estimateTotal {font-size:22px; font-weight:bold; color:#ffe17a;}
 QLabel#estimateDisclaimer {font-size:10px; color:#e4d5a2;}
-QLabel#estimateCategoryTile {background:#102f49; color:#e7f5fa; border:1px solid #315d79; border-radius:3px; padding:2px 5px; font-size:11px;}
-QFrame#estimatePrizeCard QLabel#estimateCategoryTile {background:#102f49; border:1px solid #315d79;}
-QFrame#prizeNoticeCard QLabel#estimateCategoryTile {background:#102f49; border:1px solid #315d79; color:#e7f5fa;}
+QFrame#estimateCategoryTile {background:#102f49; border:1px solid #315d79; border-radius:3px;}
+QFrame#estimateCategoryTile QLabel {color:#e7f5fa; font-size:10px;}
+QLabel#estimateCategoryHeader {color:#9eb8c9; font-size:9px; font-weight:bold;}
+QFrame#prizeNoticeCard QFrame#estimateCategoryTile QLabel {color:#e7f5fa;}
 QLabel#scrutinySummaryValue {font-size:17px; font-weight:bold; color:#e7f8ff;}
 QLabel#scrutinySummaryCaption {font-size:9px; color:#a9e8f4; font-weight:bold;}
 QWidget#ballot QLabel[ballotPercentage="true"] {color:#124675; background:#e8f6ff; border:1px solid #a6cde6; border-radius:3px; font-size:10px; font-weight:bold;}
@@ -5092,14 +5139,13 @@ class MainWindow(QMainWindow):
         self.estimate_refresh_button.clicked.connect(self.fetch_prize_estimate);estimate_top.addWidget(self.estimate_refresh_button)
         estimate_layout.addLayout(estimate_top)
         self.estimate_rows_layout=QVBoxLayout();self.estimate_rows_layout.setContentsMargins(0,0,0,0);self.estimate_rows_layout.setSpacing(1)
+        self.estimate_rows_layout.addWidget(prize_columns_header(self.estimate_prize_card))
         self.estimate_category_rows={}
         for category in (15,14,13,12,11,10):
             title='Pleno 15' if category==15 else f'{category} aciertos'
-            label=QLabel(f'{title} · — apuestas · — €/u. · — total')
-            label.setObjectName('estimateCategoryTile');label.setMinimumWidth(0);label.setWordWrap(False)
-            font=label.font();font.setPointSize(10);label.setFont(font)
-            self.estimate_rows_layout.addWidget(label)
-            self.estimate_category_rows[category]=label
+            row=PrizeCategoryRow(title,self.estimate_prize_card)
+            self.estimate_rows_layout.addWidget(row)
+            self.estimate_category_rows[category]=row
         estimate_layout.addLayout(self.estimate_rows_layout)
         self.estimate_source_label=self.estimate_scenario_label
         self.estimate_source_label.setWordWrap(True)
@@ -5127,12 +5173,12 @@ class MainWindow(QMainWindow):
         self.prize_notice_rows_layout=QVBoxLayout()
         self.prize_notice_rows_layout.setContentsMargins(0,0,0,0)
         self.prize_notice_rows_layout.setSpacing(1)
+        self.prize_notice_rows_layout.addWidget(prize_columns_header(self.prize_notice))
         self.prize_notice_rows={}
         for category in (15,14,13,12,11,10):
             name='Pleno 15' if category==15 else f'{category} aciertos'
-            row=QLabel(f'{name} · No publicado');row.setObjectName('estimateCategoryTile');row.setMinimumWidth(0)
-            row.setWordWrap(False)
-            font=row.font();font.setPointSize(10);row.setFont(font)
+            row=PrizeCategoryRow(name,self.prize_notice)
+            row.set_values(name,'— apuestas','No publicado','—')
             self.prize_notice_rows_layout.addWidget(row);self.prize_notice_rows[category]=row
         notice_layout.addLayout(self.prize_notice_rows_layout)
         self.prize_notice_footer=QLabel('');self.prize_notice_footer.setObjectName('estimateDisclaimer');self.prize_notice_footer.setWordWrap(True);self.prize_notice_footer.setMaximumHeight(36)
@@ -5907,7 +5953,7 @@ class MainWindow(QMainWindow):
             self.estimate_context_label('No hay previsión disponible ahora. '+message)
             for category,label in self.estimate_category_rows.items():
                 name='Pleno 15' if category==15 else f'{category} aciertos'
-                label.setText(f'{name} · — apuestas · — €/u. · — total')
+                label.set_values(name,'— apuestas','— €/u.','— total')
 
     def prize_estimate_finished(self,job):
         if self.estimate_worker is job:self.estimate_worker=None
@@ -5968,7 +6014,7 @@ class MainWindow(QMainWindow):
             category='Pleno 15' if row['category']==15 else f"{row['category']} aciertos"
             unit=prize_money(row['unit_cents']) if row['unit_cents'] else '—'
             subtotal=prize_money(row['subtotal_cents']) if row['subtotal_cents'] else '—'
-            labels.setText(f"{category} · {row['own_bets']:,} apuestas · {unit}/u. · {subtotal} total")
+            labels.set_values(category,f"{row['own_bets']:,} apuestas",f'{unit}/u.',f'{subtotal} total')
             labels.setToolTip(f"{category}: {row['own_bets']:,} apuestas · {unit} por apuesta · {subtotal} subtotal")
 
     def fetch_live(self):

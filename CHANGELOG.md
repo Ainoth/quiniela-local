@@ -1,5 +1,14 @@
 # Cambios
 
+## 2.0.18 — columnas alineadas en las tarjetas de premios
+
+- Alinea categoría, apuestas propias, premio por apuesta y total en ambas
+  tarjetas de Escrutinio.
+- Deja los importes en una columna a la derecha de cada tarjeta para comparar
+  fácilmente la previsión orientativa y el escrutinio oficial.
+- Verifica la presentación y la igualdad de estructura entre ambas tarjetas.
+  Pruebas: `test_prize_forecast.py`, `test_aciertos_layout.py`.
+
 ## 2.0.17 — previsión explicada y edición directa de resultados
 
 - La previsión orientativa indica cuántos partidos siguen pendientes y que
