@@ -1,5 +1,10 @@
 # Cambios
 
+## 2.0.24 — bloqueo al tamaño real de pantalla
+
+- Fija la ventana al área disponible del monitor después de maximizarla, en
+  lugar de usar el tamaño inicial antes de que el gestor de ventanas responda.
+
 ## 2.0.23 — ventana principal de tamaño fijo
 
 - Abre la aplicación maximizada y bloquea su tamaño después de que el gestor de

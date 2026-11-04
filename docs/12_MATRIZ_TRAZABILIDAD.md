@@ -1,5 +1,8 @@
 # 12 · Matriz de trazabilidad de requisitos
 
+RF-ESC-027 (v2.0.24): fija los límites de tamaño de la ventana al área
+disponible real del monitor después de maximizarla.
+
 RF-ESC-026 (v2.0.23): inicia la ventana principal maximizada y fija su tamaño
 cuando el gestor de ventanas termina de aplicarlo, impidiendo redimensionarla.
 
