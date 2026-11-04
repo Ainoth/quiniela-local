@@ -3583,8 +3583,10 @@ class MainWindow(QMainWindow):
         if table.horizontalScrollBar().isVisible():
             complete += table.horizontalScrollBar().height()
         available = self.scrutiny_splitter.height() - self.scrutiny_splitter.handleWidth()
-        reserve=self.scrutiny_lower_reserve()
-        upper = min(complete, max(80, available - reserve))
+        upper_widget=self.scrutiny_splitter.widget(0)
+        table.setFixedHeight(complete)
+        upper_widget.setFixedHeight(complete)
+        upper=complete
         self.scrutiny_splitter.setSizes([upper, max(100, available - upper)])
 
     def scrutiny_lower_reserve(self):
@@ -5097,11 +5099,13 @@ class MainWindow(QMainWindow):
             group=QHBoxLayout();group.setSpacing(4);label.setObjectName('scrutinySummaryValue');label.setStyleSheet('font-size:13px;');cap=QLabel(caption);cap.setObjectName('scrutinySummaryCaption');group.addWidget(label);group.addWidget(cap);summary_layout.addLayout(group)
         summary_layout.addStretch(1);layout.addWidget(self.scrutiny_summary_card)
         self.scrutiny_splitter=QSplitter(Qt.Orientation.Vertical);self.scrutiny_splitter.setChildrenCollapsible(False)
+        self.scrutiny_splitter.setHandleWidth(0)
         upper=QWidget();upper_layout=QVBoxLayout(upper);upper_layout.setContentsMargins(0,0,0,0)
         lower=QWidget();lower_layout=QVBoxLayout(lower);lower_layout.setContentsMargins(0,0,0,0);lower_layout.setSpacing(0)
         upper.setMinimumHeight(80);lower.setMinimumHeight(100)
         self.scrutiny_splitter.addWidget(upper);self.scrutiny_splitter.addWidget(lower)
         self.scrutiny_splitter.setStretchFactor(0,0);self.scrutiny_splitter.setStretchFactor(1,1)
+        self.scrutiny_splitter.handle(1).setEnabled(False)
         layout.addWidget(self.scrutiny_splitter,1)
         self.live_view,self.live_model=self.table(('Partido','Marcador','Resultado','Tu signo','Acierto / fallo','Estado','Día / hora'),upper_layout)
         self.live_view.setSizePolicy(QSizePolicy.Policy.Expanding,QSizePolicy.Policy.Ignored)

@@ -1,5 +1,20 @@
 # Cambios
 
+## 2.0.23 — ventana principal de tamaño fijo
+
+- Abre la aplicación maximizada y bloquea su tamaño después de que el gestor de
+  ventanas aplique la geometría de pantalla.
+- Mantiene fijo el panel de partidos de Escrutinio y deja las tarjetas de
+  premios pegadas debajo.
+
+## 2.0.22 — panel de escrutinio bloqueado
+
+- Fija el alto de la tabla al contenido de sus 15 partidos y desactiva el
+  separador que permitía redimensionarla manualmente.
+- Mantiene las tarjetas de premios inmediatamente debajo.
+- Verifica el bloqueo del panel, su ajuste y el acceso a controles en ventana
+  compacta.
+
 ## 2.0.21 — alto exacto para la tabla de escrutinio
 
 - Calcula la altura con el tamaño real de cada una de las 15 filas, sin dejar

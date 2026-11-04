@@ -1,5 +1,12 @@
 # 12 · Matriz de trazabilidad de requisitos
 
+RF-ESC-026 (v2.0.23): inicia la ventana principal maximizada y fija su tamaño
+cuando el gestor de ventanas termina de aplicarlo, impidiendo redimensionarla.
+
+RF-ESC-025 (v2.0.22): fija el alto del panel de resultados y desactiva el
+separador para impedir su redimensionamiento manual. Las tarjetas de premios
+siguen junto a la tabla. Pruebas: `test_aciertos_layout.py`.
+
 RF-ESC-024 (v2.0.21): calcula el panel de resultados con la altura efectiva de
 cada fila visible, además de la cabecera y el marco. Evita espacio vacío debajo
 del último partido y mantiene las tarjetas contiguas; el tamaño de la ventana

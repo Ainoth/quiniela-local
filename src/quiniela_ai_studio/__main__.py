@@ -65,7 +65,9 @@ def main():
         return 1
     application=QApplication([APPLICATION_ID]);application.setStyle('Fusion');application.setStyleSheet(STYLE)
     configure_application(application)
-    window=MainWindow(repository);window.show()
+    window=MainWindow(repository);window.showMaximized()
+    # Let the window manager apply the maximized geometry before locking it.
+    QTimer.singleShot(250,lambda:window.setFixedSize(window.size()))
     if args.smoke_test:QTimer.singleShot(700,window.close)
     else:QTimer.singleShot(0,lambda:window.safe(window.start_session))
     return application.exec()

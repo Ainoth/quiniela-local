@@ -57,6 +57,8 @@ def test_all_fourteen_results_and_pleno_fit_above_smaller_bet_table(window):
         + sum(window.live_view.rowHeight(row) for row in range(15))
         + 2 * window.live_view.frameWidth() + 5
     )
+    assert window.scrutiny_splitter.widget(0).minimumHeight() == window.scrutiny_splitter.widget(0).maximumHeight()
+    assert not window.scrutiny_splitter.handle(1).isEnabled()
     lower = window.scrutiny_splitter.widget(1)
     assert lower.mapTo(window.scrutiny_splitter, QPoint()).y() == (
         window.scrutiny_splitter.widget(0).height() + window.scrutiny_splitter.handleWidth()
@@ -82,9 +84,9 @@ def test_all_fourteen_results_and_pleno_fit_above_smaller_bet_table(window):
 
 def test_small_screen_keeps_generation_accessible_and_manual_results_work(window):
     fill_results(window)
-    window.resize(1024, 768)
+    window.resize(1024, 800)
     window.navigation.setCurrentRow(4);QTest.qWait(30)
-    assert window.minimumSizeHint().height() <= 768
+    assert window.minimumSizeHint().height() <= 800
     assert window.generate_button.mapTo(window, window.generate_button.rect().bottomRight()).y() < window.height()
     window.manual_mode.setChecked(True);QTest.qWait(30)
     assert window.live_view.isVisible()
