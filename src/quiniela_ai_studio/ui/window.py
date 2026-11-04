@@ -669,11 +669,11 @@ class MainWindow(QMainWindow):
         content=QWidget();layout=QVBoxLayout(content);scroll.setWidget(content);outer.addWidget(scroll,1)
         intro = QLabel('Elige un método y marca sus condiciones. El boleto base queda fijo a la izquierda; las reducciones se aplican a sus columnas.')
         intro.setWordWrap(True);layout.addWidget(intro)
-        names=('Cuenta','Racha','Cambio','Patrón','Pareja','Trío','Cuart.','Quint.','Acier.','Grupo','Relac.','Frec.','Suma','Colum.','IF/THEN','Reserva','Atenea','FSSeguidos','Interrupciones','Optimizar')
+        names=('Cuenta','Racha','Cambio','Patrón','Pareja','Trío','Cuart.','Quint.','Acier.','Grupo','Relac.','Frec.','Suma','Colum.','IF/THEN','Reserva','Atenea','FSSeguidos','Interrupciones','Optimizar','Distancias')
         self.reduction_tabs=QTabWidget();self.reduction_tabs.setObjectName('reductionTabs');self.reduction_tabs.setDocumentMode(True);self.reduction_tabs.setUsesScrollButtons(True)
         self.reduction_tab_pages=[];self.reduction_tab_layouts=[]
-        descriptions=('Cantidad de signos','Rachas máximas','Cambios entre partidos','Patrones repetidos','Parejas de signos','Patrones de tres partidos','Patrones de cuatro partidos','Patrones de cinco partidos','Coincidencias con referencia','Grupos gráficos','Relación entre grupos','Frecuencia de columnas','Sumas y rangos','Columnas por grupos','Condición entre grupos','Columnas de reserva','Reducción de cobertura Atenea','Figuras exactas de signos seguidos','Totales y figuras de cambios entre partidos','Optimización de apuestas por presupuesto')
-        visible_reductions={0,1,9,17,18,19}
+        descriptions=('Cantidad de signos','Rachas máximas','Cambios entre partidos','Patrones repetidos','Parejas de signos','Patrones de tres partidos','Patrones de cuatro partidos','Patrones de cinco partidos','Coincidencias con referencia','Grupos gráficos','Relación entre grupos','Frecuencia de columnas','Sumas y rangos','Columnas por grupos','Condición entre grupos','Columnas de reserva','Reducción de cobertura Atenea','Figuras exactas de signos seguidos','Matriz de interrupciones consecutivas','Optimización de apuestas por presupuesto','Distancia máxima entre apariciones de cada signo')
+        visible_reductions={0,1,9,17,18,19,20}
         self.reduction_visible_indexes={}
         self.classic_reduction_canvases={}
         self.classic_headers={}
@@ -685,15 +685,15 @@ class MainWindow(QMainWindow):
                 tooltip='Rachas consecutivas de 1/X/2/V; comparte el filtro histórico Racha.' if index==1 else description
                 self.reduction_tabs.setTabToolTip(visible_index,tooltip)
                 self.reduction_visible_indexes[index]=visible_index
-                canvas_width={0:700,1:960,9:720,17:590,18:600}.get(index,600)
-                canvas_height={0:650,1:730,9:610,17:625,18:640}.get(index,600)
+                canvas_width={0:700,1:960,9:720,17:590,18:600,20:600}.get(index,600)
+                canvas_height={0:650,1:730,9:610,17:625,18:640,20:640}.get(index,600)
                 if index==19:
                     self.reduction_tabs.setTabToolTip(visible_index,description)
                     self.reduction_tab_pages.append(page);self.reduction_tab_layouts.append(page_layout)
                     continue
                 # Cuenta and SSeguidos use the same plain dark workspace;
                 # the old ornamental texture obscured their dense controls.
-                canvas=ClassicReductionsCanvas(canvas_width,canvas_height,decorative=index not in (0,1,9,17,18))
+                canvas=ClassicReductionsCanvas(canvas_width,canvas_height,decorative=index not in (0,1,9,17,18,20))
                 canvas_layout=QVBoxLayout(canvas)
                 if index==0:canvas_layout.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
                 canvas_layout.setContentsMargins(8,4,8,10)
@@ -1944,7 +1944,7 @@ class MainWindow(QMainWindow):
         return rules
 
     def _build_interruption_modes(self):
-        """Build separate Manual/Azar/Automática panels for transition filters."""
+        """Build independent Interrupciones and Distancias reduction tabs."""
         from quiniela_ai_studio.domain.interruption_statistics import (
             possible_interruption_profiles,
         )
@@ -1961,7 +1961,7 @@ class MainWindow(QMainWindow):
         self._update_interruption_context()
         layout.addWidget(self.interruption_context)
 
-        board=QWidget();board.setObjectName('interruptionAndDistanceBoard')
+        board=QWidget();board.setObjectName('interruptionBoard')
         board_layout=QHBoxLayout(board);board_layout.setContentsMargins(2,2,2,2);board_layout.setSpacing(4)
         left=QGroupBox('Interrupciones');left.setObjectName('interruptionPanel');left.setFixedWidth(300)
         left_layout=QVBoxLayout(left);left_layout.setContentsMargins(4,4,4,4);left_layout.setSpacing(2)
@@ -1981,11 +1981,11 @@ class MainWindow(QMainWindow):
         left_actions.addWidget(mark_left);left_actions.addWidget(reset_left);left_actions.addStretch(1);left_layout.addLayout(left_actions)
         board_layout.addWidget(left,0,Qt.AlignmentFlag.AlignLeft|Qt.AlignmentFlag.AlignTop)
 
-        right=QGroupBox('Distancias');right.setObjectName('distanceFigurePanel');right.setFixedWidth(255)
+        right=QGroupBox('Distancias por total de cambios');right.setObjectName('distanceFigurePanel');right.setFixedWidth(255)
         right_layout=QVBoxLayout(right);right_layout.setContentsMargins(4,4,4,4);right_layout.setSpacing(2)
         right_apply_row=QHBoxLayout();right_apply_row.addStretch(1);right_apply_row.addWidget(QLabel('Aplicar'))
         self.distance_apply=SelectionSquare('Aplicar figuras exactas de interrupciones',size=14)
-        self.distance_apply.toggled.connect(lambda checked:self._activate_reduction_tab(18,checked))
+        self.distance_apply.toggled.connect(lambda checked:self._activate_reduction_tab(20,checked))
         self.distance_apply.toggled.connect(self._interruption_manual_edited);right_apply_row.addWidget(self.distance_apply);right_apply_row.addStretch(1)
         right_layout.addLayout(right_apply_row)
         lists=QHBoxLayout();lists.setContentsMargins(0,0,0,0);lists.setSpacing(3)
@@ -2019,28 +2019,10 @@ class MainWindow(QMainWindow):
         reset_right=QPushButton('Inicializar');reset_right.setMaximumWidth(82)
         mark_right.clicked.connect(self._mark_all_interruption_figures);reset_right.clicked.connect(self._reset_interruption_figures)
         right_actions.addWidget(mark_right);right_actions.addWidget(reset_right);right_actions.addStretch(1);right_layout.addLayout(right_actions)
-        board_layout.addWidget(right,0,Qt.AlignmentFlag.AlignLeft|Qt.AlignmentFlag.AlignTop)
         board_layout.addStretch(1)
         surfaces=QStackedWidget()
         surfaces.addWidget(board)
-        surfaces.addWidget(self._build_sign_distance_view())
         self.interruption_surfaces=surfaces
-        self.interruption_subtab_index=0
-        self.interruption_subtab_buttons=[]
-
-        def subtab_row():
-            row=QHBoxLayout();row.setContentsMargins(2,0,2,0);row.setSpacing(1)
-            buttons=[]
-            for index,label in enumerate(('Interrupciones','Distancias')):
-                button=QPushButton(label);button.setCheckable(True);button.setObjectName('classicSubTab')
-                button.setFixedWidth(112 if index==0 else 82)
-                button.setAccessibleName(f'Mostrar {label} de la reducción Interrupciones')
-                button.clicked.connect(lambda _checked=False,target=index:self._show_interruption_subtab(target))
-                row.addWidget(button);buttons.append(button)
-            row.addStretch(1)
-            self.interruption_subtab_buttons.append(buttons)
-            buttons[0].setChecked(True)
-            return row
 
         def host_for(page_name):
             host=QWidget();host.setObjectName(f'interruptionBoardHost{page_name}')
@@ -2052,14 +2034,12 @@ class MainWindow(QMainWindow):
         manual_note=QLabel('Marca en verde los totales y las figuras admitidas. Los cambios se miden entre los 14 partidos; el Pleno queda fuera. Distancias se combina con las demás pestañas activas y puede dejar cero apuestas si no hay cruces.')
         manual_note.setWordWrap(True);manual_note.setVisible(False);manual_note.setSizePolicy(QSizePolicy.Policy.Preferred,QSizePolicy.Policy.Fixed)
         manual_layout.addWidget(manual_note)
-        manual_layout.addLayout(subtab_row())
         host,host_layout=host_for('Manual');manual_layout.addWidget(host,0,Qt.AlignmentFlag.AlignLeft|Qt.AlignmentFlag.AlignTop);pages['Manual']=manual;hosts['Manual']=(host,host_layout)
         methods.addTab(manual,'Manual')
 
         random_page=QWidget();random_layout=QVBoxLayout(random_page);random_layout.setContentsMargins(3,3,3,3);random_layout.setSpacing(3)
         random_note=QLabel('Azar · propone perfiles alcanzables desde la base actual. La semilla permite repetir el cálculo.')
         random_note.setWordWrap(True);random_note.setVisible(False);random_note.setSizePolicy(QSizePolicy.Policy.Preferred,QSizePolicy.Policy.Fixed);random_layout.addWidget(random_note)
-        random_layout.addLayout(subtab_row())
         host,host_layout=host_for('Azar');random_layout.addWidget(host,0,Qt.AlignmentFlag.AlignLeft|Qt.AlignmentFlag.AlignTop);pages['Azar']=random_page;hosts['Azar']=(host,host_layout)
         random_row=QHBoxLayout();random_risk=RiskSelector()
         for label,value in (('Mínimo',0),('Medio',1),('Máximo',2)):random_risk.addItem(label,value)
@@ -2073,7 +2053,6 @@ class MainWindow(QMainWindow):
         automatic_page=QWidget();automatic_layout=QVBoxLayout(automatic_page);automatic_layout.setContentsMargins(3,3,3,3);automatic_layout.setSpacing(3)
         auto_note=QLabel('Automática · estadísticas descriptivas de resultados finales ya incluidos en la aplicación; no predice el siguiente resultado.')
         auto_note.setWordWrap(True);auto_note.setVisible(False);auto_note.setSizePolicy(QSizePolicy.Policy.Preferred,QSizePolicy.Policy.Fixed);automatic_layout.addWidget(auto_note)
-        automatic_layout.addLayout(subtab_row())
         host,host_layout=host_for('Automática');automatic_layout.addWidget(host,0,Qt.AlignmentFlag.AlignLeft|Qt.AlignmentFlag.AlignTop);pages['Automática']=automatic_page;hosts['Automática']=(host,host_layout)
         seasons={str(row.get('season','')) for row in self.historical_reduction_results if row.get('season')}
         season_label=QLabel();self.history_season_summaries['Interrupciones']=season_label
@@ -2115,19 +2094,21 @@ class MainWindow(QMainWindow):
         show_shared_board(methods.currentIndex())
         methods.currentChanged.connect(lambda index:self.repository.set_setting('interrupciones_mode',methods.tabText(index)))
         layout.addWidget(methods,1)
+        distance_layout=self.reduction_tab_layouts[20]
+        distance_layout.setContentsMargins(4,4,4,4);distance_layout.setSpacing(4)
+        distance_note=QLabel('Selecciona los totales y figuras de cambios, o la distancia máxima de cada signo. Se combinan con el resto de condiciones activas.')
+        distance_note.setWordWrap(True);distance_note.setObjectName('muted');distance_layout.addWidget(distance_note)
+        distance_content=QHBoxLayout();distance_content.setContentsMargins(0,0,0,0);distance_content.setSpacing(8)
+        distance_content.addWidget(right,0,Qt.AlignmentFlag.AlignLeft|Qt.AlignmentFlag.AlignTop)
+        distance_content.addWidget(self._build_sign_distance_view(),0,Qt.AlignmentFlag.AlignLeft|Qt.AlignmentFlag.AlignTop)
+        distance_content.addStretch(1);distance_layout.addLayout(distance_content)
+        distance_layout.addStretch(1)
         self.interruption_mode_pages=pages
         profiles=possible_interruption_profiles(self._streak_base())
         self.interruption_possible_profiles=set(profiles)
         self.interruption_possible_figures={total:{figure for candidate,_,figure in profiles if candidate==total}
                                              for total in range(14)}
         self._update_interruption_base()
-
-    def _show_interruption_subtab(self,index):
-        self.interruption_subtab_index=index
-        self.interruption_surfaces.setCurrentIndex(index)
-        for buttons in self.interruption_subtab_buttons:
-            for candidate,button in enumerate(buttons):
-                button.blockSignals(True);button.setChecked(candidate==index);button.blockSignals(False)
 
     def _build_sign_distance_view(self):
         """Build the independent 1/X/2/V maximum-distance panel."""
@@ -2155,7 +2136,7 @@ class MainWindow(QMainWindow):
                 self.sign_distance_squares[(sign,distance)]=square
             apply_row=QHBoxLayout();apply_row.setSpacing(2)
             square=SelectionSquare(f'Aplicar distancias de {sign}',size=12)
-            square.toggled.connect(lambda checked:self._activate_reduction_tab(18,checked))
+            square.toggled.connect(lambda checked:self._activate_reduction_tab(20,checked))
             square.toggled.connect(self._interruption_manual_edited)
             apply_row.addWidget(square);apply_row.addWidget(QLabel('Aplicar'))
             panel_layout.addLayout(apply_row);self.sign_distance_apply[sign]=square
@@ -2370,14 +2351,15 @@ class MainWindow(QMainWindow):
         summary.setText(f'{matched}/{sample_size} resultados finales compatibles con los perfiles elegidos · {len(seasons)} temporadas · riesgo {label} ({coverage:.0%} muestral). Descriptivo, no predictivo.')
 
     def _build_interruption_rules(self):
-        """Persist the two independent subfilters in outer tab 18."""
+        """Persist the independent interruption and distance filters."""
         from quiniela_ai_studio.domain.reduction_rules import ReductionRule
-        meta=self.interruption_generation_metadata;common={
+        meta=self.interruption_generation_metadata;interruption_common={
             'generation_method':meta.get('method','manual'),'generation_seed':meta.get('seed'),
             'generation_risk':meta.get('risk',''),'evidence_source':meta.get('source',''),
             'evidence_seasons':tuple(meta.get('seasons',())),'evidence_sample_size':int(meta.get('sample_size',0)),
             'evidence_coverage':float(meta.get('coverage',0)),'tab_index':18,
         }
+        distance_common={**interruption_common,'tab_index':20}
         rules=[]
         if self.interruption_apply.isChecked() and not self.interruption_selected_pairs:
             raise ValueError('Selecciona al menos una celda de la matriz de Interrupciones.')
@@ -2386,11 +2368,11 @@ class MainWindow(QMainWindow):
         if self.interruption_selected_pairs:
             rules.append(ReductionRule('interruption-total-run-pairs','allowed_interruption_profile',0,1,
                 profile_kind='interruptions',allowed_profiles=tuple(sorted(self.interruption_selected_pairs)),
-                active=self.interruption_apply.isChecked(),**common))
+                active=self.interruption_apply.isChecked(),**interruption_common))
         if self.interruption_selected_totals:
             # Disabled marker preserves the independent total-selection UI state.
             rules.append(ReductionRule('interruption-distance-totals','allowed_interruption_total',0,13,
-                allowed_values=tuple(sorted(self.interruption_selected_totals)),active=False,**common))
+                allowed_values=tuple(sorted(self.interruption_selected_totals)),active=False,**distance_common))
         if self.distance_apply.isChecked() and self.interruption_selected_figures:
             impossible={pair for pair in self.interruption_selected_figures
                         if pair[1] not in self.interruption_possible_figures.get(pair[0],set())}
@@ -2400,7 +2382,7 @@ class MainWindow(QMainWindow):
                 key=lambda figure:tuple(-int(part) for part in figure.split('-')) if figure else ()))
             if selected or not self.distance_apply.isChecked():
                 rules.append(ReductionRule(f'interruption-figure-{total}','allowed_interruption_figure',0,1,
-                    run_length=total,allowed_figures=selected,active=self.distance_apply.isChecked() and bool(selected),**common))
+                    run_length=total,allowed_figures=selected,active=self.distance_apply.isChecked() and bool(selected),**distance_common))
         for sign in ('1','X','2','V'):
             values=self.sign_distance_values[sign]
             if self.sign_distance_apply[sign].isChecked() and values-self.sign_distance_possible[sign]:
@@ -2408,7 +2390,7 @@ class MainWindow(QMainWindow):
             if values:
                 rules.append(ReductionRule(f'sign-distance-{sign}','allowed_sign_distance',0,13,
                     sign=sign,allowed_values=tuple(sorted(values)),
-                    active=self.sign_distance_apply[sign].isChecked(),**common))
+                    active=self.sign_distance_apply[sign].isChecked(),**distance_common))
         return rules
 
     def _streak_summary_cards(self,mode):
@@ -4368,7 +4350,16 @@ class MainWindow(QMainWindow):
             self.reduction_active[index]=False
         configured=bool(self.system and self.repository.setting(f'reduction_tabs_configured:{self.system.system_id}',False))
         if configured and isinstance(saved_tabs,list):
-            active=set(saved_tabs)&{0,1,9,17,18}
+            active=set(saved_tabs)&{0,1,9,17,18,20}
+            # Before Distancias had its own tab, its filters were saved under
+            # 18. Move a distance-only legacy activation to the new tab.
+            saved_rules=saved.get('reduction_rules',[])
+            has_legacy_interruption=any(rule.get('kind')=='allowed_interruption_profile'
+                                        and rule.get('tab_index')==18 for rule in saved_rules)
+            has_legacy_distance=any(rule.get('kind') in ('allowed_interruption_figure','allowed_interruption_total','allowed_sign_distance')
+                                    and rule.get('tab_index')==18 for rule in saved_rules)
+            if 18 in active and has_legacy_distance and not has_legacy_interruption:
+                active.discard(18);active.add(20)
             for index,square in self.reduction_activation_buttons.items():
                 if index==19:continue
                 square.blockSignals(True);square.setChecked(index in active);square.blockSignals(False)
@@ -4567,7 +4558,7 @@ class MainWindow(QMainWindow):
                                      if self.reduction_active.get(8,False)
                                      and self.filter_checks['coincidences'].isChecked() else ''),
                           advanced=self.advanced_spec(),reduction_rules=self.build_reduction_rules(),
-                          reduction_tabs_enabled=tuple(index for index,active in self.reduction_active.items() if active and index<19),
+                          reduction_tabs_enabled=tuple(index for index,active in self.reduction_active.items() if active and index!=19),
                           quick_conditions_active=self.quick_level is not None)
 
     def _restore_reduction_rules(self, rows):
@@ -4628,7 +4619,7 @@ class MainWindow(QMainWindow):
                         chosen=set(rule.evidence_seasons)
                         for season,square in self.history_season_squares.get('FSSeguidos',{}).items():
                             square.blockSignals(True);square.setChecked(season in chosen);square.blockSignals(False)
-            if rule.tab_index==18:
+            if rule.tab_index in (18,20):
                 method=rule.generation_method
                 self.interruption_generation_metadata.update(method=method,risk=rule.generation_risk,
                     seed=rule.generation_seed,seasons=rule.evidence_seasons,sample_size=rule.evidence_sample_size,
@@ -4736,13 +4727,13 @@ class MainWindow(QMainWindow):
                 self.interruption_selected_pairs=set(tuple(pair) for pair in rule.allowed_profiles)
                 self.interruption_matrix.set_selected_pairs(self.interruption_selected_pairs)
                 self.interruption_apply.setChecked(rule.active)
-            elif rule.kind=='allowed_interruption_total' and rule.tab_index==18:
+            elif rule.kind=='allowed_interruption_total' and rule.tab_index in (18,20):
                 self.interruption_selected_totals.update(rule.allowed_values)
-            elif rule.kind=='allowed_interruption_figure' and rule.tab_index==18:
+            elif rule.kind=='allowed_interruption_figure' and rule.tab_index in (18,20):
                 self.interruption_selected_totals.add(rule.run_length)
                 self.interruption_selected_figures.update((rule.run_length,figure) for figure in rule.allowed_figures)
                 self.distance_apply.setChecked(self.distance_apply.isChecked() or rule.active)
-            elif rule.kind=='allowed_sign_distance' and rule.tab_index==18:
+            elif rule.kind=='allowed_sign_distance' and rule.tab_index in (18,20):
                 self.sign_distance_values[rule.sign]=set(rule.allowed_values)
                 self.sign_distance_apply[rule.sign].setChecked(rule.active)
                 for value in rule.allowed_values:

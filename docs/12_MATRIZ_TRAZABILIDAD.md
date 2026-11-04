@@ -1,5 +1,13 @@
 # 12 · Matriz de trazabilidad de requisitos
 
+RF-RED-021 (v2.0.25): presenta Interrupciones y Distancias como pestañas
+principales activables e independientes, sin controles duplicados. Conserva
+los modos Manual/Azar/Automática de Interrupciones y reúne en Distancias sus
+figuras y separaciones máximas por signo. Migra las activaciones antiguas al
+nuevo índice al restaurar sistemas. Pruebas: `test_interruption_matrix_and_distances_are_separate_active_filters_and_persist`,
+`test_sign_distances_tab_filters_and_restores_without_changing_figures` y
+`test_interruption_matrix_and_distance_figures_are_independent_and_round_trip`.
+
 RF-ESC-027 (v2.0.24): fija los límites de tamaño de la ventana al área
 disponible real del monitor después de maximizarla.
 
@@ -108,7 +116,7 @@ RF-RED-020 (v1.0.35): Distancias define la medida máxima entre apariciones,
 indica que se combina con el resto de condiciones y distingue la alcanzabilidad
 en la base de la disponibilidad tras filtrar. Cuando el cruce queda vacío, el
 mensaje sugiere revisar filtros o recuperar apuestas. Pruebas:
-`test_sign_distances_subtab_filters_and_restores_without_changing_figures` y
+`test_sign_distances_tab_filters_and_restores_without_changing_figures` y
 `test_distances_are_index_differences_and_variants_share_a_family`.
 
 RF-UX-030 (v1.0.35): Optimizar presenta tres pasos —preparar candidatas,
@@ -473,7 +481,7 @@ Esta tabla está generada inicialmente a partir de `01_ESPECIFICACION_FUNCIONAL.
 | `RF-FIL-023` | v1.0.21 | IMPLEMENTADO | Cuenta las 13 transiciones; filtra total/racha y total/figura por separado. El mapa de columna a racha se identifica como provisional. |
 | `RF-UX-018` | v1.0.22 | IMPLEMENTADO CON DIFERENCIAS | Lienzos compactos de piel clásica y comparaciones visuales para SSeguidos, FSSeguidos, Interrupciones y Distancias; Cuenta/Grupo armonizados sin referencia original. Ornamento y tipografía siguen siendo aproximados. |
 | `RF-ARC-009` | v1.0.23 | CORREGIDO | Mis Sistemas abre informes de cobertura planos o anidados; una copia antigua incompleta conserva el acceso y se rotula sin cobertura verificada. Prueba Qt sobre reducción persistida. |
-| `RF-FIL-024` | v1.0.22 | IMPLEMENTADO | Distancias de 1/X/2/V independientes, alcanzabilidad exacta, activación propia y persistencia bajo la pestaña Interrupciones. |
+| `RF-FIL-024` | v1.0.22 | IMPLEMENTADO | Distancias de 1/X/2/V independientes, alcanzabilidad exacta, activación propia y persistencia. Desde v2.0.25 están en la pestaña Distancias. |
 | `RF-UX-019` | v1.0.24 | IMPLEMENTADO | Cuenta compacta integra matriz, Figuras, distribución histórica, temporadas y filtros; fondo ornamental retirado solo aquí. |
 | `RF-FIL-025` | v1.0.24 | IMPLEMENTADO | Perfiles conjuntos matemáticamente válidos V/X/2 y distancia entre equis desde Cuenta; ambas condiciones respetan activación de la pestaña. |
 | `RF-UX-020` | v1.0.25 | IMPLEMENTADO CON DIFERENCIAS | Cuenta > Manual recrea la composición compacta de tres bloques; cifras por temporada usan resultados reales, controles de reserva/media siguen vacíos e inhabilitados mientras su fórmula no esté definida. Evidencia y checklist en `docs/planes/CUENTA_PANEL_V1_0_25.md` y `docs/validacion_visual/cuenta_v1_0_25/`. |

@@ -110,7 +110,7 @@ class ReductionRule:
                    for profile in self.allowed_profiles):
                 raise ValueError('La matriz permite pares (total, racha) coherentes entre 0 y 13.')
         if self.kind == 'allowed_interruption_figure':
-            if self.tab_index!=18 or self.positions!=tuple(range(14)) or type(self.run_length) is not int or not 0<=self.run_length<=13:
+            if self.tab_index not in (18,20) or self.positions!=tuple(range(14)) or type(self.run_length) is not int or not 0<=self.run_length<=13:
                 raise ValueError('El total de la figura de interrupciones debe estar entre 0 y 13.')
             if not self.allowed_figures and self.active:
                 raise ValueError('Una figura activa necesita al menos una distribución permitida.')
@@ -120,12 +120,12 @@ class ReductionRule:
                         or sum(parts)!=self.run_length or parts!=tuple(sorted(parts,reverse=True))):
                     raise ValueError('La figura de interrupciones debe sumar su total y estar ordenada.')
         if (self.kind == 'allowed_interruption_total'
-                and (self.tab_index!=18 or self.positions!=tuple(range(14)) or not self.allowed_values
+                and (self.tab_index not in (18,20) or self.positions!=tuple(range(14)) or not self.allowed_values
                      or tuple(sorted(set(self.allowed_values)))!=self.allowed_values
                      or any(type(value) is not int or not 0<=value<=13 for value in self.allowed_values))):
             raise ValueError('Los totales de Interrupciones deben estar entre 0 y 13.')
         if (self.kind == 'allowed_sign_distance'
-                and (self.tab_index != 18 or self.positions != tuple(range(14))
+                and (self.tab_index not in (18,20) or self.positions != tuple(range(14))
                      or self.sign not in ('1', 'X', '2', 'V') or not self.allowed_values
                      or tuple(sorted(set(self.allowed_values))) != self.allowed_values
                      or any(type(value) is not int or not 0 <= value <= 13
@@ -154,7 +154,7 @@ class ReductionRule:
                 raise ValueError('El perfil Cuenta debe cumplir V = X + 2 en catorce partidos.')
             if self.evidence_sample_size < 0 or not math.isfinite(self.evidence_coverage) or not 0 <= self.evidence_coverage <= 1:
                 raise ValueError('La procedencia estadística del perfil no es válida.')
-        if type(self.active) is not bool or type(self.tab_index) is not int or not -1 <= self.tab_index < 19:
+        if type(self.active) is not bool or type(self.tab_index) is not int or not -1 <= self.tab_index < 21:
             raise ValueError('La activación de la condición no es válida.')
         if self.kind == 'pattern_occurrences':
             if not self.patterns or any(not p or any(s not in '1X2' for s in p) for p in self.patterns):

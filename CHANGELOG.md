@@ -1,5 +1,14 @@
 # Cambios
 
+## 2.0.25 — pestañas independientes para Interrupciones y Distancias
+
+- Quita las subpestañas repetidas de Interrupciones y crea una pestaña principal
+  activable para Distancias.
+- Interrupciones conserva su matriz y modos Manual, Azar y Automática; Distancias
+  reúne sus figuras por total y las distancias máximas por signo.
+- Guarda y restaura ambas condiciones por separado, y migra sistemas anteriores
+  que guardaban Distancias bajo Interrupciones.
+
 ## 2.0.24 — bloqueo al tamaño real de pantalla
 
 - Fija la ventana al área disponible del monitor después de maximizarla, en

@@ -53,7 +53,7 @@ class BasicFilters:
         if self.reference:
             validate_column(self.reference)
         if (len(set(self.reduction_tabs_enabled)) != len(self.reduction_tabs_enabled)
-                or any(type(index) is not int or not 0 <= index < 19 for index in self.reduction_tabs_enabled)):
+                or any(type(index) is not int or not 0 <= index < 21 for index in self.reduction_tabs_enabled)):
             raise ValueError('La activación de pestañas de reducción no es válida.')
 
     def apply(self, bets, cancelled: Callable[[], bool] = lambda: False):

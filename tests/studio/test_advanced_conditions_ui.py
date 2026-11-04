@@ -66,13 +66,13 @@ def test_group_editor_adds_compact_side_by_side_group_cards(window):
     window.tabs.setCurrentIndex(1)
     assert window.navigation.currentRow() == 8
     window.navigation.setCurrentRow(8)
-    assert window.reduction_tabs.count() == 6
-    assert [window.reduction_tabs.tabText(i) for i in range(6)] == ['Cuenta','SSeguidos','Grupo','FSSeguidos','Interrupciones','Optimizar']
+    assert window.reduction_tabs.count() == 7
+    assert [window.reduction_tabs.tabText(i) for i in range(7)] == ['Cuenta','SSeguidos','Grupo','FSSeguidos','Interrupciones','Optimizar','Distancias']
     for reduction_id,tab_index in window.reduction_visible_indexes.items():
         bar=window.reduction_tabs.tabBar()
         assert bar.tabButton(tab_index,QTabBar.ButtonPosition.RightSide) is window.reduction_activation_buttons[reduction_id]
         assert bar.tabButton(tab_index,QTabBar.ButtonPosition.LeftSide) is None
-    assert len(window.reduction_tab_pages) == 20  # Las demás pantallas quedan reservadas para fases futuras.
+    assert len(window.reduction_tab_pages) == 21  # Las demás pantallas quedan reservadas para fases futuras.
     assert 'Optimizar' not in window.TAB_ORDER
     assert all(not window.classic_reduction_canvases[index].decorative for index in (0,9,17,18))
     assert not window.reduction_activation_buttons[19].isChecked()
@@ -485,6 +485,10 @@ def test_interruption_matrix_and_distances_are_separate_active_filters_and_persi
     window.set_system(window.service.imported(window.round,'Interrupciones',bets))
     window.navigation.setCurrentRow(8)
     assert [window.mode_tabs['Interrupciones'].tabText(i) for i in range(3)]==['Manual','Azar','Automática']
+    assert [window.reduction_tabs.tabText(i) for i in range(window.reduction_tabs.count())].count('Interrupciones')==1
+    assert [window.reduction_tabs.tabText(i) for i in range(window.reduction_tabs.count())].count('Distancias')==1
+    assert 20 in window.reduction_activation_buttons
+    assert not hasattr(window,'interruption_subtab_buttons')
     assert not window.reduction_activation_buttons[18].isChecked()
     assert not window.interruption_apply.isChecked() and not window.distance_apply.isChecked()
     assert window.filter_spec().apply(bets)==bets
@@ -496,6 +500,7 @@ def test_interruption_matrix_and_distances_are_separate_active_filters_and_persi
     assert window.filter_spec().apply(bets)==bets
 
     window._reset_interruption_matrix()
+    window.reduction_activation_buttons[18].setChecked(False)
     window.interruption_total_buttons[7].setChecked(True)
     figure=window.interruption_figure_buttons[(7,'3-2-1-1')]
     figure.setChecked(True);window.distance_apply.setChecked(True)
@@ -503,15 +508,19 @@ def test_interruption_matrix_and_distances_are_separate_active_filters_and_persi
     assert not window.interruption_apply.isChecked()
     assert window.distance_apply.isChecked()
     assert window.mode_tabs['Interrupciones'].count()==3
+    assert window.reduction_activation_buttons[20].isChecked()
+    assert not window.reduction_activation_buttons[18].isChecked()
 
     window.apply_filters();QTest.qWait(500)
     saved=json.loads(window.system.parameters)['filter_spec']
-    assert 18 in saved['reduction_tabs_enabled']
+    assert 20 in saved['reduction_tabs_enabled'] and 18 not in saved['reduction_tabs_enabled']
     assert any(rule['kind']=='allowed_interruption_figure' and rule['allowed_figures']==['3-2-1-1']
-               and rule['run_length']==7 and rule['active'] for rule in saved['reduction_rules'])
+               and rule['run_length']==7 and rule['tab_index']==20 and rule['active'] for rule in saved['reduction_rules'])
     window.restore_filter_controls()
-    assert window.reduction_activation_buttons[18].isChecked()
+    assert not window.reduction_activation_buttons[18].isChecked()
     assert window.distance_apply.isChecked() and not window.interruption_apply.isChecked()
+    assert window.reduction_activation_buttons[20].isChecked()
+    assert not window.reduction_activation_buttons[18].isChecked()
     assert window.interruption_total_buttons[7].isChecked()
     assert window.interruption_figure_buttons[(7,'3-2-1-1')].isChecked()
 
@@ -542,7 +551,7 @@ def test_interruption_random_and_automatic_modes_use_reproducible_and_integrated
     assert '3 resultados finales' in auto_summary.text()
 
 
-def test_sign_distances_subtab_filters_and_restores_without_changing_figures(window):
+def test_sign_distances_tab_filters_and_restores_without_changing_figures(window):
     from quiniela_ai_studio.domain.models import Bet
 
     accepted = Bet('1XX1' + '1' * 10, 'M0')
@@ -550,13 +559,11 @@ def test_sign_distances_subtab_filters_and_restores_without_changing_figures(win
     bets = (accepted, rejected)
     window.set_system(window.service.imported(window.round, 'Distancias', bets))
     window.navigation.setCurrentRow(8)
-    window.reduction_tabs.setCurrentIndex(window.reduction_visible_indexes[18])
-    window._show_interruption_subtab(1)
-    assert window.interruption_surfaces.currentIndex() == 1
+    window.reduction_tabs.setCurrentIndex(window.reduction_visible_indexes[20])
     assert not window.sign_distance_squares[('1', 14)].isEnabled()
     window.sign_distance_squares[('1', 3)].setChecked(True)
     window.sign_distance_apply['1'].setChecked(True)
-    assert window.reduction_activation_buttons[18].isChecked()
+    assert window.reduction_activation_buttons[20].isChecked()
     assert window.filter_spec().apply(bets) == (accepted,)
     assert 'Distancias se combina' in window._empty_filter_message(window.filter_spec())
     assert not window.distance_apply.isChecked()
@@ -570,14 +577,14 @@ def test_sign_distances_subtab_filters_and_restores_without_changing_figures(win
     assert any(row['kind']=='allowed_sign_distance' and row['sign']=='1'
                and row['allowed_values']==[3] and row['active']
                for row in saved['reduction_rules'])
-    window.reduction_activation_buttons[18].setChecked(False)
+    window.reduction_activation_buttons[20].setChecked(False)
     for _ in range(200):
         QTest.qWait(10)
         if not window.filter_timer.isActive() and window.filter_job is None:
             break
     assert window.filter_spec().apply(bets) == bets
     assert window.system.bets == bets
-    window.reduction_activation_buttons[18].setChecked(True)
+    window.reduction_activation_buttons[20].setChecked(True)
     for _ in range(200):
         QTest.qWait(10)
         if not window.filter_timer.isActive() and window.filter_job is None:
@@ -621,8 +628,8 @@ def test_unmatched_distance_keeps_existing_development_instead_of_saving_zero(wi
     window.set_system(system)
     spec=BasicFilters(
         reduction_rules=(ReductionRule('sign-distance-X','allowed_sign_distance',0,13,
-            sign='X',allowed_values=(13,),tab_index=18),),
-        reduction_tabs_enabled=(18,),
+            sign='X',allowed_values=(13,),tab_index=20),),
+        reduction_tabs_enabled=(20,),
     )
     assert spec.apply(bets)==()
 

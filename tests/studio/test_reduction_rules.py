@@ -89,7 +89,7 @@ def test_interruption_matrix_and_distance_figures_are_independent_and_round_trip
     matrix=ReductionRule('interruption-matrix','allowed_interruption_profile',0,1,
         profile_kind='interruptions',allowed_profiles=((7,3),),tab_index=18)
     distance=ReductionRule('interruption-figure','allowed_interruption_figure',0,1,
-        run_length=7,allowed_figures=('3-2-1-1',),tab_index=18)
+        run_length=7,allowed_figures=('3-2-1-1',),tab_index=20)
     example='12X22X11221111'
     bits=(1,1,1,0,1,1,0,1,1,0,0,0,0)
     alternate=['1']
@@ -98,7 +98,7 @@ def test_interruption_matrix_and_distance_figures_are_independent_and_round_trip
     alternate=''.join(alternate)
     assert matrix.accepts(example) and distance.accepts(example)
     assert matrix.accepts(alternate) and not distance.accepts(alternate)
-    spec=BasicFilters(reduction_rules=(matrix,distance),reduction_tabs_enabled=(18,))
+    spec=BasicFilters(reduction_rules=(matrix,distance),reduction_tabs_enabled=(18,20))
     bets=(Bet(example,'M0'),Bet(alternate,'M0'))
     assert spec.apply(bets)==(bets[0],)
     assert filters_from_parameters(spec.parameters())==spec
