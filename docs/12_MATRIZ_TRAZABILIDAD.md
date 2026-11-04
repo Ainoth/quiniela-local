@@ -1,5 +1,11 @@
 # 12 · Matriz de trazabilidad de requisitos
 
+RF-ESC-023 (v2.0.20): limita la tabla de escrutinio al alto real de la cabecera
+y sus 15 filas y alinea las tarjetas de premios al inicio de la zona inferior.
+La lista de 14 partidos mantiene altura estable sin barra vertical y las
+cabeceras 1/X/2 comparten el estilo del resto de encabezados. Pruebas:
+`test_aciertos_layout.py` y `test_normal_generator_ui.py`.
+
 RF-ESC-022 (v2.0.19): sustituye el reparto orientativo por el techo de aciertos
 posible en las apuestas abiertas. Usa solo resultados definitivos para descartar
 opciones y trata los demás partidos como pendientes, sin asignar favoritos ni

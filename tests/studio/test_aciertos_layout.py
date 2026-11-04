@@ -31,6 +31,8 @@ def ballot_positions(window):
 
 def test_ballot_width_and_sign_positions_do_not_expand_with_window(window):
     fill_results(window)
+    assert window.ballot_scroll.verticalScrollBarPolicy() == Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+    assert all(label.property('ballotHeader') == 'data' for label in window.ballot_header_labels)
     window.resize(1200, 975);QTest.qWait(30)
     original = ballot_positions(window)
     assert window.ballot.width() == 550
@@ -49,6 +51,19 @@ def test_all_fourteen_results_and_pleno_fit_above_smaller_bet_table(window):
     window.navigation.setCurrentRow(4);QTest.qWait(50)
     assert window.live_model.rowCount() == 15
     assert window.live_view.verticalScrollBar().maximum() == 0
+    assert window.live_view.height() == window.scrutiny_splitter.widget(0).height()
+    assert window.scrutiny_splitter.widget(0).height() == (
+        window.live_view.horizontalHeader().height()
+        + 15 * window.live_view.verticalHeader().defaultSectionSize()
+        + 2 * window.live_view.frameWidth() + 5
+    )
+    lower = window.scrutiny_splitter.widget(1)
+    assert lower.mapTo(window.scrutiny_splitter, QPoint()).y() == (
+        window.scrutiny_splitter.widget(0).height() + window.scrutiny_splitter.handleWidth()
+    )
+    assert window.estimate_prize_card.mapTo(window.scrutiny_splitter, QPoint()).y() == (
+        lower.mapTo(window.scrutiny_splitter, QPoint()).y()
+    )
     for row in (13, 14):
         rectangle = window.live_view.visualRect(window.live_model.index(row, 0))
         assert rectangle.bottom() < window.live_view.viewport().height()

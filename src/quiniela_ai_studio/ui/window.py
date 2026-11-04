@@ -3889,14 +3889,18 @@ class MainWindow(QMainWindow):
         self.builder_info = QLabel(); self.builder_info.setWordWrap(True);self.builder_info.setMinimumHeight(38); layout.addWidget(self.builder_info)
         scroll = QScrollArea(); scroll.setWidgetResizable(True);scroll.setMaximumHeight(322)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.ballot_scroll = scroll
         grid_widget = QWidget();grid_widget.setFixedHeight(322)
         grid = QGridLayout(grid_widget); grid.setSpacing(1);grid.setContentsMargins(6,4,6,4);grid.setAlignment(Qt.AlignmentFlag.AlignTop)
         grid_widget.setObjectName('ballot')
-        self.prob_headers=[]
+        self.prob_headers=[];self.ballot_header_labels=[]
         for col,title in enumerate(('#', 'Partido', '1 %', 'X %', '2 %', '1', 'X', '2', 'Bloq.')):
             heading=QLabel(title);heading.setFixedHeight(20);heading.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            heading.setProperty('ballotHeader','sign' if col in (5,6,7) else 'data')
+            # The 1/X/2 labels are column headings too; keep their style consistent
+            # with the other headers so they cannot be mistaken for selectable signs.
+            heading.setProperty('ballotHeader','data')
+            self.ballot_header_labels.append(heading)
             grid.addWidget(heading,0,col)
             if col in (2,3,4):self.prob_headers.append(heading)
         self.match_labels=[];self.match_number_labels=[];self.prob_labels=[];self.sign_buttons=[];self.lock_buttons=[]
@@ -5092,12 +5096,13 @@ class MainWindow(QMainWindow):
         summary_layout.addStretch(1);layout.addWidget(self.scrutiny_summary_card)
         self.scrutiny_splitter=QSplitter(Qt.Orientation.Vertical);self.scrutiny_splitter.setChildrenCollapsible(False)
         upper=QWidget();upper_layout=QVBoxLayout(upper);upper_layout.setContentsMargins(0,0,0,0)
-        lower=QWidget();lower_layout=QVBoxLayout(lower);lower_layout.setContentsMargins(0,0,0,0)
+        lower=QWidget();lower_layout=QVBoxLayout(lower);lower_layout.setContentsMargins(0,0,0,0);lower_layout.setSpacing(0)
         upper.setMinimumHeight(80);lower.setMinimumHeight(100)
         self.scrutiny_splitter.addWidget(upper);self.scrutiny_splitter.addWidget(lower)
         self.scrutiny_splitter.setStretchFactor(0,0);self.scrutiny_splitter.setStretchFactor(1,1)
         layout.addWidget(self.scrutiny_splitter,1)
         self.live_view,self.live_model=self.table(('Partido','Marcador','Resultado','Tu signo','Acierto / fallo','Estado','Día / hora'),upper_layout)
+        self.live_view.setSizePolicy(QSizePolicy.Policy.Expanding,QSizePolicy.Policy.Ignored)
         self.live_view.verticalHeader().hide();self.live_view.verticalHeader().setDefaultSectionSize(21)
         for column in range(1,7):self.live_view.horizontalHeader().setSectionResizeMode(column,QHeaderView.ResizeMode.ResizeToContents)
         result_column=self.live_model.headers.index('Resultado')
@@ -5201,7 +5206,7 @@ class MainWindow(QMainWindow):
         official_layout.addWidget(self.prize_card);official_layout.addWidget(self.prize_notice)
         self.prize_cards_layout=QHBoxLayout();self.prize_cards_layout.setContentsMargins(0,0,0,0);self.prize_cards_layout.setSpacing(8)
         self.prize_cards_layout.addWidget(self.estimate_prize_card,1);self.prize_cards_layout.addWidget(self.official_prize_column,1)
-        lower_layout.addLayout(self.prize_cards_layout)
+        lower_layout.addLayout(self.prize_cards_layout);lower_layout.setAlignment(self.prize_cards_layout,Qt.AlignmentFlag.AlignTop)
         eval_tools=QHBoxLayout();eval_tools.setContentsMargins(0,0,0,0)
         self.eval_summary=QLabel('Abre una quiniela con apuestas para ver tus aciertos.');self.eval_summary.setWordWrap(False);self.eval_summary.setMinimumHeight(28);eval_tools.addWidget(self.eval_summary,1)
         self.eval_detail_button=QPushButton('Ver apuestas evaluadas ▾');self.eval_detail_button.setFixedHeight(25);self.eval_detail_button.clicked.connect(self.toggle_scrutiny_bets);eval_tools.addWidget(self.eval_detail_button)

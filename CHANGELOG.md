@@ -1,5 +1,13 @@
 # Cambios
 
+## 2.0.20 — tablas compactas y tarjetas pegadas al escrutinio
+
+- Ajusta el tamaño del panel de resultados a su cabecera y sus 15 filas, y
+  coloca las tarjetas de premios inmediatamente después.
+- Oculta la barra vertical de los 14 partidos y unifica el color de las
+  cabeceras 1/X/2 con las demás columnas.
+- Verifica las dimensiones, la posición de las tarjetas y la vista compacta.
+
 ## 2.0.19 — máximo de aciertos posibles
 
 - Sustituye la proyección de premios por el máximo de aciertos alcanzable con
