@@ -72,8 +72,6 @@ from quiniela_ai_studio.infrastructure.providers import (
 from quiniela_ai_studio.infrastructure.published_scrutiny import (
     fetch_published_scrutiny,
 )
-from quiniela_ai_studio.infrastructure.prize_estimate import fetch_prize_estimate
-from quiniela_ai_studio.domain.prize_forecast import estimate_prizes
 from quiniela_ai_studio.ui.classic_reductions import (
     ClassicContextHeader,
     ClassicReductionsCanvas,
@@ -145,6 +143,11 @@ class PrizeCategoryRow(QFrame):
         self.category=str(category);self.category_label.setText(self.category)
         self.bets_label.setText(str(bets));self.unit_label.setText(str(unit));self.total_label.setText(str(total))
 
+    def set_potential(self,category,count):
+        self.set_values(category,f'{count:,}','', '')
+        self.bets_label.setFixedWidth(180)
+        self.unit_label.hide();self.total_label.hide()
+
     def text(self):
         return f'{self.category} · {self.bets_label.text()} · {self.unit_label.text()} · {self.total_label.text()}'
 
@@ -152,9 +155,15 @@ class PrizeCategoryRow(QFrame):
         return self._word_wrap
 
 
-def prize_columns_header(parent):
+def prize_columns_header(parent,potential=False):
     header=QWidget(parent);layout=QHBoxLayout(header)
     layout.setContentsMargins(6,0,6,0);layout.setSpacing(8)
+    if potential:
+        category=QLabel('Categoría');category.setObjectName('estimateCategoryHeader')
+        count=QLabel('Apuestas con opción');count.setObjectName('estimateCategoryHeader')
+        count.setFixedWidth(180);count.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
+        layout.addWidget(category,1);layout.addWidget(count)
+        return header
     labels=(('Categoría',None),('Apuestas',135),('Premio/u.',105),('Total',115))
     for title,width in labels:
         label=QLabel(title);label.setObjectName('estimateCategoryHeader')
@@ -4036,7 +4045,6 @@ class MainWindow(QMainWindow):
                     self.eval_summary.setText('Abre una quiniela con apuestas y carga resultados para ver tus aciertos.')
                     self.eval_view.hide();self.eval_detail_button.setEnabled(False)
                 self.render_prize_forecast()
-            self.fetch_prize_estimate()
 
     def clear_scrutiny_awards(self):
         """Discard awards from the previously selected system immediately."""
@@ -5049,7 +5057,6 @@ class MainWindow(QMainWindow):
         self.external_scrutiny_bets=None;self.external_scrutiny_name=''
         self.live_worker=None;self.live_context=None
         self.live_timer=QTimer(self);self.live_timer.setInterval(60000);self.live_timer.timeout.connect(self.fetch_live_automatically)
-        self.prize_estimate_timer=QTimer(self);self.prize_estimate_timer.setInterval(600000);self.prize_estimate_timer.timeout.connect(self.fetch_prize_estimate)
         row=QHBoxLayout();row.setContentsMargins(0,0,0,0);row.setSpacing(6)
         self.auto_live=QCheckBox('Marcador automático');self.auto_live.setChecked(self.repository.setting('automatic_live',True));self.auto_live.setToolTip('Actualizar los resultados automáticamente mientras esta pestaña esté abierta.');row.addWidget(self.auto_live)
         self.live_interval=QComboBox()
@@ -5131,19 +5138,21 @@ class MainWindow(QMainWindow):
         self.estimate_layout=estimate_layout
         estimate_top=QHBoxLayout();estimate_top.setContentsMargins(0,0,0,0);estimate_top.setSpacing(6)
         self.estimate_top_layout=estimate_top
-        self.estimate_headline=QLabel('≈ PREVISIÓN ORIENTATIVA');self.estimate_headline.setObjectName('estimateHeadline')
-        self.estimate_total=QLabel('—');self.estimate_total.setObjectName('estimateTotal')
+        self.estimate_headline=QLabel('≈ MÁXIMO ALCANZABLE');self.estimate_headline.setObjectName('estimateHeadline')
+        self.estimate_total=QLabel('— aciertos');self.estimate_total.setObjectName('estimateTotal')
         self.estimate_scenario_label=QLabel('');self.estimate_scenario_label.setObjectName('estimateDisclaimer');self.estimate_scenario_label.setWordWrap(True)
         estimate_top.addWidget(self.estimate_headline);estimate_top.addStretch(1);estimate_top.addWidget(self.estimate_total)
         self.estimate_refresh_button=QPushButton('↻');self.estimate_refresh_button.setFixedWidth(34);self.estimate_refresh_button.setToolTip('Actualizar la previsión de premios')
-        self.estimate_refresh_button.clicked.connect(self.fetch_prize_estimate);estimate_top.addWidget(self.estimate_refresh_button)
+        self.estimate_refresh_button.setToolTip('Recalcular el máximo con los resultados actuales')
+        self.estimate_refresh_button.clicked.connect(lambda:self.render_prize_forecast());estimate_top.addWidget(self.estimate_refresh_button)
         estimate_layout.addLayout(estimate_top)
         self.estimate_rows_layout=QVBoxLayout();self.estimate_rows_layout.setContentsMargins(0,0,0,0);self.estimate_rows_layout.setSpacing(1)
-        self.estimate_rows_layout.addWidget(prize_columns_header(self.estimate_prize_card))
+        self.estimate_rows_layout.addWidget(prize_columns_header(self.estimate_prize_card,potential=True))
         self.estimate_category_rows={}
         for category in (15,14,13,12,11,10):
             title='Pleno 15' if category==15 else f'{category} aciertos'
             row=PrizeCategoryRow(title,self.estimate_prize_card)
+            row.set_potential(title,0)
             self.estimate_rows_layout.addWidget(row)
             self.estimate_category_rows[category]=row
         estimate_layout.addLayout(self.estimate_rows_layout)
@@ -5152,7 +5161,6 @@ class MainWindow(QMainWindow):
         self.estimate_source_label.setMaximumHeight(36)
         self.estimate_source_label.setStyleSheet('font-size:9px; color:#e4d5a2;')
         estimate_layout.addWidget(self.estimate_source_label)
-        self.estimate_worker=None;self.estimate_round_key=None;self.estimate_model=None
         self.estimate_prize_card.hide()
         self.prize_notice=PrizeStatusCard();self.prize_notice.setObjectName('prizeNoticeCard')
         self.prize_cache_error=''
@@ -5320,8 +5328,8 @@ class MainWindow(QMainWindow):
             legacy[1].setText(str(payout['bets']))
             legacy[2].setText(unit)
             legacy[3].setText(subtotal)
-            self.prize_notice.rows[category].setText(
-                f"{name} · {payout['bets']:,} apuestas · {unit}/u. · {subtotal} total"
+            self.prize_notice.rows[category].set_values(
+                name,f"{payout['bets']:,} apuestas",f'{unit}/u.',f'{subtotal} total'
             )
         self.prize_notice.headline.setText('≈ PREMIOS OFICIALES')
         self.prize_notice.total.setText(prize_money(total))
@@ -5411,7 +5419,6 @@ class MainWindow(QMainWindow):
         self.external_scrutiny_status.setText(f'Fichero externo: {source.name} · {quantity:,} apuestas · asignado a {self.frozen_round().key}.')
         self.external_scrutiny_status.show()
         self.clear_external_scrutiny_button.show()
-        self.fetch_prize_estimate()
         if self.manual_mode.isChecked():self.refresh_manual_evaluation()
         elif self.live_matches:self.evaluate_live()
         elif not self.show_cached_scrutiny():
@@ -5423,7 +5430,6 @@ class MainWindow(QMainWindow):
         self.external_scrutiny_status.setText('Escrutando las apuestas de la quiniela abierta.')
         self.external_scrutiny_status.hide()
         self.clear_external_scrutiny_button.hide()
-        self.fetch_prize_estimate()
         if not self.scrutiny_bets():
             self.eval_model.update_rows([])
             self.eval_summary.setText('Abre una quiniela con apuestas o importa otro fichero externo.')
@@ -5889,14 +5895,9 @@ class MainWindow(QMainWindow):
     def ensure_live_updates(self,*_):
         if self.close_pending:return
         active=self.auto_live.isChecked() and not self.manual_mode.isChecked() and self.navigation.currentRow()==4 and self.round_picker.currentData() and self.round.season!='DEMO'
-        estimate_active=self.navigation.currentRow()==4 and self.round_picker.currentData() and self.round.season!='DEMO'
         self.repository.set_setting('automatic_live',self.auto_live.isChecked())
         self.repository.set_setting('live_interval_seconds',self.live_interval.currentData())
         self.live_timer.stop()
-        self.prize_estimate_timer.stop()
-        if estimate_active:
-            self.prize_estimate_timer.start()
-            self.fetch_prize_estimate()
         if active:
             self.live_timer.setInterval(self.live_interval.currentData()*1000);self.live_timer.start();self.fetch_live_automatically()
         else:
@@ -5909,113 +5910,67 @@ class MainWindow(QMainWindow):
         if self.close_pending or not self.auto_live.isChecked() or self.manual_mode.isChecked() or self.navigation.currentRow()!=4:return
         self.fetch_live()
 
-    def fetch_prize_estimate(self):
-        """Fetch cached public revenue/percentages off the GUI thread."""
-        if (self.close_pending or self.navigation.currentRow()!=4 or not self.round_picker.currentData()
-                or self.round.season=='DEMO' or not self.scrutiny_bets()):
-            return
-        context=self.frozen_round()
-        if self.estimate_round_key!=context.key:
-            self.estimate_round_key=context.key
-            cached=self.repository.setting('prize_estimate:'+context.key)
-            self.estimate_model=cached if isinstance(cached,dict) else None
-        if self.estimate_model:
-            self.render_prize_forecast()
-            if time.time()-float(self.estimate_model.get('received_at',0))<600:return
-        if self.estimate_worker is not None:return
-        self.estimate_refresh_button.setEnabled(False)
-        if not self.estimate_model:
-            self.estimate_context_label('Consultando recaudación, bote y porcentajes públicos…')
-        job=DataTask(lambda cancel,status:fetch_prize_estimate(context),self)
-        self.estimate_worker=job
-        job.completed.connect(lambda model:self.prize_estimate_received(context,model))
-        job.failed.connect(lambda message:self.prize_estimate_error(context,message))
-        job.finished.connect(lambda:self.prize_estimate_finished(job))
-        job.start()
-
     def estimate_context_label(self,message):
         self.estimate_scenario_label.setText(message)
 
-    def prize_estimate_received(self,context,model):
-        if self.close_pending or self.round.key!=context.key:return
-        model=dict(model);model['received_at']=time.time()
-        self.estimate_model=model;self.estimate_round_key=context.key
-        self.repository.set_setting('prize_estimate:'+context.key,model)
-        self.render_prize_forecast()
-
-    def prize_estimate_error(self,context,message):
-        if self.close_pending or self.round.key!=context.key:return
-        if self.estimate_model:
-            self.estimate_context_label('Se conserva la última estimación. No se pudo actualizar: '+message)
-        else:
-            self.estimate_prize_card.show()
-            self.estimate_total.setText('—')
-            self.estimate_context_label('No hay previsión disponible ahora. '+message)
-            for category,label in self.estimate_category_rows.items():
-                name='Pleno 15' if category==15 else f'{category} aciertos'
-                label.set_values(name,'— apuestas','— €/u.','— total')
-
-    def prize_estimate_finished(self,job):
-        if self.estimate_worker is job:self.estimate_worker=None
-        self.estimate_refresh_button.setEnabled(True)
-        job.deleteLater()
-        if self.close_pending:self.close()
-
     def render_prize_forecast(self,outcome=None):
-        """Paint a clearly separate scenario estimate; official awards keep priority."""
+        """Show each bet's hit ceiling from definitive results and unresolved matches."""
         if self.navigation.currentRow()==4:
             QTimer.singleShot(0,self.fit_scrutiny_tables)
         bets=self.scrutiny_bets()
         if not bets:
             self.estimate_prize_card.show()
-            self.estimate_total.setText('—')
-            self.estimate_context_label('Importa apuestas o abre un desarrollo para mostrar aquí la previsión orientativa.')
+            self.estimate_total.setText('— aciertos')
+            self.estimate_context_label('Importa apuestas o abre un desarrollo para calcular las categorías que aún pueden alcanzarse.')
+            for category,row in self.estimate_category_rows.items():
+                row.set_potential('Pleno 15' if category==15 else f'{category} aciertos',0)
             return
-        if not self.estimate_model:
-            self.estimate_prize_card.show()
-            self.estimate_total.setText('—')
-            self.estimate_context_label('Sin datos de estimación. La previsión usará los marcadores disponibles y el signo más probable en los partidos pendientes.')
-            return
-        result_signs={};pleno=''
+        result=['-']*14;finalized=[False]*14;pleno='';pleno_final=False
         if self.published_scrutiny:
-            result_signs={index+1:sign for index,sign in enumerate(self.published_scrutiny['result'])}
-            pleno=self.published_scrutiny['pleno']
+            result=list(self.published_scrutiny['result'][:14].upper().ljust(14,'-'))
+            finalized=[sign in '1X2' for sign in result]
+            pleno=self.published_scrutiny.get('pleno','')
+            pleno_final=bool(pleno)
         elif self.manual_mode.isChecked():
-            result_signs={index+1:sign for index,sign in enumerate(self.result_input.text().upper()) if sign in '1X2'}
+            result=list(self.result_input.text().upper().ljust(14,'-')[:14])
+            if self.final_check.isChecked():finalized=[sign in '1X2' for sign in result]
             pleno=self.result_pleno.text().upper()
+            pleno_final=bool(self.final_check.isChecked() and len(pleno)==2 and not set(pleno)-set('012M'))
         else:
-            for match in self.live_matches or ():
-                if match.number<15 and match.sign and match.sign in '1X2':result_signs[match.number]=match.sign
-                elif match.number==15:pleno=match.pleno
-        try:estimate=estimate_prizes(bets,self.estimate_model,result_signs,pleno)
-        except (TypeError,ValueError,KeyError) as exc:
-            self.estimate_prize_card.show();self.estimate_total.setText('—');self.estimate_context_label(str(exc));return
+            by_number={match.number:match for match in (self.live_matches or ())}
+            for number in range(1,15):
+                match=by_number.get(number)
+                if match and match.sign and match.sign in '1X2':
+                    result[number-1]=match.sign
+                    finalized[number-1]=bool(match.final)
+            match=by_number.get(15)
+            if match:
+                pleno=match.pleno or ''
+                pleno_final=bool(match.final and len(pleno)==2 and not set(pleno)-set('012M'))
+        if len(pleno)!=2 or set(pleno)-set('012M'):
+            pleno='';pleno_final=False
+        if outcome is None:
+            outcome=engine.evaluate(bets,''.join(result),pleno,finalized=tuple(finalized),pleno_final=pleno_final)
         self.estimate_prize_card.show()
-        self.estimate_total.setText(prize_money(estimate['total_cents']))
-        captured=self.estimate_model.get('received_at')
-        updated=datetime.fromtimestamp(captured).astimezone().strftime('%H:%M') if captured else '—'
-        pending=14-len(result_signs)
-        if not result_signs:
-            scenario='0/14 · escenario hipotético: favoritos del mercado · no es premio real'
-        elif pending:
-            scenario=f"{len(result_signs)}/14 · {pending} pendientes usan favoritos del mercado · no es premio real"
-        else:
-            scenario='14/14 · resultados recibidos · aproximación no oficial, pendiente de escrutinio'
-        metadata=(f"Recaudación {prize_money(estimate['revenue_cents'])} · bote {prize_money(estimate['jackpot_cents'])} · "
-                  f"{estimate['public_entries']:,} apuestas públicas · {updated} · {estimate['source']}")
-        context=f'{scenario} · {metadata}'
+        ceiling=max((row['maximum'] for row in outcome['rows']),default=0)
+        self.estimate_total.setText(f'{ceiling} aciertos')
+        settled=sum(finalized);pending=14-settled
+        context=(f'{settled}/14 resultados definitivos · {pending} pendientes · '
+                 'máximo teórico según las apuestas y los resultados cerrados; no predice los restantes.')
         self.estimate_context_label(context)
         self.estimate_scenario_label.setToolTip(
-            f'{context}. Cada partido pendiente se completa con el favorito del mercado; '
-            'es una simulación orientativa, no un premio real.'
+            'El máximo se calcula por apuesta: aciertos definitivos más partidos que todavía pueden cambiar. '
+            'Cada fila cuenta las apuestas que aún pueden terminar exactamente en esa categoría.'
         )
-        for row in estimate['rows']:
-            labels=self.estimate_category_rows[row['category']]
-            category='Pleno 15' if row['category']==15 else f"{row['category']} aciertos"
-            unit=prize_money(row['unit_cents']) if row['unit_cents'] else '—'
-            subtotal=prize_money(row['subtotal_cents']) if row['subtotal_cents'] else '—'
-            labels.set_values(category,f"{row['own_bets']:,} apuestas",f'{unit}/u.',f'{subtotal} total')
-            labels.setToolTip(f"{category}: {row['own_bets']:,} apuestas · {unit} por apuesta · {subtotal} subtotal")
+        for category,row in self.estimate_category_rows.items():
+            eligible=0
+            for bet in outcome['rows']:
+                can_reach=(bet['confirmed']<=category<=bet['maximum']) if category<15 else (
+                    bet['maximum']==14 and bool(bet['pleno']) and (not pleno_final or bet['pleno_hit']))
+                if can_reach:eligible+=bet['quantity']
+            name='Pleno 15' if category==15 else f'{category} aciertos'
+            row.set_potential(name,eligible)
+            row.setToolTip(f'{eligible:,} apuestas aún pueden alcanzar {name}.')
 
     def fetch_live(self):
         if self.live_worker is not None or self.round.season=='DEMO':return
@@ -6316,13 +6271,10 @@ class MainWindow(QMainWindow):
     def closeEvent(self,event):
         self.template_timer.stop()
         self.live_timer.stop();self.manual_eval_timer.stop()
-        self.prize_estimate_timer.stop()
         if self.published_worker and self.published_worker.isRunning():
             self.close_pending=True;self.published_worker.cancel_event.set();event.ignore();return
         if self.live_worker and self.live_worker.isRunning():
             self.close_pending=True;self.live_worker.cancel_event.set();event.ignore();return
-        if self.estimate_worker and self.estimate_worker.isRunning():
-            self.close_pending=True;self.estimate_worker.cancel_event.set();event.ignore();return
         self.filter_timer.stop();self.filter_epoch+=1
         if self.athena_job and self.athena_job.isRunning():
             self.close_pending=True;self.athena_job.cancel_event.set();event.ignore();return

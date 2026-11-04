@@ -111,9 +111,9 @@ def test_official_card_matches_forecast_card_layout_and_controls(window):
     assert all(
         forecast.font().pointSize() == official.font().pointSize()
         and not forecast.wordWrap() and not official.wordWrap()
-        and forecast.bets_label.width() == official.bets_label.width()
-        and forecast.unit_label.width() == official.unit_label.width()
-        and forecast.total_label.width() == official.total_label.width()
+        and forecast.bets_label.width() == 180
+        and official.bets_label.width() == 135
+        and forecast.unit_label.isHidden() and forecast.total_label.isHidden()
         for forecast, official in zip(window.estimate_category_rows.values(), window.prize_notice_rows.values())
     )
     window.prize_notice.setText("Premios oficiales pendientes de publicación.")
@@ -125,17 +125,6 @@ def test_desktop_shows_live_progress_and_golden_forecast_card(window):
     assert window.prize_cards_layout.itemAt(1).widget() is window.official_prize_column
     bets = (Bet("1" * 14, "00"), Bet("1" * 14, "11"))
     window.system = window.service.imported(window.round, "Previsión", bets)
-    window.estimate_model = {
-        "played": ((1.0, 0.0, 0.0),) * 14,
-        "market": ((1.0, 0.0, 0.0),) * 14,
-        "pleno_home": (1.0, 0.0, 0.0, 0.0),
-        "pleno_away": (1.0, 0.0, 0.0, 0.0),
-        "revenue_cents": 100_000_000,
-        "jackpot_cents": 5_000_000,
-        "ticket_cents": 75,
-        "source": "Fuente de prueba",
-    }
-    window.estimate_round_key = window.round.key
     window.live_matches = tuple(
         LiveMatch(i + 1, match.home, match.away, "1-0", "1" if i == 0 else "X" if i == 1 else "",
                   "", "Finalizado" if i < 2 else "Pendiente", i < 2, 1)
@@ -147,13 +136,15 @@ def test_desktop_shows_live_progress_and_golden_forecast_card(window):
     assert window.scrutiny_summary_misses.text() == "1"
     assert window.scrutiny_summary_pending.text() == "12"
     assert not window.estimate_prize_card.isHidden()
-    assert window.estimate_total.text() != "—"
-    assert "12 pendientes usan favoritos del mercado" in window.estimate_source_label.text()
-    assert "no es premio real" in window.estimate_source_label.text()
+    assert window.estimate_total.text() == "13 aciertos"
+    assert "2/14 resultados definitivos · 12 pendientes" in window.estimate_source_label.text()
+    assert "no predice" in window.estimate_source_label.text()
+    assert window.estimate_category_rows[14].bets_label.text() == "0"
+    assert window.estimate_category_rows[13].bets_label.text() == "2"
     assert window.estimate_prize_card.minimumHeight() == 0
     assert len(window.estimate_category_rows) == 6
     assert window.estimate_rows_layout.count() == 7
-    assert all(" apuestas · " in label.text() and not label.wordWrap() for label in window.estimate_category_rows.values())
+    assert all(not label.wordWrap() for label in window.estimate_category_rows.values())
     assert not window.estimate_prize_card.isHidden()
     assert not window.prize_notice.isHidden()
     assert window.prize_notice.minimumHeight() == 0
@@ -163,3 +154,19 @@ def test_desktop_shows_live_progress_and_golden_forecast_card(window):
     )
     assert all('No publicado' in line for line in window.prize_notice.text().splitlines()[1:])
     assert all(label.font().pointSize() <= 11 for label in window.estimate_category_rows.values())
+
+
+def test_hit_ceiling_uses_only_final_results_and_does_not_fill_pending_from_market(window):
+    bets=(Bet('1'*14,'00'),Bet('2'*14,'11'))
+    window.system=window.service.imported(window.round,'Máximo posible',bets)
+    signs=('1','X','1','2')
+    window.live_matches=tuple(
+        LiveMatch(i+1,match.home,match.away,'1-0',signs[i],'','Finalizado',True,1)
+        if i<4 else LiveMatch(i+1,match.home,match.away,'—','','','Pendiente',False,0)
+        for i,match in enumerate(window.round.matches)
+    )
+    window.render_prize_forecast()
+    assert window.estimate_total.text()=='12 aciertos'
+    assert '4/14 resultados definitivos · 10 pendientes' in window.estimate_source_label.text()
+    assert [window.estimate_category_rows[c].bets_label.text() for c in (15,14,13,12,11,10)]==['0','0','0','1','2','2']
+    assert 'favorito' not in window.estimate_source_label.text().casefold()

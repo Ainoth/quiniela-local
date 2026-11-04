@@ -795,19 +795,16 @@ def test_manual_results_selector_updates_without_check_button(window):
     assert not window.live_timer.isActive()
 
 
-def test_forecast_labels_market_favorite_scenario_before_any_match(window):
+def test_forecast_shows_theoretical_hit_ceiling_before_any_match(window):
     from quiniela_ai_studio.domain.models import Bet
 
     window.system=window.service.imported(window.round,'Previsión hipotética',(Bet('1'*14,'00'),))
-    window.estimate_model={
-        'played':((1/3,1/3,1/3),)*14,'market':((.7,.2,.1),)*14,
-        'pleno_home':(.25,.25,.25,.25),'pleno_away':(.25,.25,.25,.25),
-        'revenue_cents':100_000,'jackpot_cents':5_000,'ticket_cents':75,
-        'source':'Fuente de prueba',
-    }
     window.live_matches=()
     window.render_prize_forecast()
-    assert '0/14 · escenario hipotético: favoritos del mercado · no es premio real' in window.estimate_source_label.text()
+    assert window.estimate_total.text()=='14 aciertos'
+    assert '0/14 resultados definitivos · 14 pendientes' in window.estimate_source_label.text()
+    assert 'favoritos del mercado' not in window.estimate_source_label.text()
+    assert all(row.bets_label.text()=='1' for category,row in window.estimate_category_rows.items())
 
 
 def test_live_bad_identity_and_close_do_not_corrupt_cache(window,monkeypatch,application):

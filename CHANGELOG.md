@@ -1,5 +1,15 @@
 # Cambios
 
+## 2.0.19 — máximo de aciertos posibles
+
+- Sustituye la proyección de premios por el máximo de aciertos alcanzable con
+  las apuestas actuales y los resultados definitivos.
+- Los partidos sin resultado definitivo se consideran abiertos; no se asigna
+  un favorito ni se muestran importes hipotéticos en la tarjeta amarilla.
+- Cuenta las apuestas que aún pueden alcanzar cada categoría, incluida la
+  posibilidad de Pleno al 15. Verificación: `test_prize_forecast.py`,
+  `test_aciertos_layout.py` y `test_ui.py`.
+
 ## 2.0.18 — columnas alineadas en las tarjetas de premios
 
 - Alinea categoría, apuestas propias, premio por apuesta y total en ambas

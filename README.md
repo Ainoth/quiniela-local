@@ -117,16 +117,14 @@ Un segundo panel compacto muestra los acertantes y premios oficiales de las
 seis categorías junto a las apuestas premiadas de la quiniela abierta y sus
 subtotales. Al cambiar de quiniela, ambos paneles se actualizan para ella.
 
-Mientras no haya escrutinio definitivo, Escrutinio muestra una segunda tarjeta
-dorada con la previsión orientativa de tus apuestas. Consulta recaudación, bote
-y porcentajes públicos de Quinielista; combina los signos ya recibidos con el
-favorito publicado para partidos pendientes y estima los importes por categoría
-según el reparto vigente. Incluye el total, tus apuestas en cada categoría, el
-importe unitario estimado y la hora de actualización. Se refresca cada diez
-minutos mientras la pestaña está abierta y también manualmente. La tarjeta
-resumen añade aciertos confirmados, aciertos provisionales, fallos confirmados
-y partidos pendientes. Ni la previsión ni el total estimado acreditan un premio
-oficial o el cobro de un boleto.
+Mientras no haya escrutinio definitivo, Escrutinio muestra una tarjeta dorada
+con el máximo de aciertos que aún pueden alcanzar tus apuestas. Los resultados
+definitivos descartan las apuestas que ya no pueden llegar a ciertas categorías;
+los partidos abiertos siguen contando como pendientes, sin asignarles un signo.
+La tarjeta muestra el máximo posible y cuántas apuestas aún podrían alcanzar
+cada categoría, incluido el Pleno al 15. Es un límite teórico, no una predicción
+de resultados ni un cálculo de premios. La tarjeta resumen añade aciertos
+confirmados, aciertos provisionales, fallos confirmados y partidos pendientes.
 
 La ventana y la barra de tareas recuperan el icono de Quiniela Local; se incluye
 en el paquete instalable. En Linux, el acceso directo debe usar

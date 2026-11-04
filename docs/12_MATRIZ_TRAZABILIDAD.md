@@ -1,5 +1,12 @@
 # 12 · Matriz de trazabilidad de requisitos
 
+RF-ESC-022 (v2.0.19): sustituye el reparto orientativo por el techo de aciertos
+posible en las apuestas abiertas. Usa solo resultados definitivos para descartar
+opciones y trata los demás partidos como pendientes, sin asignar favoritos ni
+predecir sus resultados. Muestra el máximo alcanzable y el número de apuestas
+que aún puede llegar a cada categoría, incluido el Pleno al 15. Pruebas:
+`test_prize_forecast.py`, `test_aciertos_layout.py` y `test_ui.py`.
+
 RF-ESC-021 (v2.0.18): las tarjetas de previsión orientativa y premios oficiales
 presentan cada categoría en columnas comunes para categoría, apuestas propias,
 premio unitario y total. Los importes unitarios y subtotales se alinean a la
