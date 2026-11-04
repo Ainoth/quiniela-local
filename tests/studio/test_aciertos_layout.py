@@ -54,7 +54,7 @@ def test_all_fourteen_results_and_pleno_fit_above_smaller_bet_table(window):
     assert window.live_view.height() == window.scrutiny_splitter.widget(0).height()
     assert window.scrutiny_splitter.widget(0).height() == (
         window.live_view.horizontalHeader().height()
-        + 15 * window.live_view.verticalHeader().defaultSectionSize()
+        + sum(window.live_view.rowHeight(row) for row in range(15))
         + 2 * window.live_view.frameWidth() + 5
     )
     lower = window.scrutiny_splitter.widget(1)

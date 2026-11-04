@@ -1,5 +1,14 @@
 # Cambios
 
+## 2.0.21 — alto exacto para la tabla de escrutinio
+
+- Calcula la altura con el tamaño real de cada una de las 15 filas, sin dejar
+  una franja vacía bajo los partidos.
+- Mantiene las tarjetas pegadas al escrutinio y limita la zona a la altura
+  necesaria; la ventana completa sigue siendo adaptable.
+- Verificación visual con una ventana de escritorio y pruebas de pantalla
+  compacta.
+
 ## 2.0.20 — tablas compactas y tarjetas pegadas al escrutinio
 
 - Ajusta el tamaño del panel de resultados a su cabecera y sus 15 filas, y

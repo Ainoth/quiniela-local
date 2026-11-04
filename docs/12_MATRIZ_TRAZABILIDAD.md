@@ -1,5 +1,10 @@
 # 12 · Matriz de trazabilidad de requisitos
 
+RF-ESC-024 (v2.0.21): calcula el panel de resultados con la altura efectiva de
+cada fila visible, además de la cabecera y el marco. Evita espacio vacío debajo
+del último partido y mantiene las tarjetas contiguas; el tamaño de la ventana
+sigue siendo adaptable. Pruebas: `test_aciertos_layout.py`.
+
 RF-ESC-023 (v2.0.20): limita la tabla de escrutinio al alto real de la cabecera
 y sus 15 filas y alinea las tarjetas de premios al inicio de la zona inferior.
 La lista de 14 partidos mantiene altura estable sin barra vertical y las

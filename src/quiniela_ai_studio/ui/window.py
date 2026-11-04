@@ -3576,7 +3576,9 @@ class MainWindow(QMainWindow):
         if self.close_pending or self.navigation.currentRow() != 4:
             return
         table = self.live_view
-        complete = table.horizontalHeader().height() + 15 * table.verticalHeader().defaultSectionSize() + 2 * table.frameWidth()
+        visible_rows=min(15,table.model().rowCount())
+        rows_height=sum(table.rowHeight(row) for row in range(visible_rows))
+        complete = table.horizontalHeader().height() + rows_height + 2 * table.frameWidth()
         complete += 5  # Qt leaves a couple of pixels between the calculated height and the last row.
         if table.horizontalScrollBar().isVisible():
             complete += table.horizontalScrollBar().height()
