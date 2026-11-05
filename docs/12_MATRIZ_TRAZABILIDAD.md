@@ -1,5 +1,29 @@
 # 12 · Matriz de trazabilidad de requisitos
 
+RF-RED-024 (v2.0.28): unifica la presentación de las pestañas de Reducciones,
+añade búsqueda y presets comunes para temporadas históricas y sitúa Optimizar
+al final en un panel compacto. Pruebas: suite focalizada de pestañas y
+temporadas; revisión visual de las seis vistas con Qt fuera de pantalla.
+
+RF-RED-023 (v2.0.27): unifica el estado azul seleccionado y los controles
+numerados en las cuadrículas de Cuenta, SSeguidos, Grupo, Interrupciones y
+Distancias. Los totales y las distancias se leen dentro de cada botón. Pruebas:
+`test_interruption_matrix_and_distances_are_separate_active_filters_and_persist`
+y `test_sign_distances_tab_filters_and_restores_without_changing_figures`.
+
+RF-ESC-028 (v2.0.26): mantiene el control nativo de maximizar/restaurar y
+bloquea el redimensionado manual en estado normal, sin fijar min/max al mismo
+tamaño. Prueba: `test_normal_window_size_is_locked_without_hiding_maximize_control`.
+
+RF-ESC-029 (v2.0.26): permite abrir el diagnóstico con apuestas aunque falten
+resultados; muestra el aviso de que se necesitan los 14 signos y habilita el
+panel sin esperar al cierre de la jornada. Prueba: `test_evaluated_bets_can_be_opened_before_any_live_result_arrives`.
+
+RF-RED-022 (v2.0.26): elimina la navegación duplicada Signos Seguidos/Figuras de
+FSSeguidos y muestra los totales 0–14 en una cuadrícula visible, con resumen de
+figuras posibles y seleccionadas. Pruebas: `test_fsseguidos_filters_exact_partition_separately_and_persists`
+y `test_fsseguidos_automatic_uses_integrated_history_and_azar_repeats_seed`.
+
 RF-RED-021 (v2.0.25): presenta Interrupciones y Distancias como pestañas
 principales activables e independientes, sin controles duplicados. Conserva
 los modos Manual/Azar/Automática de Interrupciones y reúne en Distancias sus

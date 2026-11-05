@@ -1,5 +1,32 @@
 # Cambios
 
+## 2.0.28 — diseño unificado de Reducciones
+
+- Homogeneiza encabezados, pestañas, paneles y controles gráficos entre los
+  métodos de Reducciones; compacta el contexto de temporada y jornada.
+- Añade búsqueda y selección rápida de temporadas a los métodos históricos.
+- Reordena Optimizar al final, reduce su ancho y elimina el espacio vacío antes
+  del presupuesto. Reubica «Restablecer filtros» junto a la introducción.
+- Distribuye Interrupciones y sus controles históricos en dos columnas para
+  mantener visible «Calcular».
+
+## 2.0.27 — selección gráfica unificada en Reducciones
+
+- Lleva a Cuenta, SSeguidos, Grupo, Interrupciones y Distancias el mismo estado
+  azul de selección usado en FSSeguidos; las casillas muestran su valor dentro.
+- Mantiene las selecciones de partido 1/X/2 con el mismo color azul activo.
+- Añade los números directamente a los botones de totales y distancias para
+  evitar alternar entre una casilla pequeña y una etiqueta separada.
+
+## 2.0.26 — restauración de ventana, diagnóstico y FSSeguidos
+
+- Conserva el botón nativo de maximizar/restaurar y bloquea el cambio manual de
+  tamaño al volver a la ventana normal.
+- Permite abrir «¿Dónde se produjo el fallo?» antes de que estén los 14 signos;
+  el panel explica qué resultados faltan.
+- Elimina la subpestaña redundante «Signos Seguidos» de FSSeguidos. Muestra los
+  totales 0–14 en una cuadrícula compacta y el estado de figuras seleccionadas.
+
 ## 2.0.25 — pestañas independientes para Interrupciones y Distancias
 
 - Quita las subpestañas repetidas de Interrupciones y crea una pestaña principal

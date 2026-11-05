@@ -171,11 +171,14 @@ def test_evaluated_bets_can_be_opened_before_any_live_result_arrives(window):
     assert window.eval_detail_button.isEnabled()
     assert window.eval_model.rowCount() == len(system.bets)
     assert 'esperando resultados' in window.eval_summary.text()
+    assert window.scrutiny_diagnostic_button.isEnabled()
+    assert '14 signos ganadores' in window.scrutiny_diagnostic_text_label.text()
+    window.scrutiny_diagnostic_button.click();QTest.qWait(20)
+    assert not window.scrutiny_diagnostic_panel.isHidden()
     window.eval_detail_button.click();QTest.qWait(20)
     assert window.eval_view.isVisible()
     assert window.eval_model.rows[0][3] == 0
     assert window.eval_model.rows[0][5] == 14
-    assert not window.scrutiny_diagnostic_button.isEnabled()
 
 
 def test_scrutiny_cards_are_equal_and_compact_at_desktop_width(window):

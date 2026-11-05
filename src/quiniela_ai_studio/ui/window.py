@@ -12,7 +12,7 @@ from decimal import Decimal
 from functools import partial
 from pathlib import Path
 
-from PySide6.QtCore import QAbstractTableModel, QModelIndex, Qt, QThread, QTimer, Signal
+from PySide6.QtCore import QAbstractTableModel, QModelIndex, QSize, Qt, QThread, QTimer, Signal
 from PySide6.QtGui import QColor, QIntValidator, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QAbstractItemView,
@@ -75,7 +75,7 @@ from quiniela_ai_studio.infrastructure.published_scrutiny import (
 from quiniela_ai_studio.ui.classic_reductions import (
     ClassicContextHeader,
     ClassicReductionsCanvas,
-    ClassicTotalList,
+    ClassicTotalGrid,
     emboss_symbol,
 )
 from quiniela_ai_studio.ui.normal_generator import NormalGenerator
@@ -396,7 +396,7 @@ class SignMatrixWidget(QWidget):
             group=QButtonGroup(self);group.setExclusive(True);row_buttons=[]
             for column,sign in enumerate('1X2',1):
                 button=QPushButton(sign);button.setCheckable(True);button.setFixedSize(28,21)
-                button.setStyleSheet('QPushButton{padding:0;border-radius:2px;background:#f3f6fb;color:#16406a;border:1px solid #9bb9d4;} QPushButton:checked{background:#d82848;color:white;border:1px solid #ff6678;font-weight:bold;}')
+                button.setStyleSheet('QPushButton{padding:0;border-radius:2px;background:#f3f6fb;color:#173b75;border:1px solid #9bb9d4;} QPushButton:checked{background:#2782b8;color:white;border:1px solid #b5e1fb;font-weight:bold;}')
                 button.toggled.connect(self._button_changed);group.addButton(button,column-1);grid.addWidget(button,row+1,column);row_buttons.append(button)
             self.buttons.append(row_buttons)
         self.setSizePolicy(QSizePolicy.Policy.Maximum,QSizePolicy.Policy.Fixed)
@@ -423,7 +423,7 @@ class SignMatrixWidget(QWidget):
 
 
 class SelectionSquare(QPushButton):
-    """Accessible white/green binary control without a checkmark glyph."""
+    """Accessible white/blue selection square used consistently in reductions."""
 
     def __init__(self, name, *, size=18, parent=None):
         super().__init__(parent)
@@ -432,19 +432,19 @@ class SelectionSquare(QPushButton):
         self.setFixedSize(size, size)
         self.setText('')
         self.setAccessibleName(name)
-        self.setAccessibleDescription('Verde: seleccionado. Blanco: desactivado.')
+        self.setAccessibleDescription('Azul: seleccionado. Blanco: desactivado.')
         self.setToolTip(name)
         self.setStyleSheet(
-            'QPushButton#selectionSquare{padding:0;background:#f3f6fb;color:transparent;'
+            'QPushButton#selectionSquare{padding:0;background:#f3f6fb;color:#173b75;'
             'border:1px solid #8eb1cd;border-radius:0;} '
-            'QPushButton#selectionSquare:checked{background:#62c515;border:1px solid #b6f45d;} '
+            'QPushButton#selectionSquare:checked{background:#2782b8;color:white;border:1px solid #b5e1fb;font-weight:bold;} '
             'QPushButton#selectionSquare:focus{border:2px solid #ffc83d;} '
             'QPushButton#selectionSquare:disabled{background:#8b98a6;border-color:#59718d;}'
         )
 
 
 class SelectionValueSquare(SelectionSquare):
-    """Tiny white/green historical-frequency cell with its count inside."""
+    """Compact historical-frequency cell with its value inside."""
 
     def __init__(self, name, *, parent=None):
         super().__init__(name, size=24, parent=parent)
@@ -452,8 +452,8 @@ class SelectionValueSquare(SelectionSquare):
         self.setStyleSheet(
             'QPushButton#selectionSquare{padding:0;background:#f3f6fb;color:#10243b;'
             'border:1px solid #8eb1cd;border-radius:1px;font-size:7px;} '
-            'QPushButton#selectionSquare:checked{background:#62c515;color:#062442;'
-            'border:1px solid #b6f45d;font-weight:bold;} '
+            'QPushButton#selectionSquare:checked{background:#2782b8;color:white;'
+            'border:1px solid #b5e1fb;font-weight:bold;} '
             'QPushButton#selectionSquare:focus{border:2px solid #ffc83d;} '
             'QPushButton#selectionSquare:disabled{background:#d7e0e9;border-color:#879aaa;}'
         )
@@ -579,6 +579,9 @@ class MainWindow(QMainWindow):
         self.edit_buttons = []
         self.setWindowTitle(f'Quiniela AI Studio · v{__version__}')
         self.resize(1200, 820)
+        self._locked_normal_size=QSize(self.size())
+        self._normal_window_size_locked=False
+        self._restoring_locked_size=False
         self.setMinimumSize(900, 650)
         body = QWidget(); self.setCentralWidget(body)
         root = QVBoxLayout(body); root.setContentsMargins(12, 10, 12, 8)
@@ -667,10 +670,22 @@ class MainWindow(QMainWindow):
         outer = self.page_layout(8)
         scroll=QScrollArea();scroll.setWidgetResizable(True)
         content=QWidget();layout=QVBoxLayout(content);scroll.setWidget(content);outer.addWidget(scroll,1)
+        intro_row=QHBoxLayout()
         intro = QLabel('Elige un método y marca sus condiciones. El boleto base queda fijo a la izquierda; las reducciones se aplican a sus columnas.')
-        intro.setWordWrap(True);layout.addWidget(intro)
+        intro.setWordWrap(True);intro_row.addWidget(intro,1)
+        self.filter_reset.setText('Restablecer filtros')
+        self.filter_reset.setToolTip('Quita las condiciones activas de Reducciones.')
+        self.filter_reset.setMaximumWidth(150)
+        intro_row.addWidget(self.filter_reset,0,Qt.AlignmentFlag.AlignRight)
+        layout.addLayout(intro_row)
         names=('Cuenta','Racha','Cambio','Patrón','Pareja','Trío','Cuart.','Quint.','Acier.','Grupo','Relac.','Frec.','Suma','Colum.','IF/THEN','Reserva','Atenea','FSSeguidos','Interrupciones','Optimizar','Distancias')
         self.reduction_tabs=QTabWidget();self.reduction_tabs.setObjectName('reductionTabs');self.reduction_tabs.setDocumentMode(True);self.reduction_tabs.setUsesScrollButtons(True)
+        self.reduction_tabs.setStyleSheet('''
+            QTabWidget#reductionTabs::pane{background:#0a203b;border:1px solid #315c7c;border-radius:4px;top:-1px;}
+            QTabWidget#reductionTabs QTabBar::tab{background:#123657;color:#cfe7f5;border:1px solid #315c7c;border-bottom-color:#102944;padding:7px 11px;margin-right:2px;min-height:21px;font-size:10px;}
+            QTabWidget#reductionTabs QTabBar::tab:selected{background:#1b527e;color:#8cebea;border-color:#48a0c5;font-weight:bold;}
+            QTabWidget#reductionTabs QTabBar::tab:hover{background:#1b4569;}
+        ''')
         self.reduction_tab_pages=[];self.reduction_tab_layouts=[]
         descriptions=('Cantidad de signos','Rachas máximas','Cambios entre partidos','Patrones repetidos','Parejas de signos','Patrones de tres partidos','Patrones de cuatro partidos','Patrones de cinco partidos','Coincidencias con referencia','Grupos gráficos','Relación entre grupos','Frecuencia de columnas','Sumas y rangos','Columnas por grupos','Condición entre grupos','Columnas de reserva','Reducción de cobertura Atenea','Figuras exactas de signos seguidos','Matriz de interrupciones consecutivas','Optimización de apuestas por presupuesto','Distancia máxima entre apariciones de cada signo')
         visible_reductions={0,1,9,17,18,19,20}
@@ -685,8 +700,8 @@ class MainWindow(QMainWindow):
                 tooltip='Rachas consecutivas de 1/X/2/V; comparte el filtro histórico Racha.' if index==1 else description
                 self.reduction_tabs.setTabToolTip(visible_index,tooltip)
                 self.reduction_visible_indexes[index]=visible_index
-                canvas_width={0:700,1:960,9:720,17:590,18:600,20:600}.get(index,600)
-                canvas_height={0:650,1:730,9:610,17:625,18:640,20:640}.get(index,600)
+                canvas_width={0:700,1:960,9:720,17:880,18:1080,20:850}.get(index,600)
+                canvas_height={0:650,1:730,9:610,17:700,18:700,20:700}.get(index,600)
                 if index==19:
                     self.reduction_tabs.setTabToolTip(visible_index,description)
                     self.reduction_tab_pages.append(page);self.reduction_tab_layouts.append(page_layout)
@@ -764,7 +779,7 @@ class MainWindow(QMainWindow):
         help_text=QLabel('Marca «Usar» y pulsa 1, X o 2 en cada partido. Si marcas varios signos, cualquiera de ellos sirve.')
         help_text.setWordWrap(True);self.reduction_tab_layouts[9].addWidget(help_text)
         self.advanced_feedback=QLabel();self.advanced_feedback.setWordWrap(True);self.reduction_tab_layouts[9].addWidget(self.advanced_feedback)
-        layout.addWidget(self.filter_feedback);layout.addWidget(self.filter_reset)
+        layout.addWidget(self.filter_feedback)
         self._move_optimizer_into_reductions()
         self._make_reduction_numeric_graphical()
         self.reduction_tabs.currentChanged.connect(self._reduction_tab_selected)
@@ -779,11 +794,29 @@ class MainWindow(QMainWindow):
         """Place budget optimization beside reduction methods and gate it explicitly."""
         source=self.page_layout(2)
         destination=self.reduction_tab_layouts[19]
+        workspace=QWidget();workspace.setObjectName('optimizerWorkspace');workspace.setMaximumWidth(1080)
+        workspace.setStyleSheet('''
+            QWidget#optimizerWorkspace QGroupBox{margin-top:13px;padding-top:5px;border:1px solid #315c7c;border-radius:4px;background:#0c2742;}
+            QWidget#optimizerWorkspace QGroupBox::title{subcontrol-origin:margin;subcontrol-position:top left;left:8px;padding:1px 5px;color:#8cebea;background:#0a203b;}
+        ''')
+        workspace_layout=QVBoxLayout(workspace);workspace_layout.setContentsMargins(4,4,4,4);workspace_layout.setSpacing(8)
         while source.count():
             item=source.takeAt(0);widget=item.widget()
-            if widget is None:continue
-            if widget.objectName()=='title':widget.deleteLater()
-            else:widget.setParent(None);destination.addWidget(widget)
+            if widget is not None:
+                if widget.objectName()=='title':widget.deleteLater()
+                else:widget.setParent(None);workspace_layout.addWidget(widget)
+            elif item.layout() is not None:
+                # Preserve nested rows and spacers from the original optimizer
+                # page; skipping nested rows detached labels and clipped controls.
+                workspace_layout.addItem(item)
+        destination.addWidget(workspace,0,Qt.AlignmentFlag.AlignHCenter|Qt.AlignmentFlag.AlignTop)
+        destination.addStretch(1)
+        tab_bar=self.reduction_tabs.tabBar()
+        old_optimizer=self.reduction_visible_indexes[19]
+        last_index=self.reduction_tabs.count()-1
+        tab_bar.moveTab(old_optimizer,last_index)
+        self.reduction_visible_indexes[19]=last_index
+        self.reduction_visible_indexes[20]=old_optimizer
         square=SelectionSquare('Activar optimización por presupuesto',size=14,parent=self.reduction_tabs.tabBar())
         square.toggled.connect(partial(self.reduction_tab_toggled,19))
         tab_index=self.reduction_visible_indexes[19]
@@ -1135,6 +1168,8 @@ class MainWindow(QMainWindow):
         self.history_season_grids={}
         self.history_season_select_all={}
         self.history_season_select_none={}
+        self.history_season_cells={}
+        self.history_season_search={}
         self.history_season_summaries={}
         self.count_frequency_labels={};self.run_frequency_labels={}
         self.mode_azar_controls={};self.mode_automatic_controls={}
@@ -1151,7 +1186,6 @@ class MainWindow(QMainWindow):
                     widget.setParent(manual);manual_layout.addWidget(widget)
             if classic_header is not None:
                 original.addWidget(classic_header)
-                if title=='Cuenta':classic_header.hide()
             # The interval editors are superseded by the classic graphical
             # count/length grid. Keep their values in the model for migrations.
             old_box=self._existing_filter_boxes[outer_index][0]
@@ -1610,14 +1644,14 @@ class MainWindow(QMainWindow):
         auto_row=QHBoxLayout();auto_row.setSpacing(5)
         auto_row.setAlignment(Qt.AlignmentFlag.AlignLeft|Qt.AlignmentFlag.AlignTop)
 
-        season_group=QGroupBox('Temporadas');season_group.setObjectName('streakSeasonGroup');season_group.setFixedWidth(210)
+        season_group=QGroupBox('Temporadas');season_group.setObjectName('streakSeasonGroup');season_group.setFixedWidth(380)
         season_group_layout=QVBoxLayout(season_group);season_group_layout.setContentsMargins(4,3,4,3);season_group_layout.setSpacing(2)
         season_actions=QHBoxLayout();select_all=QPushButton('Todas');select_none=QPushButton('Ninguna')
         select_all.setMaximumWidth(56);select_none.setMaximumWidth(64);season_actions.addWidget(select_all);season_actions.addWidget(select_none);season_actions.addStretch(1);season_group_layout.addLayout(season_actions)
         season_host=QWidget();season_grid=QGridLayout(season_host);season_grid.setContentsMargins(1,1,1,1);season_grid.setHorizontalSpacing(2);season_grid.setVerticalSpacing(1)
         season_scroll=QScrollArea();season_scroll.setWidgetResizable(True);season_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff);season_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         season_scroll.setObjectName('classicWhiteList')
-        season_scroll.setFixedSize(192,208);season_scroll.setWidget(season_host);season_group_layout.addWidget(season_scroll)
+        season_scroll.setFixedSize(360,145);season_scroll.setWidget(season_host);season_group_layout.addWidget(season_scroll)
         season_host.setStyleSheet('background:#ffffff;QLabel{color:#163b74;background:#ffffff;font-size:10px;}')
         self.history_season_squares['Racha']={};self.history_season_hosts['Racha']=season_host;self.history_season_grids['Racha']=season_grid
         self.history_season_select_all['Racha']=select_all;self.history_season_select_none['Racha']=select_none
@@ -1628,6 +1662,7 @@ class MainWindow(QMainWindow):
         self._populate_history_seasons('Racha',seasons,initial)
         select_all.clicked.connect(lambda _checked=False:self._set_history_seasons('Racha',True))
         select_none.clicked.connect(lambda _checked=False:self._set_history_seasons('Racha',False))
+        self._install_history_season_tools('Racha',season_group_layout,season_actions,season_host)
         recommendation=QGroupBox();recommendation.setFixedWidth(112)
         recommendation_layout=QVBoxLayout(recommendation);recommendation_layout.setContentsMargins(7,8,7,8);recommendation_layout.setSpacing(4)
         recommendation_layout.addWidget(QLabel('Riesgo'))
@@ -1668,7 +1703,7 @@ class MainWindow(QMainWindow):
         self.fss_mode_pages={}
         self.fss_figure_totals={sign:0 for sign in ('1','X','2','V')}
         self.fss_figure_values={sign:{} for sign in ('1','X','2','V')}
-        self.fss_total_controls={};self.fss_figure_lists={};self.fss_figure_apply={}
+        self.fss_total_controls={};self.fss_figure_lists={};self.fss_figure_apply={};self.fss_figure_status={}
         self.fss_possible_figures={sign:{} for sign in ('1','X','2','V')}
         self.fss_render_signatures={}
         self.fss_generation_metadata={}
@@ -1681,23 +1716,28 @@ class MainWindow(QMainWindow):
         board=QWidget();board.setObjectName('fssFigureBoard')
         board_layout=QHBoxLayout(board);board_layout.setContentsMargins(3,3,3,3);board_layout.setSpacing(1)
         for sign in ('1','X','2','V'):
-            panel=QGroupBox();panel.setObjectName('fssFigurePanel');panel.setFixedWidth(140)
+            panel=QGroupBox();panel.setObjectName('fssFigurePanel');panel.setFixedWidth(174)
             panel_layout=QVBoxLayout(panel);panel_layout.setContentsMargins(3,2,3,3);panel_layout.setSpacing(1)
-            top=QHBoxLayout();top.setContentsMargins(0,0,0,0);top.setSpacing(3)
-            mark=QLabel(sign);mark.setObjectName('classicSign');mark.setFixedHeight(85);emboss_symbol(mark)
-            mark.setFixedWidth(75)
-            total=ClassicTotalList(f'Total de signos {sign} para FSSeguidos')
+            top=QHBoxLayout();top.setContentsMargins(2,0,2,0);top.setSpacing(4)
+            mark=QLabel(sign);mark.setObjectName('classicSign');mark.setFixedSize(45,45);emboss_symbol(mark)
+            mark.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            total=ClassicTotalGrid(f'Total de signos {sign} para FSSeguidos')
             total.setObjectName(f'fssTotal{sign}')
-            total.setFixedHeight(75)
-            top.addWidget(mark);top.addStretch(1);top.addWidget(total)
+            total_box=QVBoxLayout();total_box.setContentsMargins(0,0,0,0);total_box.setSpacing(2)
+            total_caption=QLabel('Total 0');total_caption.setObjectName('classicHeading')
+            total_caption.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            total.valueChanged.connect(lambda value,label=total_caption:label.setText(f'Total {value}'))
+            total_box.addWidget(total_caption);total_box.addWidget(total,0,Qt.AlignmentFlag.AlignHCenter)
+            top.addWidget(mark);top.addStretch(1);top.addLayout(total_box)
             panel_layout.addLayout(top)
-            panel_layout.addSpacing(31)
-            figure_title=QLabel('Figuras');figure_title.setObjectName('classicHeading')
+            figure_title=QLabel('Figuras permitidas');figure_title.setObjectName('classicHeading')
             panel_layout.addWidget(figure_title)
             choices=QListWidget();choices.setObjectName(f'fssFigures{sign}')
             choices.setSelectionMode(QAbstractItemView.SelectionMode.MultiSelection)
-            choices.setFixedSize(128,220)
+            choices.setFixedSize(158,205)
             panel_layout.addWidget(choices,1)
+            status=QLabel('0 seleccionadas');status.setObjectName('muted');status.setAlignment(Qt.AlignmentFlag.AlignRight)
+            panel_layout.addWidget(status);self.fss_figure_status[sign]=status
             apply_row=QHBoxLayout();apply_row.setContentsMargins(0,0,0,0);apply_row.setSpacing(4)
             apply_row.addWidget(QLabel('Aplicar'))
             square=SelectionSquare(f'Aplicar figuras exactas de {sign} en FSSeguidos',size=13)
@@ -1717,7 +1757,6 @@ class MainWindow(QMainWindow):
             return host,host_layout
 
         manual=QWidget();manual_layout=QVBoxLayout(manual);manual_layout.setContentsMargins(4,3,4,3);manual_layout.setSpacing(3)
-        manual_layout.addLayout(self._fss_navigation_strip())
         manual_note=QLabel('Selecciona el total y una o varias particiones exactas de sus rachas máximas. X y 2 se agrupan como V; solo se analizan los 14 partidos.')
         manual_note.setWordWrap(True);manual_note.setVisible(False);manual_layout.addWidget(manual_note)
         manual_host,manual_host_layout=make_placeholder('Manual');manual_layout.addWidget(manual_host,0,Qt.AlignmentFlag.AlignLeft)
@@ -1726,7 +1765,6 @@ class MainWindow(QMainWindow):
         methods.addTab(manual,'Manual');self.fss_mode_pages['Manual']=manual
 
         random_page=QWidget();random_layout=QVBoxLayout(random_page);random_layout.setContentsMargins(4,3,4,3);random_layout.setSpacing(4)
-        random_layout.addLayout(self._fss_navigation_strip())
         random_note=QLabel('Azar · elige figuras alcanzables con la base actual. La semilla permite repetir la propuesta.')
         random_note.setWordWrap(True);random_layout.addWidget(random_note)
         random_host,random_host_layout=make_placeholder('Azar');random_layout.addWidget(random_host,0,Qt.AlignmentFlag.AlignLeft)
@@ -1742,7 +1780,6 @@ class MainWindow(QMainWindow):
         self.mode_azar_controls['FSSeguidos']=(random_risk,seed,random_summary)
 
         automatic_page=QWidget();automatic_layout=QVBoxLayout(automatic_page);automatic_layout.setContentsMargins(4,3,4,3);automatic_layout.setSpacing(4)
-        automatic_layout.addLayout(self._fss_navigation_strip())
         auto_note=QLabel('Automática · recomienda figuras por su frecuencia en resultados finales reales; no predice la próxima jornada.')
         auto_note.setWordWrap(True);automatic_layout.addWidget(auto_note)
         auto_host,auto_host_layout=make_placeholder('Automática');automatic_layout.addWidget(auto_host,0,Qt.AlignmentFlag.AlignLeft)
@@ -1750,19 +1787,20 @@ class MainWindow(QMainWindow):
         summary_label=QLabel();self.history_season_summaries['FSSeguidos']=summary_label
         scored=sum(bool(row.get('score_01')) for row in self.historical_reduction_results)
         summary_label.setText(f'{len(seasons)} temp. · {len(self.historical_reduction_results):,} jornadas · {scored} con marcador'.replace(',','.'))
-        season_group=QGroupBox('Temporadas');season_group.setFixedWidth(400)
+        season_group=QGroupBox('Temporadas');season_group.setFixedWidth(350)
         season_layout=QVBoxLayout(season_group);season_layout.setContentsMargins(4,3,4,3);season_layout.setSpacing(2)
         season_actions=QHBoxLayout();select_all=QPushButton('Todas');select_none=QPushButton('Ninguna')
         select_all.setMaximumWidth(56);select_none.setMaximumWidth(64);season_actions.addWidget(select_all);season_actions.addWidget(select_none);season_actions.addStretch(1);season_layout.addLayout(season_actions)
         season_host=QWidget();season_grid=QGridLayout(season_host);season_grid.setContentsMargins(1,1,1,1);season_grid.setHorizontalSpacing(2);season_grid.setVerticalSpacing(1)
         season_scroll=QScrollArea();season_scroll.setWidgetResizable(True);season_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff);season_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        season_scroll.setFixedSize(380,105);season_scroll.setWidget(season_host);season_layout.addWidget(season_scroll)
+        season_scroll.setFixedSize(380,145);season_scroll.setWidget(season_host);season_layout.addWidget(season_scroll)
         self.history_season_squares['FSSeguidos']={};self.history_season_hosts['FSSeguidos']=season_host;self.history_season_grids['FSSeguidos']=season_grid
         current_round_key=self.round_picker.currentData();season_key=f'fsseguidos_seasons:{current_round_key}' if current_round_key else 'fsseguidos_seasons'
         saved_seasons=self.repository.setting(season_key,None)
         self._populate_history_seasons('FSSeguidos',seasons,{season:(season in saved_seasons if saved_seasons is not None else True) for season in seasons})
         select_all.clicked.connect(lambda _checked=False:self._set_history_seasons('FSSeguidos',True))
         select_none.clicked.connect(lambda _checked=False:self._set_history_seasons('FSSeguidos',False))
+        self._install_history_season_tools('FSSeguidos',season_layout,season_actions,season_host)
         season_group_layout=QHBoxLayout();season_group_layout.setContentsMargins(0,0,0,0);season_group_layout.setSpacing(5)
         auto_risk=self._make_streak_risk_group(automatic_page,'Riesgo FSSeguidos automático');auto_risk.setExclusive(True);auto_risk.button(0).setChecked(True)
         season_group_layout.addWidget(season_group,0,Qt.AlignmentFlag.AlignTop)
@@ -1790,17 +1828,6 @@ class MainWindow(QMainWindow):
         for sign in ('1','X','2','V'):
             self._refresh_fss_figure_list(sign)
         self._update_fss_context()
-
-    def _fss_navigation_strip(self):
-        """Keep the original Signos Seguidos / Figuras navigation functional."""
-        row=QHBoxLayout();row.setContentsMargins(1,0,1,0);row.setSpacing(1)
-        previous=QPushButton('Signos Seguidos');previous.setObjectName('classicSubTab')
-        previous.clicked.connect(lambda _checked=False:self.reduction_tabs.setCurrentIndex(self.reduction_visible_indexes[1]))
-        current=QPushButton('Figuras Signos Seg.');current.setObjectName('classicSubTab')
-        current.setCheckable(True);current.setChecked(True)
-        current.clicked.connect(lambda _checked=False:self.reduction_tabs.setCurrentIndex(self.reduction_visible_indexes[17]))
-        row.addWidget(previous);row.addWidget(current);row.addStretch(1)
-        return row
 
     def _update_fss_context(self):
         if not hasattr(self,'fss_context'):return
@@ -1834,6 +1861,13 @@ class MainWindow(QMainWindow):
             if figure not in possible:
                 item.setToolTip('La selección se conserva, aunque la base actual no pueda alcanzar esta figura.')
         widget.blockSignals(False)
+        self._update_fss_figure_status(sign)
+
+    def _update_fss_figure_status(self,sign):
+        if sign not in self.fss_figure_status:return
+        selected=len(self.fss_figure_lists[sign].selectedItems())
+        available=len(self.fss_possible_figures[sign].get(self.fss_total_controls[sign].value(),()))
+        self.fss_figure_status[sign].setText(f'{selected} seleccionadas · {available} posibles')
 
     def _fss_total_changed(self,sign,total):
         self.fss_figure_totals[sign]=int(total)
@@ -1847,6 +1881,7 @@ class MainWindow(QMainWindow):
         selected={str(item.data(Qt.ItemDataRole.UserRole)) for item in widget.selectedItems()
                   if item.data(Qt.ItemDataRole.UserRole) is not None}
         self.fss_figure_values[sign][total]=selected
+        self._update_fss_figure_status(sign)
         if not selected and self.fss_figure_apply[sign].isChecked():
             self.fss_figure_apply[sign].setChecked(False)
         self._fss_manual_edited()
@@ -1991,18 +2026,18 @@ class MainWindow(QMainWindow):
         lists=QHBoxLayout();lists.setContentsMargins(0,0,0,0);lists.setSpacing(3)
         totals_box=QVBoxLayout();totals_box.addWidget(QLabel('Total'))
         totals_host=QWidget();totals_grid=QGridLayout(totals_host);totals_grid.setContentsMargins(0,0,0,0);totals_grid.setHorizontalSpacing(2);totals_grid.setVerticalSpacing(1)
-        self.interruption_total_buttons={};self.interruption_total_labels={}
+        self.interruption_total_buttons={}
         self.interruption_focus_total=None
         for total in range(14):
-            square=SelectionSquare(f'Permitir {total} interrupciones en Distancias',size=13)
+            square=SelectionSquare(f'Permitir {total} interrupciones en Distancias',size=19)
+            square.setText(str(total))
+            square.setStyleSheet(square.styleSheet()+'QPushButton#selectionSquare{font-size:9px;}')
             square.toggled.connect(lambda checked,value=total:self._interruption_total_toggled(value,checked))
             square.clicked.connect(lambda _checked=False,value=total:self._focus_interruption_total(value))
-            label=QLabel(str(total));label.setFixedWidth(18)
-            label.setStyleSheet('color:#173b75;background:#ffffff;font-size:10px;')
-            totals_grid.addWidget(square,total,0);totals_grid.addWidget(label,total,1)
-            self.interruption_total_buttons[total]=square;self.interruption_total_labels[total]=label
+            totals_grid.addWidget(square,total,0,Qt.AlignmentFlag.AlignCenter)
+            self.interruption_total_buttons[total]=square
         totals_scroll=QScrollArea();totals_scroll.setWidgetResizable(True);totals_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        totals_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded);totals_scroll.setFixedSize(45,330);totals_scroll.setWidget(totals_host)
+        totals_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded);totals_scroll.setFixedSize(34,330);totals_scroll.setWidget(totals_host)
         totals_scroll.setObjectName('classicWhiteList');totals_host.setStyleSheet('background:#ffffff;')
         totals_box.addWidget(totals_scroll);lists.addLayout(totals_box)
         figures_box=QVBoxLayout();figures_box.addWidget(QLabel('Figuras'))
@@ -2021,6 +2056,9 @@ class MainWindow(QMainWindow):
         right_actions.addWidget(mark_right);right_actions.addWidget(reset_right);right_actions.addStretch(1);right_layout.addLayout(right_actions)
         board_layout.addStretch(1)
         surfaces=QStackedWidget()
+        surfaces.setObjectName('interruptionSharedBoard')
+        surfaces.setFixedSize(585,405)
+        surfaces.setSizePolicy(QSizePolicy.Policy.Fixed,QSizePolicy.Policy.Fixed)
         surfaces.addWidget(board)
         self.interruption_surfaces=surfaces
 
@@ -2057,19 +2095,20 @@ class MainWindow(QMainWindow):
         seasons={str(row.get('season','')) for row in self.historical_reduction_results if row.get('season')}
         season_label=QLabel();self.history_season_summaries['Interrupciones']=season_label
         season_label.setText(f'{len(seasons)} temp. · {len(self.historical_reduction_results):,} jornadas'.replace(',','.'))
-        season_group=QGroupBox('Temporadas');season_group.setFixedWidth(180)
+        season_group=QGroupBox('Temporadas');season_group.setFixedWidth(400)
         season_layout=QVBoxLayout(season_group);season_layout.setContentsMargins(4,3,4,3);season_layout.setSpacing(2)
         actions=QHBoxLayout();select_all=QPushButton('Todas');select_none=QPushButton('Ninguna')
         select_all.setMaximumWidth(58);select_none.setMaximumWidth(66);actions.addWidget(select_all);actions.addWidget(select_none);actions.addStretch(1);season_layout.addLayout(actions)
         season_host=QWidget();season_grid=QGridLayout(season_host);season_grid.setContentsMargins(1,1,1,1);season_grid.setHorizontalSpacing(2);season_grid.setVerticalSpacing(1)
         season_scroll=QScrollArea();season_scroll.setWidgetResizable(True);season_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        season_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded);season_scroll.setFixedSize(162,124);season_scroll.setWidget(season_host);season_layout.addWidget(season_scroll)
+        season_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded);season_scroll.setFixedSize(330,145);season_scroll.setWidget(season_host);season_layout.addWidget(season_scroll)
         self.history_season_squares['Interrupciones']={};self.history_season_hosts['Interrupciones']=season_host;self.history_season_grids['Interrupciones']=season_grid
         self.history_season_select_all['Interrupciones']=select_all;self.history_season_select_none['Interrupciones']=select_none
         key=self._interruption_season_setting_key();saved=self.repository.setting(key,None)
         self._populate_history_seasons('Interrupciones',seasons,{season:(season in saved if saved is not None else True) for season in seasons})
         select_all.clicked.connect(lambda _checked=False:self._set_history_seasons('Interrupciones',True))
         select_none.clicked.connect(lambda _checked=False:self._set_history_seasons('Interrupciones',False))
+        self._install_history_season_tools('Interrupciones',season_layout,actions,season_host)
         controls=QHBoxLayout();auto_risk=RiskSelector()
         for label,value in (('Mínimo',0),('Medio',1),('Máximo',2)):auto_risk.addItem(label,value)
         auto_calculate=QPushButton('Calcular');auto_summary=QLabel('Elige temporadas y calcula una recomendación basada en los resultados reales disponibles.')
@@ -2077,10 +2116,17 @@ class MainWindow(QMainWindow):
         auto_calculate.clicked.connect(lambda _checked=False:self.safe(lambda:self._calculate_automatic_interruption_mode(auto_risk,auto_summary)))
         controls.addWidget(QLabel('Riesgo'));controls.addWidget(auto_risk);controls.addWidget(auto_calculate);controls.addStretch(1)
         season_label.setVisible(False)
-        automatic_layout.addWidget(season_label)
-        compact_auto=QHBoxLayout();compact_auto.addLayout(controls);compact_auto.addStretch(1)
-        compact_auto.addWidget(season_group,0,Qt.AlignmentFlag.AlignTop)
-        automatic_layout.addLayout(compact_auto);automatic_layout.addWidget(auto_summary);automatic_layout.addStretch(1)
+        automatic_layout.removeWidget(host)
+        automatic_layout.removeWidget(season_label)
+        automatic_layout.removeWidget(auto_summary)
+        workspace=QHBoxLayout();workspace.setContentsMargins(0,0,0,0);workspace.setSpacing(10)
+        workspace.addWidget(host,0,Qt.AlignmentFlag.AlignLeft|Qt.AlignmentFlag.AlignTop)
+        auto_side=QVBoxLayout();auto_side.setContentsMargins(0,0,0,0);auto_side.setSpacing(6)
+        auto_side.addWidget(season_group,0,Qt.AlignmentFlag.AlignLeft|Qt.AlignmentFlag.AlignTop)
+        controls.addStretch(1);auto_side.addLayout(controls)
+        auto_summary.setObjectName('muted');auto_side.addWidget(auto_summary);auto_side.addStretch(1)
+        workspace.addLayout(auto_side,0);workspace.addStretch(1)
+        automatic_layout.addLayout(workspace);automatic_layout.addStretch(1)
         methods.addTab(automatic_page,'Automática');self.mode_automatic_controls['Interrupciones']=(auto_risk,auto_summary,auto_calculate)
 
         def show_shared_board(index):
@@ -2127,11 +2173,11 @@ class MainWindow(QMainWindow):
             mark.setAlignment(Qt.AlignmentFlag.AlignCenter);panel_layout.addWidget(mark)
             for distance in range(15):
                 row=QHBoxLayout();row.setContentsMargins(5,0,5,0);row.setSpacing(3)
-                label=QLabel(str(distance));label.setFixedWidth(18)
-                label.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
-                square=SelectionSquare(f'Distancia máxima {distance} entre {sign}',size=12)
+                square=SelectionSquare(f'Distancia máxima {distance} entre {sign}',size=20)
+                square.setText(str(distance))
+                square.setStyleSheet(square.styleSheet()+'QPushButton#selectionSquare{font-size:9px;}')
                 square.toggled.connect(lambda checked,s=sign,n=distance:self._sign_distance_toggled(s,n,checked))
-                row.addWidget(label);row.addWidget(square);row.addStretch(1)
+                row.addWidget(square,0,Qt.AlignmentFlag.AlignHCenter);row.addStretch(1)
                 panel_layout.addLayout(row)
                 self.sign_distance_squares[(sign,distance)]=square
             apply_row=QHBoxLayout();apply_row.setSpacing(2)
@@ -2217,7 +2263,6 @@ class MainWindow(QMainWindow):
         for total,button in self.interruption_total_buttons.items():
             visible=bool(self.interruption_possible_figures.get(total)) or total in self.interruption_selected_totals
             button.setEnabled(visible);button.setVisible(visible)
-            self.interruption_total_labels[total].setVisible(visible)
         if self.interruption_focus_total not in self.interruption_possible_figures or not self.interruption_possible_figures.get(self.interruption_focus_total):
             self.interruption_focus_total=next((total for total,figures in self.interruption_possible_figures.items() if figures),None)
         self._refresh_interruption_figure_list()
@@ -2764,7 +2809,7 @@ class MainWindow(QMainWindow):
             item=grid.takeAt(0)
             widget=item.widget()
             if widget is not None:widget.deleteLater()
-        buttons={}
+        buttons={};cells={}
         ordered=sorted(seasons,reverse=True)
         columns=2
         if not ordered:
@@ -2778,14 +2823,49 @@ class MainWindow(QMainWindow):
                 label=QLabel(season);label.setFixedWidth(68)
                 if title in ('Racha','FSSeguidos','Interrupciones'):
                     label.setStyleSheet('color:#173b75;background:#ffffff;font-size:10px;')
-                cell=QWidget();cell_layout=QHBoxLayout(cell);cell_layout.setContentsMargins(1,0,1,0);cell_layout.setSpacing(3);cell_layout.addWidget(square);cell_layout.addWidget(label);cell_layout.addStretch(1)
+                cell=QWidget();cell.setObjectName('seasonChoice');cell_layout=QHBoxLayout(cell);cell_layout.setContentsMargins(2,1,2,1);cell_layout.setSpacing(4);cell_layout.addWidget(square);cell_layout.addWidget(label);cell_layout.addStretch(1)
+                cell.setStyleSheet('QWidget#seasonChoice{background:#123657;border:1px solid #315c7c;border-radius:3px;}')
                 grid.addWidget(cell,index//columns,index%columns)
-                buttons[season]=square
+                buttons[season]=square;cells[season]=cell
         self.history_season_squares[title]=buttons
+        self.history_season_cells[title]=cells
+        self._filter_history_season_choices(title)
         self._refresh_history_statistics(title)
         if title=='Cuenta':
             self._refresh_count_profiles()
             self._refresh_count_season_picker()
+
+    def _install_history_season_tools(self,title,season_layout,actions,season_host):
+        """Give every historical reduction the same compact season controls."""
+        recent5=QPushButton('Últimas 5');recent10=QPushButton('Últimas 10')
+        recent5.setToolTip('Selecciona las cinco temporadas más recientes.')
+        recent10.setToolTip('Selecciona las diez temporadas más recientes.')
+        actions.insertWidget(0,recent10);actions.insertWidget(0,recent5)
+        recent5.clicked.connect(lambda _checked=False,t=title:self._set_recent_history_seasons(t,5))
+        recent10.clicked.connect(lambda _checked=False,t=title:self._set_recent_history_seasons(t,10))
+        search=QLineEdit();search.setPlaceholderText('Buscar temporada…')
+        search.setClearButtonEnabled(True);search.setObjectName(f'historySeasonSearch{title}')
+        search.textChanged.connect(lambda _text,t=title:self._filter_history_season_choices(t))
+        season_layout.insertWidget(1,search)
+        self.history_season_search[title]=search
+        season_host.setStyleSheet('background:#0b223c;')
+
+    def _set_recent_history_seasons(self,title,count):
+        seasons=sorted(self.history_season_squares.get(title,{}),reverse=True)
+        chosen=set(seasons[:count])
+        self.configuring_filters=True
+        try:
+            for season,square in self.history_season_squares.get(title,{}).items():
+                square.setChecked(season in chosen)
+        finally:
+            self.configuring_filters=False
+        self._history_season_toggled(title)
+
+    def _filter_history_season_choices(self,title):
+        query=self.history_season_search.get(title)
+        needle=query.text().strip().lower() if query else ''
+        for season,cell in self.history_season_cells.get(title,{}).items():
+            cell.setVisible(needle in season.lower())
 
     def _refresh_history_statistics(self,title=None):
         """Show exact historical frequencies in the miniature classic grid."""
@@ -3376,7 +3456,7 @@ class MainWindow(QMainWindow):
             row_buttons=[]
             for col,sign in enumerate('1X2',1):
                 button=QPushButton(sign);button.setCheckable(True);button.setFixedSize(24,20)
-                button.setStyleSheet('QPushButton{padding:0;border-radius:2px;background:#f3f6fb;color:#16406a;border:1px solid #9bb9d4;} QPushButton:checked{background:#d82848;color:white;border:1px solid #ff6678;font-weight:bold;} QPushButton:disabled{color:#9aabba;background:#e6edf3;}')
+                button.setStyleSheet('QPushButton{padding:0;border-radius:2px;background:#f3f6fb;color:#173b75;border:1px solid #9bb9d4;} QPushButton:checked{background:#2782b8;color:white;border:1px solid #b5e1fb;font-weight:bold;} QPushButton:disabled{color:#9aabba;background:#e6edf3;}')
                 button.toggled.connect(self.advanced_conditions_changed);grid.addWidget(button,row+1,col);row_buttons.append(button)
             buttons.append(row_buttons)
         box.addLayout(grid)
@@ -3532,6 +3612,10 @@ class MainWindow(QMainWindow):
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
+        if (self._normal_window_size_locked and not self._restoring_locked_size
+                and not self.isMaximized() and not self.isMinimized() and not self.isFullScreen()
+                and event.size()!=self._locked_normal_size):
+            QTimer.singleShot(0,self._restore_locked_normal_size)
         if hasattr(self,'prize_layout'):
             compact=self.width()<1700
             self.prize_layout.setDirection(QBoxLayout.Direction.TopToBottom if compact else QBoxLayout.Direction.LeftToRight)
@@ -3552,6 +3636,20 @@ class MainWindow(QMainWindow):
                         card.setFixedHeight(225)
         if hasattr(self, 'scrutiny_splitter') and self.navigation.currentRow() == 4:
             QTimer.singleShot(0, self.fit_scrutiny_tables)
+
+    def lock_normal_window_size(self):
+        """Block manual resizing while retaining the native maximize/restore control."""
+        self._normal_window_size_locked=True
+        if not self.isMaximized() and not self.isMinimized():
+            self._locked_normal_size=QSize(self.size())
+
+    def _restore_locked_normal_size(self):
+        if (not self._normal_window_size_locked or self.isMaximized() or self.isMinimized()
+                or self.isFullScreen() or self.size()==self._locked_normal_size):
+            return
+        self._restoring_locked_size=True
+        try:self.resize(self._locked_normal_size)
+        finally:self._restoring_locked_size=False
 
     def fit_scrutiny_tables(self):
         """Reserve room for all 15 score rows before expanding the bet list."""
@@ -4251,6 +4349,7 @@ class MainWindow(QMainWindow):
     def build_optimize(self):
         outer=self.page_layout(2)
         scroll=QScrollArea();scroll.setWidgetResizable(True)
+        scroll.setMaximumHeight(260);scroll.hide()
         content=QWidget();layout=QVBoxLayout(content);scroll.setWidget(content)
         self.quick_level=None;self.configuring_filters=False
         self.filter_job=None;self.filter_epoch=0;self.filter_pending=False;self.athena_job=None
@@ -4296,7 +4395,6 @@ class MainWindow(QMainWindow):
         grid.addWidget(QLabel('La otra quiniela'),9,0);grid.addWidget(self.filter_reference,9,1,1,4)
         self.filter_reset=QPushButton('Quitar todas las condiciones');self.filter_reset.clicked.connect(self.reset_filters)
         self.filter_feedback=QLabel();self.filter_feedback.setWordWrap(True)
-        layout.addStretch()
         self.budget_group=QGroupBox('2 · Define presupuesto y prioridad')
         budget_outer=QVBoxLayout(self.budget_group);budget_layout=QHBoxLayout();budget_outer.addLayout(budget_layout);budget_layout.addWidget(QLabel('Presupuesto máximo (€)'))
         self.budget=QDoubleSpinBox();self.budget.setRange(0,100000);self.budget.setDecimals(2);self.budget.setValue(10);budget_layout.addWidget(self.budget)
@@ -4307,12 +4405,14 @@ class MainWindow(QMainWindow):
         self.budget_apply=self.button('Calcular propuesta',self.optimize,row,primary=True,editable=True)
         self.portfolio_cancel=self.button('Cancelar optimización',self.cancel_data,budget_outer)
         self.portfolio_cancel.setEnabled(False)
+        self.portfolio_cancel.setVisible(False)
         advanced_toggle=QCheckBox('Parámetros avanzados');budget_outer.addWidget(advanced_toggle)
         advanced=QGroupBox('Parámetros avanzados de optimización');advanced_layout=QGridLayout(advanced);advanced.hide()
         # Comparte el área desplazable de condiciones: nunca desplaza los
         # botones de presupuesto/cancelación fuera de pantallas pequeñas.
-        layout.insertWidget(1,advanced)
+        layout.addWidget(advanced)
         advanced_toggle.toggled.connect(advanced.setVisible)
+        advanced_toggle.toggled.connect(scroll.setVisible)
         advanced_toggle.toggled.connect(lambda checked:QTimer.singleShot(0,lambda:scroll.ensureWidgetVisible(advanced)) if checked else None)
         self.portfolio_advanced_toggle=advanced_toggle;self.portfolio_advanced=advanced
         self.portfolio_seed=QSpinBox();self.portfolio_seed.setRange(0,2_000_000_000)
@@ -4323,13 +4423,14 @@ class MainWindow(QMainWindow):
         for i,(label_text,control) in enumerate((('Semilla',self.portfolio_seed),('Tiempo de búsqueda (s)',self.portfolio_time),('Universo',self.portfolio_scope),('Canal',self.portfolio_channel))):advanced_layout.addWidget(QLabel(label_text),i,0);advanced_layout.addWidget(control,i,1)
         advanced_layout.addWidget(self.portfolio_pleno_model,4,0,1,2)
         self.portfolio_summary=QLabel('3 · Revisa la propuesta antes de aplicarla. El cálculo no modifica tus apuestas.')
-        self.portfolio_summary.setWordWrap(True);self.portfolio_summary.setObjectName('optimizationProposalSummary')
+        self.portfolio_summary.setWordWrap(True);self.portfolio_summary.setMinimumHeight(34);self.portfolio_summary.setObjectName('optimizationProposalSummary')
         self.portfolio_summary.setStyleSheet('background:#102b45;border:1px solid #2c6c98;border-radius:4px;padding:6px;')
         budget_outer.addWidget(self.portfolio_summary)
         self.budget.valueChanged.connect(self.update_budget_capacity)
         outer.addWidget(self.budget_group)
         self.budget_apply.setToolTip('Calcula una cartera dentro del presupuesto y de las condiciones activas. Tus apuestas no cambian hasta que pulses «Aplicar selección» en la propuesta.')
         outer.addWidget(self.methods_status)
+        layout.addStretch(1)
         for minimum,maximum in self.filter_ranges.values():
             minimum.valueChanged.connect(self.manual_filters_changed);maximum.valueChanged.connect(self.manual_filters_changed)
         for control in (self.filter_max_one,self.filter_max_x,self.filter_max_two):control.valueChanged.connect(self.manual_filters_changed)
@@ -5377,8 +5478,7 @@ class MainWindow(QMainWindow):
         self._render_prize_card(outcome,source,scrutiny)
         self.render_prize_forecast(outcome)
         self.scrutiny_diagnostic_text_label.setText(self.scrutiny_diagnostic_text(actual_result, outcome))
-        complete_result=(len(actual_result)==14 and '-' not in actual_result and not set(actual_result)-set('1X2'))
-        self.scrutiny_diagnostic_button.setEnabled(bool(outcome['rows']) and complete_result)
+        self.scrutiny_diagnostic_button.setEnabled(bool(outcome['rows']))
         self.eval_summary.setText(
             f'{outcome["known"]}/14 resultados · mejor: {best} aciertos · '
             f'{outcome["counts"][15]} Plenos · marcadores en juego pueden cambiar; sin premios calculados.'
@@ -5608,7 +5708,8 @@ class MainWindow(QMainWindow):
         busy=bool((self.data_worker and self.data_worker.isRunning()) or (self.worker and self.worker.isRunning()))
         for button in self.data_buttons:button.setEnabled(not busy and (button is not self.full_export_button or not self.export_busy()))
         self.data_cancel.setEnabled(bool(self.data_worker and self.data_worker.isRunning()))
-        self.portfolio_cancel.setEnabled(bool(self.data_worker and self.data_worker.isRunning() and self.data_kind=='portfolio'))
+        portfolio_running=bool(self.data_worker and self.data_worker.isRunning() and self.data_kind=='portfolio')
+        self.portfolio_cancel.setEnabled(portfolio_running);self.portfolio_cancel.setVisible(portfolio_running)
 
     def move_round(self,delta):
         keys=[r.key for r in sorted(self.repository.rounds(),key=lambda r:(r.season,r.number))]

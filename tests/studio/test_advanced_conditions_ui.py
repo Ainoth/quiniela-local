@@ -67,7 +67,7 @@ def test_group_editor_adds_compact_side_by_side_group_cards(window):
     assert window.navigation.currentRow() == 8
     window.navigation.setCurrentRow(8)
     assert window.reduction_tabs.count() == 7
-    assert [window.reduction_tabs.tabText(i) for i in range(7)] == ['Cuenta','SSeguidos','Grupo','FSSeguidos','Interrupciones','Optimizar','Distancias']
+    assert [window.reduction_tabs.tabText(i) for i in range(7)] == ['Cuenta','SSeguidos','Grupo','FSSeguidos','Interrupciones','Distancias','Optimizar']
     for reduction_id,tab_index in window.reduction_visible_indexes.items():
         bar=window.reduction_tabs.tabBar()
         assert bar.tabButton(tab_index,QTabBar.ButtonPosition.RightSide) is window.reduction_activation_buttons[reduction_id]
@@ -78,6 +78,9 @@ def test_group_editor_adds_compact_side_by_side_group_cards(window):
     assert not window.reduction_activation_buttons[19].isChecked()
     assert 'Reducidas' not in window.TAB_ORDER
     assert not window.budget_apply.isEnabled()
+    assert 'background:#2782b8' in window.count_squares[('V', 1)].styleSheet()
+    assert 'background:#2782b8' in window.advanced_groups[0]['buttons'][0][0].styleSheet()
+    assert 'background:#2782b8' in window.reduction_activation_buttons[19].styleSheet()
     from quiniela_ai_studio.domain.models import Bet
     window.set_system(window.service.imported(window.round,'Optimizer test',(Bet('1'*14,'M0'),)))
     window.reduction_activation_buttons[19].setChecked(True)
@@ -408,11 +411,17 @@ def test_fsseguidos_filters_exact_partition_separately_and_persists(window):
     window.set_system(window.service.imported(window.round,'Figuras exactas',bets))
     window.navigation.setCurrentRow(8)
     assert [window.mode_tabs['FSSeguidos'].tabText(i) for i in range(3)]==['Manual','Azar','Automática']
+    assert not any(button.text()=='Signos Seguidos'
+                   for button in window.mode_tabs['FSSeguidos'].findChildren(QPushButton))
     assert all(not square.isChecked() for square in window.reduction_activation_buttons.values())
     assert window.fss_figure_totals['V']==0
+    assert len(window.fss_total_controls['V'].buttons)==15
+    assert [button.text() for button in window.fss_total_controls['V'].buttons]==[str(value) for value in range(15)]
+    assert window.classic_reduction_canvases[17].width()>=700
     assert window.filter_spec().apply(bets)==bets
 
     window.fss_total_controls['V'].setValue(7)
+    assert window.fss_figure_status['V'].text().startswith('0 seleccionadas ·')
     choices=window.fss_figure_lists['V']
     selected=next(choices.item(i) for i in range(choices.count())
                   if choices.item(i).data(Qt.ItemDataRole.UserRole)=='3-2-1-1')
@@ -438,6 +447,16 @@ def test_fsseguidos_filters_exact_partition_separately_and_persists(window):
     restored=window.fss_figure_lists['V']
     assert any(restored.item(i).data(Qt.ItemDataRole.UserRole)=='3-2-1-1' and restored.item(i).isSelected()
                for i in range(restored.count()))
+
+
+def test_normal_window_size_is_locked_without_hiding_maximize_control(window):
+    original=window.size()
+    window.lock_normal_window_size()
+    assert window.windowFlags() & Qt.WindowType.WindowMaximizeButtonHint
+    assert window.maximumSize().width()>window.minimumSize().width()
+    window.resize(original.width()+80,original.height()+60)
+    QTest.qWait(30)
+    assert window.size()==original
 
 
 def test_fsseguidos_automatic_uses_integrated_history_and_azar_repeats_seed(window):
@@ -495,6 +514,9 @@ def test_interruption_matrix_and_distances_are_separate_active_filters_and_persi
 
     matrix_cell=window.interruption_matrix.buttons[(7,3)]
     assert matrix_cell.isEnabled()
+    assert 'background:#2782b8' in matrix_cell.styleSheet()
+    assert window.interruption_total_buttons[7].text()=='7'
+    assert 'background:#2782b8' in window.interruption_total_buttons[7].styleSheet()
     matrix_cell.setChecked(True);window.interruption_apply.setChecked(True)
     window.reduction_activation_buttons[18].setChecked(True)
     assert window.filter_spec().apply(bets)==bets
@@ -561,6 +583,8 @@ def test_sign_distances_tab_filters_and_restores_without_changing_figures(window
     window.navigation.setCurrentRow(8)
     window.reduction_tabs.setCurrentIndex(window.reduction_visible_indexes[20])
     assert not window.sign_distance_squares[('1', 14)].isEnabled()
+    assert window.sign_distance_squares[('1', 3)].text()=='3'
+    assert 'background:#2782b8' in window.sign_distance_squares[('1', 3)].styleSheet()
     window.sign_distance_squares[('1', 3)].setChecked(True)
     window.sign_distance_apply['1'].setChecked(True)
     assert window.reduction_activation_buttons[20].isChecked()

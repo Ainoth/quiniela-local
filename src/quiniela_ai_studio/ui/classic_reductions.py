@@ -9,11 +9,14 @@ from __future__ import annotations
 from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtGui import QColor, QLinearGradient, QPainter, QPen, QRadialGradient
 from PySide6.QtWidgets import (
+    QButtonGroup,
     QGraphicsDropShadowEffect,
+    QGridLayout,
     QHBoxLayout,
     QLabel,
     QListWidget,
     QListWidgetItem,
+    QPushButton,
     QSizePolicy,
     QWidget,
 )
@@ -23,8 +26,8 @@ QWidget#classicReductionCanvas QWidget {background:transparent;}
 QWidget#classicReductionCanvas QLabel {background:transparent;color:#f4f7ff;font-family:Arial,"DejaVu Sans";font-size:11px;}
 QWidget#classicReductionCanvas QLabel#classicHeading {color:#78e9e8;font-weight:bold;font-size:13px;}
 QWidget#classicReductionCanvas QLabel#classicSign {color:#ffe67a;font-weight:900;font-size:46px;}
-QWidget#classicReductionCanvas QGroupBox {background:rgba(15,55,112,70);border:2px solid #a3cbeb;border-bottom-color:#173c7b;border-right-color:#173c7b;border-radius:0;margin-top:7px;padding-top:3px;color:#83ebec;font-weight:bold;font-size:11px;}
-QWidget#classicReductionCanvas QGroupBox::title {subcontrol-origin:margin;subcontrol-position:top center;padding:0 5px;color:#8cebea;background:transparent;}
+QWidget#classicReductionCanvas QGroupBox {background:rgba(15,55,112,70);border:1px solid #568bb4;border-radius:4px;margin-top:14px;padding-top:5px;color:#83ebec;font-weight:bold;font-size:11px;}
+QWidget#classicReductionCanvas QGroupBox::title {subcontrol-origin:margin;subcontrol-position:top left;left:8px;padding:1px 5px;color:#8cebea;background:#0a203b;}
 QWidget#classicReductionCanvas QTabWidget#reductionModeTabs::pane {background:transparent;border:2px solid #a3cbed;border-bottom-color:#16417b;border-right-color:#16417b;top:-1px;}
 QWidget#classicReductionCanvas QTabWidget#reductionModeTabs QTabBar::tab {background:qlineargradient(x1:0,y1:0,x2:0,y2:1,stop:0 #245c9a,stop:1 #11346c);border:1px solid #87c9ed;border-bottom-color:#193e7c;color:#8be9ef;padding:6px 12px;margin-right:1px;font-size:11px;min-width:72px;}
 QWidget#classicReductionCanvas QTabWidget#reductionModeTabs QTabBar::tab:selected {background:qlineargradient(x1:0,y1:0,x2:0,y2:1,stop:0 #4b92c7,stop:1 #1a4b91);color:#ffe571;font-weight:bold;}
@@ -96,12 +99,12 @@ class ClassicPillBadge(QLabel):
     def __init__(self, value: str, parent: QWidget | None = None):
         super().__init__(value, parent)
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.setFixedSize(140, 32)
+        self.setFixedSize(78, 22)
         self.setStyleSheet(
             "QLabel{background:qlineargradient(x1:0,y1:0,x2:0,y2:1,"
             "stop:0 #071f4f,stop:0.52 #1d639d,stop:1 #092858);"
-            "border:1px solid #8dc4eb;border-radius:12px;"
-            "color:#6feb67;font-weight:bold;font-size:11px;}"
+            "border:1px solid #39749c;border-radius:5px;"
+            "color:#9ee9ff;font-weight:bold;font-size:10px;}"
         )
 
 
@@ -111,8 +114,8 @@ class ClassicContextHeader(QWidget):
     def __init__(self, parent: QWidget | None = None):
         super().__init__(parent)
         row = QHBoxLayout(self)
-        row.setContentsMargins(14, 8, 14, 4)
-        row.setSpacing(7)
+        row.setContentsMargins(4, 1, 4, 1)
+        row.setSpacing(5)
         row.addStretch(1)
         row.addWidget(QLabel("Temporada"))
         self.season = ClassicPillBadge("—")
@@ -123,7 +126,7 @@ class ClassicContextHeader(QWidget):
         self.round.setFixedWidth(58)
         row.addWidget(self.round)
         row.addStretch(1)
-        self.setFixedHeight(65)
+        self.setFixedHeight(28)
 
     def set_context(self, season: str, round_number: str) -> None:
         self.season.setText(season)
@@ -163,6 +166,64 @@ class ClassicTotalList(QListWidget):
             enabled = value in allowed or value in retained
             item.setFlags(Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled if enabled else Qt.ItemFlag.NoItemFlags)
             item.setForeground(QColor("#163c75") if enabled else QColor("#97a4b4"))
+
+
+class ClassicTotalGrid(QWidget):
+    """Compact, fully visible 0–14 selector for exact run figures."""
+
+    valueChanged = Signal(int)
+
+    def __init__(self, accessible_name: str, parent: QWidget | None = None):
+        super().__init__(parent)
+        self.setAccessibleName(accessible_name)
+        self._allowed: set[int] = set(range(15))
+        self._retained: set[int] = set()
+        self._value = 0
+        self.buttons: list[QPushButton] = []
+        self.group = QButtonGroup(self)
+        self.group.setExclusive(True)
+        grid = QGridLayout(self)
+        grid.setContentsMargins(0, 0, 0, 0)
+        grid.setHorizontalSpacing(2)
+        grid.setVerticalSpacing(2)
+        for value in range(15):
+            button = QPushButton(str(value), self)
+            button.setCheckable(True)
+            button.setFixedSize(20, 18)
+            button.setAccessibleName(f'{accessible_name}: total {value}')
+            button.setStyleSheet(
+                'QPushButton{padding:0;background:#f3f6fb;color:#173b75;border:1px solid #9bb9d4;}'
+                'QPushButton:checked{background:#2782b8;color:#fff;font-weight:bold;border-color:#b5e1fb;}'
+                'QPushButton:disabled{background:#d7e0e9;color:#97a4b4;border-color:#b7c6d3;}'
+            )
+            button.toggled.connect(lambda checked, total=value: self._selected(total, checked))
+            self.group.addButton(button, value)
+            self.buttons.append(button)
+            grid.addWidget(button, value // 5, value % 5)
+        self.buttons[0].setChecked(True)
+
+    def _selected(self, value: int, checked: bool) -> None:
+        if checked and value != self._value:
+            self._value = value
+            self.valueChanged.emit(value)
+
+    def value(self) -> int:
+        return self._value
+
+    def setValue(self, value: int) -> None:
+        value = max(0, min(14, int(value)))
+        self.buttons[value].setChecked(True)
+
+    def set_allowed_totals(self, allowed: set[int], selected: set[int] | None = None) -> None:
+        self._allowed = set(allowed)
+        self._retained = set(selected or ())
+        for value, button in enumerate(self.buttons):
+            enabled = value in self._allowed or value in self._retained
+            button.setEnabled(enabled)
+            button.setToolTip(
+                f'Total {value} alcanzable en la base actual.' if value in self._allowed
+                else f'Total {value} conservado; no aparece en la base actual.'
+            )
 
 
 def emboss_symbol(label: QLabel) -> None:

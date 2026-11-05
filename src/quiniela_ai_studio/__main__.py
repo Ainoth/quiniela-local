@@ -66,12 +66,9 @@ def main():
     application=QApplication([APPLICATION_ID]);application.setStyle('Fusion');application.setStyleSheet(STYLE)
     configure_application(application)
     window=MainWindow(repository);window.showMaximized()
-    # Let the window manager apply the maximized geometry before locking it.
-    def lock_maximized_geometry():
-        screen=window.screen() or application.primaryScreen()
-        geometry=screen.availableGeometry()
-        window.setFixedSize(geometry.size())
-    QTimer.singleShot(400,lock_maximized_geometry)
+    # Preserve the native title-bar maximize/restore button. Only manual normal
+    # window resizing is blocked; maximization remains managed by the window system.
+    QTimer.singleShot(400,window.lock_normal_window_size)
     if args.smoke_test:QTimer.singleShot(700,window.close)
     else:QTimer.singleShot(0,lambda:window.safe(window.start_session))
     return application.exec()
