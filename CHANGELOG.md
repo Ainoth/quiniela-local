@@ -1,5 +1,13 @@
 # Cambios
 
+## 2.0.29 — temporadas y cálculo automático para Distancias
+
+- Añade a Distancias los modos Manual y Automática, selección y búsqueda de
+  temporadas, atajos de selección y el botón Calcular.
+- La recomendación resume frecuencias históricas por signo y solo selecciona
+  distancias alcanzables desde la base actual; se identifica como descriptiva,
+  no predictiva.
+
 ## 2.0.28 — diseño unificado de Reducciones
 
 - Homogeneiza encabezados, pestañas, paneles y controles gráficos entre los

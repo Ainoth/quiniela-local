@@ -32,6 +32,11 @@ nuevo índice al restaurar sistemas. Pruebas: `test_interruption_matrix_and_dist
 `test_sign_distances_tab_filters_and_restores_without_changing_figures` y
 `test_interruption_matrix_and_distance_figures_are_independent_and_round_trip`.
 
+RF-RED-023 (v2.0.29): Distancias incluye selección persistente de temporadas y
+cálculo descriptivo de separaciones máximas frecuentes por signo, limitado a
+los valores alcanzables en la base actual. No es una predicción. Prueba:
+`test_distances_automatic_mode_has_seasons_and_calculates_historical_values`.
+
 RF-ESC-027 (v2.0.24): fija los límites de tamaño de la ventana al área
 disponible real del monitor después de maximizarla.
 

@@ -2141,14 +2141,56 @@ class MainWindow(QMainWindow):
         methods.currentChanged.connect(lambda index:self.repository.set_setting('interrupciones_mode',methods.tabText(index)))
         layout.addWidget(methods,1)
         distance_layout=self.reduction_tab_layouts[20]
-        distance_layout.setContentsMargins(4,4,4,4);distance_layout.setSpacing(4)
-        distance_note=QLabel('Selecciona los totales y figuras de cambios, o la distancia máxima de cada signo. Se combinan con el resto de condiciones activas.')
+        distance_layout.setContentsMargins(3,3,3,3);distance_layout.setSpacing(3)
+        distance_methods=QTabWidget();distance_methods.setObjectName('reductionModeTabs');distance_methods.setDocumentMode(True);distance_methods.setUsesScrollButtons(False)
+        self.mode_tabs['Distancias']=distance_methods
+        distance_note=QLabel('Elige las distancias permitidas manualmente o calcula una recomendación descriptiva con el histórico seleccionado.')
         distance_note.setWordWrap(True);distance_note.setObjectName('muted');distance_layout.addWidget(distance_note)
-        distance_content=QHBoxLayout();distance_content.setContentsMargins(0,0,0,0);distance_content.setSpacing(8)
-        distance_content.addWidget(right,0,Qt.AlignmentFlag.AlignLeft|Qt.AlignmentFlag.AlignTop)
-        distance_content.addWidget(self._build_sign_distance_view(),0,Qt.AlignmentFlag.AlignLeft|Qt.AlignmentFlag.AlignTop)
-        distance_content.addStretch(1);distance_layout.addLayout(distance_content)
-        distance_layout.addStretch(1)
+        manual_page=QWidget();manual_layout=QVBoxLayout(manual_page);manual_layout.setContentsMargins(5,5,5,5);manual_layout.setSpacing(6)
+        manual_content=QHBoxLayout();manual_content.setContentsMargins(0,0,0,0);manual_content.setSpacing(8)
+        manual_content.addWidget(right,0,Qt.AlignmentFlag.AlignLeft|Qt.AlignmentFlag.AlignTop)
+        manual_content.addWidget(self._build_sign_distance_view(),0,Qt.AlignmentFlag.AlignLeft|Qt.AlignmentFlag.AlignTop)
+        manual_content.addStretch(1);manual_layout.addLayout(manual_content);manual_layout.addStretch(1)
+        distance_methods.addTab(manual_page,'Manual')
+
+        automatic_page=QWidget();automatic_layout=QVBoxLayout(automatic_page);automatic_layout.setContentsMargins(5,5,5,5);automatic_layout.setSpacing(6)
+        auto_note=QLabel('La recomendación usa las frecuencias de los resultados finales elegidos, limitadas a las distancias posibles en la base actual. Es un resumen histórico, no una predicción.')
+        auto_note.setWordWrap(True);auto_note.setObjectName('muted');automatic_layout.addWidget(auto_note)
+        auto_workspace=QHBoxLayout();auto_workspace.setContentsMargins(0,0,0,0);auto_workspace.setSpacing(10)
+        season_group=QGroupBox('Temporadas');season_group.setFixedWidth(400)
+        season_layout=QVBoxLayout(season_group);season_layout.setContentsMargins(5,4,5,4);season_layout.setSpacing(3)
+        season_summary=QLabel();season_summary.setObjectName('muted');self.history_season_summaries['Distancias']=season_summary
+        season_layout.addWidget(season_summary)
+        actions=QHBoxLayout();select_all=QPushButton('Todas');select_none=QPushButton('Ninguna')
+        for button in (select_all,select_none):button.setMaximumWidth(70)
+        actions.addWidget(select_all);actions.addWidget(select_none);actions.addStretch(1);season_layout.addLayout(actions)
+        season_host=QWidget();season_grid=QGridLayout(season_host);season_grid.setContentsMargins(1,1,1,1);season_grid.setHorizontalSpacing(3);season_grid.setVerticalSpacing(2)
+        season_scroll=QScrollArea();season_scroll.setWidgetResizable(True);season_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff);season_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded);season_scroll.setFixedSize(370,180);season_scroll.setWidget(season_host);season_layout.addWidget(season_scroll)
+        seasons={str(row.get('season','')) for row in self.historical_reduction_results if row.get('season')}
+        self.history_season_squares['Distancias']={};self.history_season_hosts['Distancias']=season_host;self.history_season_grids['Distancias']=season_grid
+        self.history_season_select_all['Distancias']=select_all;self.history_season_select_none['Distancias']=select_none
+        selected=self.repository.setting(self._distance_season_setting_key(),None)
+        self._populate_history_seasons('Distancias',seasons,{season:(season in selected if selected is not None else True) for season in seasons})
+        season_summary.setText(f'{len(seasons)} temporadas · {len(self.historical_reduction_results):,} jornadas'.replace(',','.'))
+        select_all.clicked.connect(lambda _checked=False:self._set_history_seasons('Distancias',True))
+        select_none.clicked.connect(lambda _checked=False:self._set_history_seasons('Distancias',False))
+        self._install_history_season_tools('Distancias',season_layout,actions,season_host)
+        auto_workspace.addWidget(season_group,0,Qt.AlignmentFlag.AlignLeft|Qt.AlignmentFlag.AlignTop)
+        recommendation=QGroupBox('Recomendación');recommendation.setFixedWidth(330)
+        recommendation_layout=QVBoxLayout(recommendation);recommendation_layout.setContentsMargins(7,6,7,6);recommendation_layout.setSpacing(6)
+        risk_row=QHBoxLayout();auto_risk=RiskSelector()
+        for label,value in (('Cobertura alta',0),('Cobertura media',1),('Cobertura selectiva',2)):auto_risk.addItem(label,value)
+        calculate=QPushButton('Calcular');calculate.setEnabled(bool(seasons));risk_row.addWidget(QLabel('Cobertura'));risk_row.addWidget(auto_risk,1);risk_row.addWidget(calculate);recommendation_layout.addLayout(risk_row)
+        auto_summary=QLabel('Selecciona temporadas y pulsa Calcular para proponer distancias según su frecuencia histórica.')
+        auto_summary.setWordWrap(True);auto_summary.setObjectName('muted');recommendation_layout.addWidget(auto_summary);recommendation_layout.addStretch(1)
+        calculate.clicked.connect(lambda _checked=False:self.safe(lambda:self._calculate_automatic_distances(auto_risk,auto_summary)))
+        auto_workspace.addWidget(recommendation,0,Qt.AlignmentFlag.AlignLeft|Qt.AlignmentFlag.AlignTop);auto_workspace.addStretch(1)
+        automatic_layout.addLayout(auto_workspace);automatic_layout.addStretch(1)
+        distance_methods.addTab(automatic_page,'Automática')
+        distance_methods.setCurrentIndex(1 if self.repository.setting('distancias_mode','Manual')=='Automática' else 0)
+        distance_methods.currentChanged.connect(lambda index:self.repository.set_setting('distancias_mode',distance_methods.tabText(index)))
+        self.mode_automatic_controls['Distancias']=(auto_risk,auto_summary,calculate)
+        distance_layout.addWidget(distance_methods,1)
         self.interruption_mode_pages=pages
         profiles=possible_interruption_profiles(self._streak_base())
         self.interruption_possible_profiles=set(profiles)
@@ -2235,13 +2277,55 @@ class MainWindow(QMainWindow):
         return f'interrupciones_seasons:{current}' if current else 'interrupciones_seasons'
 
     def _restore_interruption_seasons_for_round(self):
-        selected=self.repository.setting(self._interruption_season_setting_key(),None)
-        if selected is None:return
-        selected=set(selected);self.configuring_filters=True
+        for title,key in (('Interrupciones',self._interruption_season_setting_key()),('Distancias',self._distance_season_setting_key())):
+            selected=self.repository.setting(key,None)
+            if selected is None:continue
+            selected=set(selected);self.configuring_filters=True
+            try:
+                for season,square in self.history_season_squares.get(title,{}).items():
+                    square.blockSignals(True);square.setChecked(season in selected);square.blockSignals(False)
+            finally:self.configuring_filters=False
+
+    def _distance_season_setting_key(self):
+        current=self.round_picker.currentData()
+        return f'distancias_seasons:{current}' if current else 'distancias_seasons'
+
+    def _calculate_automatic_distances(self,risk,summary):
+        """Recommend per-sign maximum gaps from selected final historical results."""
+        from collections import Counter
+
+        from quiniela_ai_studio.domain.sign_distance import maximum_sign_distance
+
+        seasons={season for season,square in self.history_season_squares.get('Distancias',{}).items() if square.isChecked()}
+        columns=[row['results14'] for row in self.historical_reduction_results
+                 if row.get('season') in seasons and row.get('results14')]
+        if not columns:raise ValueError('Selecciona temporadas con resultados finales disponibles.')
+        coverage={0:.90,1:.70,2:.50}.get(risk.currentData(),.70)
+        recommendations={}
+        for sign in ('1','X','2','V'):
+            possible=set(self.sign_distance_possible[sign])
+            counts=Counter(maximum_sign_distance(column,sign) for column in columns)
+            eligible={distance:count for distance,count in counts.items() if distance in possible}
+            total=sum(eligible.values());chosen=set();accumulated=0
+            for distance,count in sorted(eligible.items(),key=lambda item:(-item[1],item[0])):
+                chosen.add(distance);accumulated+=count
+                if accumulated/total>=coverage:break
+            recommendations[sign]=chosen
+        if not any(recommendations.values()):
+            raise ValueError('El histórico seleccionado no contiene distancias compatibles con la base actual.')
+        self.configuring_filters=True
         try:
-            for season,square in self.history_season_squares.get('Interrupciones',{}).items():
-                square.blockSignals(True);square.setChecked(season in selected);square.blockSignals(False)
+            for sign in ('1','X','2','V'):
+                values=recommendations[sign]
+                for distance in range(15):
+                    square=self.sign_distance_squares[(sign,distance)]
+                    square.blockSignals(True);square.setChecked(distance in values);square.blockSignals(False)
+                self.sign_distance_values[sign]=set(values)
+                apply=self.sign_distance_apply[sign];apply.blockSignals(True);apply.setChecked(bool(values));apply.blockSignals(False)
         finally:self.configuring_filters=False
+        self._activate_reduction_tab(20,True)
+        self._interruption_manual_edited()
+        summary.setText(f'Recomendación aplicada en {sum(bool(values) for values in recommendations.values())}/4 signos · {len(columns)} jornadas de {len(seasons)} temporadas · cobertura objetivo {coverage:.0%} entre distancias alcanzables. Histórico descriptivo, no predictivo.')
 
     def _update_interruption_context(self):
         if not hasattr(self,'interruption_context'):return
@@ -2821,7 +2905,7 @@ class MainWindow(QMainWindow):
                 square.setChecked(bool(selected.get(season,True)))
                 square.toggled.connect(lambda _checked,t=title:self._history_season_toggled(t))
                 label=QLabel(season);label.setFixedWidth(68)
-                if title in ('Racha','FSSeguidos','Interrupciones'):
+                if title in ('Racha','FSSeguidos','Interrupciones','Distancias'):
                     label.setStyleSheet('color:#173b75;background:#ffffff;font-size:10px;')
                 cell=QWidget();cell.setObjectName('seasonChoice');cell_layout=QHBoxLayout(cell);cell_layout.setContentsMargins(2,1,2,1);cell_layout.setSpacing(4);cell_layout.addWidget(square);cell_layout.addWidget(label);cell_layout.addStretch(1)
                 cell.setStyleSheet('QWidget#seasonChoice{background:#123657;border:1px solid #315c7c;border-radius:3px;}')
@@ -2912,9 +2996,10 @@ class MainWindow(QMainWindow):
         if title=='Cuenta':
             self._refresh_count_profiles()
             self._sync_count_season_picker()
-        if title in ('Racha','FSSeguidos','Interrupciones'):
+        if title in ('Racha','FSSeguidos','Interrupciones','Distancias'):
             current_round_key=self.round_picker.currentData()
             if title=='Interrupciones':key=self._interruption_season_setting_key()
+            elif title=='Distancias':key=self._distance_season_setting_key()
             else:
                 prefix='sseguidos' if title=='Racha' else 'fsseguidos'
                 key=f'{prefix}_seasons:{current_round_key}' if current_round_key else f'{prefix}_seasons'

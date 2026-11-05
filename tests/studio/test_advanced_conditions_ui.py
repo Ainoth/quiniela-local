@@ -642,6 +642,25 @@ def test_sign_distances_tab_filters_and_restores_without_changing_figures(window
     assert not window.sign_distance_apply['1'].isChecked()
 
 
+def test_distances_automatic_mode_has_seasons_and_calculates_historical_values(window):
+    assert [window.mode_tabs['Distancias'].tabText(i)
+            for i in range(window.mode_tabs['Distancias'].count())] == ['Manual', 'Automática']
+    base=window._streak_base()
+    result=''.join(picks[0] for picks in base)
+    window.historical_reduction_results=[{'season':'2099-2100','round':'1','results14':result}]
+    window.refresh_history_seasons()
+    seasons=window.history_season_squares['Distancias']
+    assert list(seasons)==['2099-2100'] and seasons['2099-2100'].isChecked()
+    risk,summary,calculate=window.mode_automatic_controls['Distancias']
+    assert calculate.isEnabled()
+    window.mode_tabs['Distancias'].setCurrentIndex(1)
+    window._calculate_automatic_distances(risk,summary)
+    assert all(window.sign_distance_apply[sign].isChecked() for sign in ('1','X','2','V'))
+    assert all(window.sign_distance_values[sign] for sign in ('1','X','2','V'))
+    assert window.reduction_activation_buttons[20].isChecked()
+    assert '1 jornadas de 1 temporadas' in summary.text()
+
+
 def test_unmatched_distance_keeps_existing_development_instead_of_saving_zero(window):
     from quiniela_ai_studio.domain.filters import BasicFilters
     from quiniela_ai_studio.domain.models import Bet
