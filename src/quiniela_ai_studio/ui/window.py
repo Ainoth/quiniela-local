@@ -2121,7 +2121,10 @@ class MainWindow(QMainWindow):
         for label,value in (('Mínimo',0),('Medio',1),('Máximo',2)):auto_risk.addItem(label,value)
         auto_calculate=QPushButton('Calcular');auto_summary=QLabel('Elige temporadas y calcula una recomendación basada en los resultados reales disponibles.')
         auto_summary.setWordWrap(True);auto_calculate.setEnabled(bool(seasons))
-        auto_calculate.clicked.connect(lambda _checked=False:self.safe(lambda:self._calculate_automatic_interruption_mode(auto_risk,auto_summary)))
+        auto_calculate.clicked.connect(
+            lambda _checked=False,risk_control=auto_risk,summary_label=auto_summary:
+                self.safe(lambda:self._calculate_automatic_interruption_mode(risk_control,summary_label))
+        )
         controls.addWidget(QLabel('Riesgo'));controls.addWidget(auto_risk);controls.addWidget(auto_calculate);controls.addStretch(1)
         season_label.setVisible(False)
         automatic_layout.removeWidget(host)
@@ -2136,7 +2139,11 @@ class MainWindow(QMainWindow):
         workspace.addLayout(auto_side,0);workspace.addStretch(1)
         automatic_layout.addLayout(workspace);automatic_layout.addStretch(1)
         methods.addTab(automatic_page,'Automática');self.mode_automatic_controls['Interrupciones']=(auto_risk,auto_summary,auto_calculate)
-
+        auto_risk.currentIndexChanged.connect(
+            lambda _index,risk_control=auto_risk,summary_label=auto_summary:
+                None if self.configuring_filters else
+                self.safe(lambda:self._calculate_automatic_interruption_mode(risk_control,summary_label))
+        )
         def show_shared_board(index):
             name=methods.tabText(index);destination,host_layout=hosts[name]
             previous=surfaces.parentWidget();previous_layout=previous.layout() if previous else None
@@ -2157,7 +2164,11 @@ class MainWindow(QMainWindow):
         manual_page=QWidget();manual_layout=QVBoxLayout(manual_page);manual_layout.setContentsMargins(5,5,5,5);manual_layout.setSpacing(6)
         manual_content=QHBoxLayout();manual_content.setContentsMargins(0,0,0,0);manual_content.setSpacing(8)
         manual_content.addWidget(right,0,Qt.AlignmentFlag.AlignLeft|Qt.AlignmentFlag.AlignTop)
-        manual_content.addWidget(self._build_sign_distance_view(),0,Qt.AlignmentFlag.AlignLeft|Qt.AlignmentFlag.AlignTop)
+        distance_view=self._build_sign_distance_view()
+        self.sign_distance_view=distance_view
+        manual_distance_host=QWidget();manual_distance_layout=QVBoxLayout(manual_distance_host)
+        manual_distance_layout.setContentsMargins(0,0,0,0);manual_distance_layout.addWidget(distance_view)
+        manual_content.addWidget(manual_distance_host,0,Qt.AlignmentFlag.AlignLeft|Qt.AlignmentFlag.AlignTop)
         manual_content.addStretch(1);manual_layout.addLayout(manual_content);manual_layout.addStretch(1)
         distance_methods.addTab(manual_page,'Manual')
 
@@ -2187,17 +2198,38 @@ class MainWindow(QMainWindow):
         recommendation=QGroupBox('Recomendación');recommendation.setFixedWidth(330)
         recommendation_layout=QVBoxLayout(recommendation);recommendation_layout.setContentsMargins(7,6,7,6);recommendation_layout.setSpacing(6)
         risk_row=QHBoxLayout();auto_risk=RiskSelector()
-        for label,value in (('Cobertura alta',0),('Cobertura media',1),('Cobertura selectiva',2)):auto_risk.addItem(label,value)
+        for label,value in (('Amplia',0),('Media',1),('Selectiva',2)):auto_risk.addItem(label,value)
         calculate=QPushButton('Calcular');calculate.setEnabled(bool(seasons));risk_row.addWidget(QLabel('Cobertura'));risk_row.addWidget(auto_risk,1);risk_row.addWidget(calculate);recommendation_layout.addLayout(risk_row)
-        auto_summary=QLabel('Selecciona temporadas y pulsa Calcular para proponer distancias según su frecuencia histórica.')
+        auto_summary=QLabel('Selecciona temporadas. El riesgo recalcula la propuesta al instante; se muestran los valores elegidos por signo.')
         auto_summary.setWordWrap(True);auto_summary.setObjectName('muted');recommendation_layout.addWidget(auto_summary);recommendation_layout.addStretch(1)
-        calculate.clicked.connect(lambda _checked=False:self.safe(lambda:self._calculate_automatic_distances(auto_risk,auto_summary)))
+        calculate.clicked.connect(
+            lambda _checked=False,risk_control=auto_risk,summary_label=auto_summary:
+                self.safe(lambda:self._calculate_automatic_distances(risk_control,summary_label))
+        )
         auto_workspace.addWidget(recommendation,0,Qt.AlignmentFlag.AlignLeft|Qt.AlignmentFlag.AlignTop);auto_workspace.addStretch(1)
-        automatic_layout.addLayout(auto_workspace);automatic_layout.addStretch(1)
+        automatic_layout.addLayout(auto_workspace)
+        auto_distance_host=QWidget();auto_distance_layout=QVBoxLayout(auto_distance_host)
+        auto_distance_layout.setContentsMargins(0,0,0,0)
+        self.distance_auto_host=auto_distance_host
+        automatic_layout.addWidget(auto_distance_host,0,Qt.AlignmentFlag.AlignLeft|Qt.AlignmentFlag.AlignTop)
+        automatic_layout.addStretch(1)
         distance_methods.addTab(automatic_page,'Automática')
         distance_methods.setCurrentIndex(1 if self.repository.setting('distancias_mode','Manual')=='Automática' else 0)
+        def show_distance_view(index):
+            destination=auto_distance_layout if index==1 else manual_distance_layout
+            previous=distance_view.parentWidget()
+            previous_layout=previous.layout() if previous else None
+            if previous_layout:previous_layout.removeWidget(distance_view)
+            destination.addWidget(distance_view,0,Qt.AlignmentFlag.AlignLeft|Qt.AlignmentFlag.AlignTop)
+        show_distance_view(distance_methods.currentIndex())
+        distance_methods.currentChanged.connect(show_distance_view)
         distance_methods.currentChanged.connect(lambda index:self.repository.set_setting('distancias_mode',distance_methods.tabText(index)))
         self.mode_automatic_controls['Distancias']=(auto_risk,auto_summary,calculate)
+        auto_risk.currentIndexChanged.connect(
+            lambda _index,risk_control=auto_risk,summary_label=auto_summary:
+                None if self.configuring_filters else
+                self.safe(lambda:self._calculate_automatic_distances(risk_control,summary_label))
+        )
         distance_layout.addWidget(distance_methods,1)
         self.interruption_mode_pages=pages
         profiles=possible_interruption_profiles(self._streak_base())
@@ -2299,26 +2331,16 @@ class MainWindow(QMainWindow):
         return f'distancias_seasons:{current}' if current else 'distancias_seasons'
 
     def _calculate_automatic_distances(self,risk,summary):
-        """Recommend per-sign maximum gaps from selected final historical results."""
-        from collections import Counter
-
-        from quiniela_ai_studio.domain.sign_distance import maximum_sign_distance
+        """Recommend joint, inspectable 1/X/2/V gaps from selected seasons."""
+        from quiniela_ai_studio.domain.sign_distance import historical_sign_distance_recommendation
 
         seasons={season for season,square in self.history_season_squares.get('Distancias',{}).items() if square.isChecked()}
         columns=[row['results14'] for row in self.historical_reduction_results
                  if row.get('season') in seasons and row.get('results14')]
         if not columns:raise ValueError('Selecciona temporadas con resultados finales disponibles.')
         coverage={0:.90,1:.70,2:.50}.get(risk.currentData(),.70)
-        recommendations={}
-        for sign in ('1','X','2','V'):
-            possible=set(self.sign_distance_possible[sign])
-            counts=Counter(maximum_sign_distance(column,sign) for column in columns)
-            eligible={distance:count for distance,count in counts.items() if distance in possible}
-            total=sum(eligible.values());chosen=set();accumulated=0
-            for distance,count in sorted(eligible.items(),key=lambda item:(-item[1],item[0])):
-                chosen.add(distance);accumulated+=count
-                if accumulated/total>=coverage:break
-            recommendations[sign]=chosen
+        recommendations,sample_size,matched,target=historical_sign_distance_recommendation(
+            columns,self._streak_base(),coverage)
         if not any(recommendations.values()):
             raise ValueError('El histórico seleccionado no contiene distancias compatibles con la base actual.')
         self.configuring_filters=True
@@ -2333,7 +2355,9 @@ class MainWindow(QMainWindow):
         finally:self.configuring_filters=False
         self._activate_reduction_tab(20,True)
         self._interruption_manual_edited()
-        summary.setText(f'Recomendación aplicada en {sum(bool(values) for values in recommendations.values())}/4 signos · {len(columns)} jornadas de {len(seasons)} temporadas · cobertura objetivo {coverage:.0%} entre distancias alcanzables. Histórico descriptivo, no predictivo.')
+        values_text=' · '.join(f'{sign}: {", ".join(map(str,sorted(recommendations[sign])))}' for sign in ('1','X','2','V'))
+        actual=matched/sample_size if sample_size else 0
+        summary.setText(f'Riesgo {risk.currentText()} · objetivo {target}/{sample_size} ({coverage:.0%}); tras combinar valores: {matched}/{sample_size} ({actual:.1%}) resultados compatibles. {len(seasons)} temporadas. Distancias: {values_text}. Histórico descriptivo, no predictivo.')
 
     def _update_interruption_context(self):
         if not hasattr(self,'interruption_context'):return
@@ -2476,6 +2500,7 @@ class MainWindow(QMainWindow):
     def _calculate_automatic_interruption_mode(self,risk,summary):
         from quiniela_ai_studio.domain.interruption_statistics import (
             historical_interruption_recommendation,
+            interruption_profile,
         )
         seasons={season for season,square in self.history_season_squares.get('Interrupciones',{}).items() if square.isChecked()}
         columns=[row['results14'] for row in self.historical_reduction_results
@@ -2485,7 +2510,16 @@ class MainWindow(QMainWindow):
         pairs,figures,sample_size,matched=historical_interruption_recommendation(columns,self._streak_base(),coverage)
         self._install_interruption_recommendation(pairs,figures,method='automática',risk=label,
             seasons=seasons,sample_size=sample_size,coverage=coverage)
-        summary.setText(f'{matched}/{sample_size} resultados finales compatibles con los perfiles elegidos · {len(seasons)} temporadas · riesgo {label} ({coverage:.0%} muestral). Descriptivo, no predictivo.')
+        admitted=sum(
+            (profile:=interruption_profile(column))[:2] in pairs
+            and (profile[0],profile[2]) in figures
+            for column in columns
+        )
+        summary.setText(
+            f'Riesgo {label} · objetivo {coverage:.0%}; compatibles tras combinar ambos paneles: '
+            f'{admitted}/{sample_size} jornadas · matriz {len(pairs)} pares · Distancias {len(figures)} figuras · '
+            f'{len(seasons)} temporadas. Histórico descriptivo, no predictivo.'
+        )
 
     def _build_interruption_rules(self):
         """Persist the independent interruption and distance filters."""
@@ -5799,10 +5833,22 @@ class MainWindow(QMainWindow):
         self.data_worker.start();self.refresh()
 
     def background_finished(self):
-        if self.close_pending:QTimer.singleShot(0,self.close)
-        else:self.refresh()
+        if self.close_pending:
+            QTimer.singleShot(0,self.close)
+            return
+        cancelled=bool(self.data_worker and self.data_worker.cancel_event.is_set())
+        was_portfolio=self.data_kind=='portfolio'
+        if cancelled and was_portfolio:
+            message='Optimización cancelada · la quiniela anterior se conserva.'
+            self.portfolio_summary.setText(message)
+            self.statusBar().showMessage(message,8000)
+        self.refresh()
 
     def background_status(self,message):
+        # Queued progress messages can arrive after the user presses Cancelar.
+        # Do not let one replace the cancellation state in the orange footer.
+        if self.data_worker and self.data_worker.cancel_event.is_set() and self.data_kind=='portfolio':
+            return
         self.data_message.setText(message);self.statusBar().showMessage(message)
         if self.data_kind=='portfolio':self.portfolio_summary.setText(message)
 
@@ -5822,7 +5868,11 @@ class MainWindow(QMainWindow):
     def cancel_data(self):
         if self.data_worker:
             self.data_worker.cancel_event.set()
-            self.background_status('Cancelando cálculo… La quiniela anterior se conserva.' if self.data_kind=='portfolio' else 'Cancelando… Se espera a que termine la petición en curso (máximo 30 s).')
+            message=('Cancelando optimización… La quiniela anterior se conserva.' if self.data_kind=='portfolio'
+                     else 'Cancelando… Se espera a que termine la petición en curso (máximo 30 s).')
+            self.data_message.setText(message)
+            self.statusBar().clearMessage()
+            self._relay_status_message(message)
 
     def confirm_data(self,prepared):
         dialog=QDialog(self);dialog.setWindowTitle('Revisar importación de datos');dialog.resize(780,580)

@@ -551,7 +551,8 @@ def test_interruption_random_and_automatic_modes_use_reproducible_and_integrated
     from quiniela_ai_studio.domain.models import Bet
 
     columns=('12X22X11221111','11X21221XX121X','1'*14)
-    window.set_system(window.service.imported(window.round,'Perfiles de interrupciones',tuple(Bet(column,'M0') for column in columns)))
+    bets=tuple(Bet(column,'M0') for column in columns)
+    window.set_system(window.service.imported(window.round,'Perfiles de interrupciones',bets))
     window.historical_reduction_results=[
         {'season':'2097-2098','round':str(index+1),'results14':column,'source':'fixture'}
         for index,column in enumerate(columns)
@@ -570,7 +571,41 @@ def test_interruption_random_and_automatic_modes_use_reproducible_and_integrated
     window._calculate_automatic_interruption_mode(auto_risk,auto_summary)
     assert window.interruption_generation_metadata['method']=='automática'
     assert window.interruption_generation_metadata['seasons']==('2097-2098',)
-    assert '3 resultados finales' in auto_summary.text()
+    assert '3/3 jornadas' in auto_summary.text()
+    before=(set(window.interruption_selected_pairs),set(window.interruption_selected_figures))
+    auto_risk.setCurrentIndex(auto_risk.findData(2))
+    after=(set(window.interruption_selected_pairs),set(window.interruption_selected_figures))
+    assert window.interruption_generation_metadata['risk']=='Máximo'
+    assert 'Riesgo Máximo' in auto_summary.text()
+    assert before!=after
+    assert len(window.filter_spec().apply(bets)) < len(bets)
+
+
+def test_distances_automatic_shows_selected_sign_values_and_recalculates_on_risk(window):
+    from quiniela_ai_studio.domain.models import Bet
+
+    columns=('1'*14,'X'*14,'2'*14,'1X'*7,'12'*7,'X2'*7,
+             '1'*7+'X'*7,'X'*7+'2'*7,'2'*7+'1'*7)*3
+    window.set_system(window.service.imported(window.round,'Distancias automáticas',tuple(Bet(column,'M0') for column in columns)))
+    window.historical_reduction_results=[
+        {'season':'2097-2098','round':str(index+1),'results14':column,'source':'fixture'}
+        for index,column in enumerate(columns)
+    ]
+    window.refresh_history_seasons()
+    modes=window.mode_tabs['Distancias']
+    modes.setCurrentIndex(1)
+    risk,summary,_calculate=window.mode_automatic_controls['Distancias']
+    window._calculate_automatic_distances(risk,summary)
+    broad={sign:set(values) for sign,values in window.sign_distance_values.items()}
+    assert window.sign_distance_view.parentWidget() is window.distance_auto_host
+    assert all(window.sign_distance_apply[sign].isChecked() for sign in ('1','X','2','V'))
+    assert all(values for values in broad.values())
+    assert 'Distancias: 1:' in summary.text()
+    risk.setCurrentIndex(risk.findData(2))
+    selective={sign:set(values) for sign,values in window.sign_distance_values.items()}
+    assert broad!=selective
+    assert 'Riesgo Selectiva' in summary.text()
+    assert len(window.filter_spec().apply(window.system.bets)) < len(window.system.bets)
 
 
 def test_sign_distances_tab_filters_and_restores_without_changing_figures(window):
@@ -668,7 +703,9 @@ def test_distances_automatic_mode_has_seasons_and_calculates_historical_values(w
     assert all(window.sign_distance_apply[sign].isChecked() for sign in ('1','X','2','V'))
     assert all(window.sign_distance_values[sign] for sign in ('1','X','2','V'))
     assert window.reduction_activation_buttons[20].isChecked()
-    assert '1 jornadas de 1 temporadas' in summary.text()
+    assert 'objetivo 1/1' in summary.text()
+    assert '1 temporadas' in summary.text()
+    assert 'Distancias: 1:' in summary.text()
 
 
 def test_unmatched_distance_keeps_existing_development_instead_of_saving_zero(window):

@@ -1,5 +1,17 @@
 # Cambios
 
+## 2.0.31 — riesgo automático y Distancias visibles
+
+- Corrige callbacks de riesgo que apuntaban al selector y resumen de otra
+  pestaña; Interrupciones y Distancias conservan sus propios controles.
+- Al cambiar el riesgo, recalcula la recomendación histórica de inmediato.
+- Distancias usa perfiles conjuntos 1/X/2/V para evitar multiplicar cuatro
+  coberturas independientes y muestra los valores recomendados en ambos modos.
+- Conserva en la franja naranja un estado final claro cuando se cancela
+  Optimizar, ignorando mensajes de progreso que lleguen tarde.
+- Añade pruebas de riesgo, valores recomendados, panel automático visible y
+  cancelación de optimización.
+
 ## 2.0.30 — reducciones combinadas y Optimizar
 
 - Optimizar usa siempre las apuestas admitidas por todas las reducciones activas;

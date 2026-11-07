@@ -1,5 +1,16 @@
 # 12 · Matriz de trazabilidad de requisitos
 
+RF-RED-026 (v2.0.31): los selectores Automáticos de Interrupciones y Distancias
+actualizan su propia recomendación al cambiar riesgo. Distancias calcula la
+cobertura sobre perfiles históricos conjuntos 1/X/2/V, muestra los valores
+seleccionados en los cuatro paneles y conserva visibles esos controles en
+Manual y Automática. La cancelación de Optimizar mantiene el estado final en
+la franja naranja pese a eventos de progreso tardíos. Pruebas:
+`test_distances_automatic_shows_selected_sign_values_and_recalculates_on_risk`,
+`test_interruption_random_and_automatic_modes_use_reproducible_and_integrated_data`,
+`test_historical_recommendation_uses_joint_profiles_and_risk_changes_values` y
+`test_cancelled_optimization_is_audited_without_modifying_system`.
+
 RF-RED-025 (v2.0.30): todas las reducciones activas se cruzan con AND sobre el
 mismo conjunto de candidatas; Optimizar solo toma ese conjunto filtrado y ya no
 presenta un segundo filtro rápido. FSSeguidos y Distancias conservan sus figuras
@@ -522,6 +533,7 @@ Esta tabla está generada inicialmente a partir de `01_ESPECIFICACION_FUNCIONAL.
 | `RF-UX-018` | v1.0.22 | IMPLEMENTADO CON DIFERENCIAS | Lienzos compactos de piel clásica y comparaciones visuales para SSeguidos, FSSeguidos, Interrupciones y Distancias; Cuenta/Grupo armonizados sin referencia original. Ornamento y tipografía siguen siendo aproximados. |
 | `RF-ARC-009` | v1.0.23 | CORREGIDO | Mis Sistemas abre informes de cobertura planos o anidados; una copia antigua incompleta conserva el acceso y se rotula sin cobertura verificada. Prueba Qt sobre reducción persistida. |
 | `RF-FIL-024` | v1.0.22 | IMPLEMENTADO | Distancias de 1/X/2/V independientes, alcanzabilidad exacta, activación propia y persistencia. Desde v2.0.25 están en la pestaña Distancias. |
+| `RF-RED-026` | v2.0.31 | IMPLEMENTADO | El riesgo automático recalcula en sus propios controles; Distancias presenta valores conjuntos por signo e informa cobertura observada. Cancelar Optimizar repone su estado final en la franja naranja. |
 | `RF-UX-019` | v1.0.24 | IMPLEMENTADO | Cuenta compacta integra matriz, Figuras, distribución histórica, temporadas y filtros; fondo ornamental retirado solo aquí. |
 | `RF-FIL-025` | v1.0.24 | IMPLEMENTADO | Perfiles conjuntos matemáticamente válidos V/X/2 y distancia entre equis desde Cuenta; ambas condiciones respetan activación de la pestaña. |
 | `RF-UX-020` | v1.0.25 | IMPLEMENTADO CON DIFERENCIAS | Cuenta > Manual recrea la composición compacta de tres bloques; cifras por temporada usan resultados reales, controles de reserva/media siguen vacíos e inhabilitados mientras su fórmula no esté definida. Evidencia y checklist en `docs/planes/CUENTA_PANEL_V1_0_25.md` y `docs/validacion_visual/cuenta_v1_0_25/`. |

@@ -120,6 +120,12 @@ Azar muestrea perfiles alcanzables de forma reproducible por semilla; Automátic
 ordena perfiles observados compatibles con la base por frecuencia en las
 temporadas seleccionadas. Los niveles de riesgo son políticas originales de
 cobertura de muestra, no probabilidades de acierto. Ninguno inventa datos.
+En la recomendación automática de Distancias, las coberturas se calculan sobre
+tuplas conjuntas `(D_1,D_X,D_2,D_V)`; luego se proyectan a los cuatro controles
+visibles y se informa la cobertura histórica observada después de esa proyección.
+Cambiar el nivel de riesgo recalcula la propuesta. Esta evaluación es
+descriptiva de la muestra elegida; las reducciones activas todavía se combinan
+con AND y pueden dejar el desarrollo actual vacío.
 
 ## 4. Probabilidad de una columna
 

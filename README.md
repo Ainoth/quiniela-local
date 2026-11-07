@@ -6,7 +6,7 @@ Aplicación de Quiniela para escritorio y Android. La versión de escritorio
 puede leer los datos instalados por WIN1X2; ambas versiones descargan datos,
 porcentajes y marcadores directamente de sus proveedores públicos.
 
-## Quiniela AI Studio — v2.0.30
+## Quiniela AI Studio — v2.0.31
 
 ## Quiniela AI Studio — v1.0.37
 
@@ -95,6 +95,10 @@ entre dos apariciones de `1`, `X`, `2` o `V`; sus cuatro bloques Aplicar pueden
 apagarse sin perder las elecciones. La distancia es la diferencia de posiciones
 de dos apariciones consecutivas y vale 0 si hay menos de dos. La pestaña
 Interrupciones exterior debe estar activa para que participe en el cálculo.
+En Automática, los cuatro paneles siguen visibles para revisar los valores que
+se han elegido; cambiar el nivel de riesgo vuelve a calcular la recomendación.
+El riesgo histórico se calcula sobre perfiles conjuntos, no como cuatro
+coberturas marginales multiplicadas.
 [Réplica visual y decisión matemática v1.0.22](docs/planes/REPLICA_VISUAL_REDUCCIONES_V1_0_22.md).
 La selección de temporadas es ahora una cuadrícula compacta con botones Todas/Ninguna;
 los recuentos V/X/2 y 1/X/2/V se muestran en paneles estrechos.

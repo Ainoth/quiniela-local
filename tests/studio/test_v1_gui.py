@@ -117,6 +117,7 @@ def test_cancelled_optimization_is_audited_without_modifying_system(window,monke
     events=[json.loads(row[3]) for row in window.repository.audit() if row[1]=='optimization_run']
     assert events[0]['status']=='cancelled' and events[0]['input_hash']==original.hash
     assert window.system==original and 'config' in events[0]
+    assert 'Optimización cancelada' in window.footer.text()
 
 
 def test_failed_optimization_is_audited_without_modifying_system(window,monkeypatch):
