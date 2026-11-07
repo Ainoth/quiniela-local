@@ -228,13 +228,12 @@ QScrollBar::handle:vertical:hover {background:#57d4ff;}
 QGroupBox {border:1px solid #2a6698; border-radius:4px; margin-top:12px; padding-top:12px;}
 QGroupBox::title {color:#57d4ff;}
 QCheckBox::indicator {width:18px; height:18px; border:2px solid #86bfe8; border-radius:3px; background:#eef7ff;}
-QCheckBox::indicator:checked {background:#18864b; border-color:#35d27f;}
+QCheckBox::indicator:checked {background:#2782b8; border-color:#84c9ed;}
 QCheckBox::indicator:disabled {background:#24405b; border-color:#62768b;}
-QCheckBox#manualResultsMode:checked {background:#104a33; border:1px solid #37c878; border-radius:4px; padding:2px 6px; color:#b8f2ca; font-weight:bold;}
+QCheckBox#manualResultsMode:checked {background:#17466d; border:1px solid #4b9ccc; border-radius:4px; padding:2px 6px; color:#e5f5ff; font-weight:bold;}
 QLineEdit:disabled, QSpinBox:disabled {background:#173451; color:#8ba5be; border-color:#35536e;}
 QSlider::groove:horizontal {height:7px; background:#123b65; border:1px solid #53a8d2; border-radius:3px;}
 QSlider::handle:horizontal {background:#ffc83d; width:18px; margin:-6px 0; border-radius:5px;}
-QSlider#optimizationSlider::handle:horizontal {background:#35d27f;}
 QProgressBar {border:1px solid #2a6698; text-align:center;}
 QProgressBar::chunk {background:#159881;}
 QFrame#prizeCard {background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 #104a33,stop:0.55 #103b35,stop:1 #12354a); border:2px solid #37c878; border-radius:7px;}
@@ -639,6 +638,9 @@ class MainWindow(QMainWindow):
         self.footer_progress.hide()
         footer_layout.addWidget(self.footer);footer_layout.addWidget(self.footer_progress)
         root.addWidget(footer_host)
+        self._footer_summary=''
+        self.statusBar().messageChanged.connect(self._relay_status_message)
+        self.statusBar().hide()
         self.build_home(); self.build_builder(); self.build_optimize(); self.build_analysis()
         self.build_evaluation(); self.build_systems(); self.build_settings();self.build_reductions();self.build_advanced_conditions()
         self.navigation.currentRowChanged.connect(self.pages.setCurrentIndex)
@@ -668,8 +670,10 @@ class MainWindow(QMainWindow):
     def build_advanced_conditions(self):
         """Pestañas de reducción compactas, inspiradas en WIN1X2 y nativas Qt."""
         outer = self.page_layout(8)
-        scroll=QScrollArea();scroll.setWidgetResizable(True)
-        content=QWidget();layout=QVBoxLayout(content);scroll.setWidget(content);outer.addWidget(scroll,1)
+        layout=QVBoxLayout()
+        layout.setContentsMargins(0,0,0,0)
+        layout.setSpacing(4)
+        outer.addLayout(layout,1)
         intro_row=QHBoxLayout()
         intro = QLabel('Elige un método y marca sus condiciones. El boleto base queda fijo a la izquierda; las reducciones se aplican a sus columnas.')
         intro.setWordWrap(True);intro_row.addWidget(intro,1)
@@ -693,7 +697,11 @@ class MainWindow(QMainWindow):
         self.classic_reduction_canvases={}
         self.classic_headers={}
         for index,(name,description) in enumerate(zip(names,descriptions)):
-            page=QWidget();page_layout=QVBoxLayout(page);page_layout.setContentsMargins(8,8,8,8)
+            page=QWidget();page_root=QVBoxLayout(page);page_root.setContentsMargins(0,0,0,0)
+            page_scroll=QScrollArea();page_scroll.setWidgetResizable(True)
+            page_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+            page_content=QWidget();page_layout=QVBoxLayout(page_content);page_layout.setContentsMargins(8,8,8,8)
+            page_scroll.setWidget(page_content);page_root.addWidget(page_scroll)
             if index in visible_reductions:
                 visible_name='Grupo' if index==9 else 'SSeguidos' if index==1 else name
                 visible_index=self.reduction_tabs.addTab(page,visible_name)
@@ -2887,7 +2895,7 @@ class MainWindow(QMainWindow):
             calculate.setEnabled(bool(seasons))
 
     def _populate_history_seasons(self,title,seasons,selected):
-        """Build a compact, row-major season grid with accessible green squares."""
+        """Build a searchable one-column list of compact, accessible seasons."""
         grid=self.history_season_grids[title]
         while grid.count():
             item=grid.takeAt(0)
@@ -2895,7 +2903,7 @@ class MainWindow(QMainWindow):
             if widget is not None:widget.deleteLater()
         buttons={};cells={}
         ordered=sorted(seasons,reverse=True)
-        columns=2
+        columns=1
         if not ordered:
             empty=QLabel('No hay temporadas disponibles en el histórico integrado.')
             grid.addWidget(empty,0,0,1,columns)
@@ -2909,7 +2917,7 @@ class MainWindow(QMainWindow):
                     label.setStyleSheet('color:#173b75;background:#ffffff;font-size:10px;')
                 cell=QWidget();cell.setObjectName('seasonChoice');cell_layout=QHBoxLayout(cell);cell_layout.setContentsMargins(2,1,2,1);cell_layout.setSpacing(4);cell_layout.addWidget(square);cell_layout.addWidget(label);cell_layout.addStretch(1)
                 cell.setStyleSheet('QWidget#seasonChoice{background:#123657;border:1px solid #315c7c;border-radius:3px;}')
-                grid.addWidget(cell,index//columns,index%columns)
+                grid.addWidget(cell,index,0)
                 buttons[season]=square;cells[season]=cell
         self.history_season_squares[title]=buttons
         self.history_season_cells[title]=cells
@@ -3916,6 +3924,12 @@ class MainWindow(QMainWindow):
         self.refresh()
         if mode=='reduced' and not self.system and self.round.editable:self.construction_page_changed(7)
 
+    def _relay_status_message(self, message):
+        """Use the orange summary strip for transient status instead of a second bar."""
+        if not hasattr(self, 'footer'):
+            return
+        self.footer.setText(message or self._footer_summary)
+
     def refresh(self):
         round_ = self.round
         self.update_source_status()
@@ -3938,7 +3952,8 @@ class MainWindow(QMainWindow):
         base_quantity=(engine.size(self.system.base)*len(self.system.plenos)) if self.system else 0
         base_cost=money(base_quantity*round_.price_cents)
         current_cost=money(self.system.cost(round_) if self.system else 0)
-        self.footer.setText(f'Base completa · {base_quantity:,} · {base_cost}  │  Desarrollo actual · {quantity:,} · {current_cost} · {pending} sin Pleno{guarantee} · Premio económico no garantizado')
+        self._footer_summary=f'Base completa · {base_quantity:,} · {base_cost}  │  Desarrollo actual · {quantity:,} · {current_cost} · {pending} sin Pleno{guarantee} · Premio económico no garantizado'
+        self.footer.setText(self.statusBar().currentMessage() or self._footer_summary)
         self.home_info.setText(f'{round_.key}\n15 partidos · {len(self.repository.systems(round_.key))} quinielas guardadas\nPrecio por apuesta: {money(round_.price_cents)} por apuesta. Guardar un archivo no envía ni paga la apuesta.')
         self.data_info.setText('Datos guardados: ' + (self.repository.setting('data_directory') or 'todavía no has añadido datos') + '\nWIN1X2 aporta partidos y premios. Quinielista aporta elecciones de otros jugadores y marcadores.')
         self.rule_price.setValue(round_.price_cents)
@@ -3961,7 +3976,6 @@ class MainWindow(QMainWindow):
         # filter_group remains a hidden QObject parent for legacy lookups; disabling
         # it would also disable the controls reparented into the reduction tabs.
         self.update_filter_controls()
-        self.quick_conditions_slider.setEnabled(round_.editable and not ((self.worker and self.worker.isRunning()) or (self.data_worker and self.data_worker.isRunning())))
         system = self.system
         number=json.loads(system.parameters).get('reduction_choice',json.loads(system.parameters).get('reduction',self.reduction_picker.currentData())) if system else None
         self.ballot_title.setText(f'BASE PARA REDUCIDA {number}' if self.construction_mode()=='reduced' else 'PARTIDOS DE LA JORNADA')
@@ -4439,18 +4453,8 @@ class MainWindow(QMainWindow):
         self.quick_level=None;self.configuring_filters=False
         self.filter_job=None;self.filter_epoch=0;self.filter_pending=False;self.athena_job=None
         self.filter_timer=QTimer(self);self.filter_timer.setSingleShot(True);self.filter_timer.setInterval(150);self.filter_timer.timeout.connect(self.start_live_filter)
-        progressive=QGroupBox('1 · Prepara las apuestas candidatas')
-        progressive_layout=QVBoxLayout(progressive)
-        self.quick_conditions_slider=QSlider(Qt.Orientation.Horizontal);self.quick_conditions_slider.setObjectName('optimizationSlider');self.quick_conditions_slider.setRange(0,10);self.quick_conditions_slider.setValue(10)
-        self.quick_conditions_slider.setTickPosition(QSlider.TickPosition.TicksBelow);self.quick_conditions_slider.setTickInterval(1)
-        self.quick_conditions_slider.setAccessibleName('Nivel de condiciones rápidas: cero es más restrictivo; diez no aplica condiciones rápidas')
-        progressive_layout.addWidget(self.quick_conditions_slider)
-        ends=QHBoxLayout();ends.addWidget(QLabel('0 · Más restrictivo'));ends.addStretch();ends.addWidget(QLabel('10 · Sin filtro rápido'));progressive_layout.addLayout(ends)
-        self.quick_description=QLabel('Sin condiciones rápidas: se consideran todas las apuestas del desarrollo de origen.')
-        self.quick_description.setWordWrap(True);progressive_layout.addWidget(self.quick_description)
-        quick_note=QLabel('Este nivel filtra candidatas; no fija el número final ni el importe. El presupuesto se define abajo y la propuesta se revisa antes de aplicarla.')
-        quick_note.setWordWrap(True);quick_note.setObjectName('muted');progressive_layout.addWidget(quick_note)
-        outer.addWidget(progressive)
+        # Legacy quick_level data is ignored; reductions are configured once
+        # in their own tabs and shared by the optimiser.
         self.optimize_info=QLabel();self.optimize_info.setWordWrap(True);self.optimize_info.setObjectName('optimizationSourceSummary')
         self.optimize_info.setStyleSheet('background:#12385c;border:1px solid #2c6c98;border-radius:4px;padding:6px;')
         outer.addWidget(self.optimize_info)
@@ -4502,10 +4506,10 @@ class MainWindow(QMainWindow):
         self.portfolio_advanced_toggle=advanced_toggle;self.portfolio_advanced=advanced
         self.portfolio_seed=QSpinBox();self.portfolio_seed.setRange(0,2_000_000_000)
         self.portfolio_time=QSpinBox();self.portfolio_time.setRange(1,300);self.portfolio_time.setValue(10)
-        self.portfolio_scope=QComboBox();self.portfolio_scope.addItem('Base completa (incluye descartadas)','base');self.portfolio_scope.addItem('Solo candidatas tras condiciones','candidates')
+        self.portfolio_scope=QComboBox();self.portfolio_scope.addItem('Candidatas tras reducciones','candidates');self.portfolio_scope.setEnabled(False);self.portfolio_scope.hide()
         self.portfolio_channel=QComboBox();self.portfolio_channel.addItem('Genérico: mínimo 1 por Pleno',1);self.portfolio_channel.addItem('TuLotero sencillas: mínimo 2 por Pleno',2)
         self.portfolio_pleno_model=QCheckBox('Incluir Pleno en probabilidad: independencia explícita de goles')
-        for i,(label_text,control) in enumerate((('Semilla',self.portfolio_seed),('Tiempo de búsqueda (s)',self.portfolio_time),('Universo',self.portfolio_scope),('Canal',self.portfolio_channel))):advanced_layout.addWidget(QLabel(label_text),i,0);advanced_layout.addWidget(control,i,1)
+        for i,(label_text,control) in enumerate((('Semilla',self.portfolio_seed),('Tiempo de búsqueda (s)',self.portfolio_time),('Canal',self.portfolio_channel))):advanced_layout.addWidget(QLabel(label_text),i,0);advanced_layout.addWidget(control,i,1)
         advanced_layout.addWidget(self.portfolio_pleno_model,4,0,1,2)
         self.portfolio_summary=QLabel('3 · Revisa la propuesta antes de aplicarla. El cálculo no modifica tus apuestas.')
         self.portfolio_summary.setWordWrap(True);self.portfolio_summary.setMinimumHeight(34);self.portfolio_summary.setObjectName('optimizationProposalSummary')
@@ -4520,7 +4524,6 @@ class MainWindow(QMainWindow):
             minimum.valueChanged.connect(self.manual_filters_changed);maximum.valueChanged.connect(self.manual_filters_changed)
         for control in (self.filter_max_one,self.filter_max_x,self.filter_max_two):control.valueChanged.connect(self.manual_filters_changed)
         self.filter_reference.changed.connect(self.manual_filters_changed)
-        self.quick_conditions_slider.valueChanged.connect(self.configure_quick_conditions)
         self.update_filter_controls()
 
     def restore_filter_controls(self):
@@ -4555,16 +4558,15 @@ class MainWindow(QMainWindow):
         self.reduction_activation_buttons[19].setChecked(optimizer_enabled)
         self.reduction_activation_buttons[19].blockSignals(False)
         self.reduction_active[19]=optimizer_enabled
-        level=params.get('quick_level')
-        self.quick_level=level if type(level) is int and 0<=level<=10 else None
-        self.quick_conditions_slider.blockSignals(True);self.quick_conditions_slider.setValue(self.quick_level if self.quick_level is not None else 10);self.quick_conditions_slider.blockSignals(False)
-        automatic={'variants','x_count','two_count','changes','max_one_run','max_x_run','max_two_run'}
+        # Older releases stored a second, quick filter in Optimizar. Ignore it:
+        # all candidate rules now live in their reduction tabs.
+        self.quick_level=None
         for key,(minimum,maximum) in self.filter_ranges.items():
             limits=tuple(saved.get(key,self.filter_defaults[key]))
             minimum.setValue(limits[0]);maximum.setValue(limits[1])
-            self.filter_checks[key].setChecked((self.quick_level is not None and key in automatic) or limits!=self.filter_defaults[key])
+            self.filter_checks[key].setChecked(limits!=self.filter_defaults[key])
         for key,control in (('max_one_run',self.filter_max_one),('max_x_run',self.filter_max_x),('max_two_run',self.filter_max_two)):
-            control.setValue(saved.get(key,14));self.filter_checks[key].setChecked((self.quick_level is not None) or control.value()!=14)
+            control.setValue(saved.get(key,14));self.filter_checks[key].setChecked(control.value()!=14)
         self.filter_reference.set_column(saved.get('reference',''))
         self.filter_checks['coincidences'].setChecked(bool(saved.get('reference')))
         from quiniela_ai_studio.domain.advanced_conditions import (
@@ -4614,33 +4616,11 @@ class MainWindow(QMainWindow):
                 self.count_values[sign]=set(range(low,high+1));self.count_apply[sign].setChecked(True)
         for (sign,value),button in self.count_squares.items():button.setChecked(value in self.count_values[sign])
         self._refresh_count_profiles()
-        self.quick_description.setText(self._quick_conditions_text(self.quick_level) if self.quick_level is not None else 'Condiciones personalizadas: se usan los límites que has seleccionado.' if saved else self._quick_conditions_text(10))
         self.filter_feedback.setText('Primero pulsa «Generar apuestas» al final de la pestaña Normal.' if not self.system or (not self.system.bets and not saved) else '')
         self.configuring_filters=False
         self._refresh_history_statistics('Cuenta')
         self._refresh_history_statistics('Racha')
         self.update_filter_controls()
-
-    def configure_quick_conditions(self, level):
-        """Populate filter controls; moving the slider never edits a saved system."""
-        from quiniela_ai_studio.domain.filters import quick_conditions
-        spec=quick_conditions(level)
-        self.configuring_filters=True
-        self.quick_level=level
-        # Quick presets take the place of custom Cuenta/Racha conditions while
-        # preserving their grid selections for when the user returns to Manual.
-        self.automatic_profile_rules.clear()
-        for button in (*self.count_apply.values(),*self.run_apply.values()):button.setChecked(False)
-        active={'variants','x_count','two_count','changes','max_one_run','max_x_run','max_two_run'}
-        for key,check in self.filter_checks.items():check.setChecked(key in active)
-        for key,(minimum,maximum) in self.filter_ranges.items():
-            limits=getattr(spec,key)
-            minimum.setValue(limits[0]);maximum.setValue(limits[1])
-        self.filter_max_one.setValue(spec.max_one_run)
-        self.filter_max_x.setValue(spec.max_x_run);self.filter_max_two.setValue(spec.max_two_run)
-        self.quick_description.setText(self._quick_conditions_text(level))
-        self.configuring_filters=False
-        self.update_filter_controls();self.schedule_live_filter()
 
     def filters_changed(self):
         self.update_filter_controls();self.manual_filters_changed()
@@ -4648,14 +4628,7 @@ class MainWindow(QMainWindow):
     def manual_filters_changed(self):
         if self.configuring_filters:return
         self.quick_level=None
-        self.quick_description.setText('Condiciones personalizadas: se usan los límites que has seleccionado.')
         self.schedule_live_filter()
-
-    @staticmethod
-    def _quick_conditions_text(level):
-        if level == 10:
-            return 'Nivel 10 · sin condiciones rápidas; se consideran todas las apuestas del desarrollo de origen.'
-        return f'Nivel {level}/10 · aplica condiciones rápidas; cuanto más bajo sea, más restrictiva es la selección.'
 
     @staticmethod
     def _empty_filter_message(spec):
@@ -4694,8 +4667,6 @@ class MainWindow(QMainWindow):
     def reset_filters(self):
         self.configuring_filters=True
         self.quick_level=None
-        self.quick_description.setText(self._quick_conditions_text(10))
-        self.quick_conditions_slider.blockSignals(True);self.quick_conditions_slider.setValue(10);self.quick_conditions_slider.blockSignals(False)
         for check in self.filter_checks.values():check.setChecked(False)
         self.count_values.clear();self.count_values.update({sign:set() for sign in ('V','X','2')})
         self.count_profiles_selected.clear();self.count_profile_active=False
@@ -4745,7 +4716,7 @@ class MainWindow(QMainWindow):
                                      and self.filter_checks['coincidences'].isChecked() else ''),
                           advanced=self.advanced_spec(),reduction_rules=self.build_reduction_rules(),
                           reduction_tabs_enabled=tuple(index for index,active in self.reduction_active.items() if active and index!=19),
-                          quick_conditions_active=self.quick_level is not None)
+                          quick_conditions_active=False)
 
     def _restore_reduction_rules(self, rows):
         from quiniela_ai_studio.domain.reduction_rules import rules_from_parameters
@@ -5075,7 +5046,7 @@ class MainWindow(QMainWindow):
         source=self.system
         bets,base,config,frozen,spec=self.service.optimization_input(source,cents,
             objective=self.portfolio_objective.currentData(),seed=self.portfolio_seed.value(),max_seconds=self.portfolio_time.value(),
-            universe_scope=self.portfolio_scope.currentData(),min_per_pleno=self.portfolio_channel.currentData(),
+            universe_scope='candidates',min_per_pleno=self.portfolio_channel.currentData(),
             include_pleno_probability=self.portfolio_pleno_model.isChecked())
         from quiniela_ai_studio.domain.portfolio import optimize_portfolio
         audit=dict(run_id=uuid.uuid4().hex,created_at=utcnow(),round_key=source.round_key,input_hash=source.hash,

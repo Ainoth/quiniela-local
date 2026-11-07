@@ -555,7 +555,7 @@ def test_edit_clears_stale_progress_and_explains_missing_development(window):
 
 
 
-def test_quick_condition_slider_populates_filters_and_recovers_original_bets(window):
+def test_reductions_filter_candidates_before_optimization(window):
     from quiniela_studio import engine
     window.new_system()
     base=('1X2',)*6+tuple('1X21X21X')
@@ -565,21 +565,13 @@ def test_quick_condition_slider_populates_filters_and_recovers_original_bets(win
     recommended_counts=(window.normal_generator.triples.value(),window.normal_generator.doubles.value())
     window.navigation.setCurrentRow(8);window.reduction_tabs.setCurrentIndex(window.reduction_visible_indexes[19]);QTest.qWait(10)
     window.reduction_activation_buttons[0].setChecked(True)
-    assert window.quick_conditions_slider.isVisible()
-    window.quick_conditions_slider.setValue(0)
-    assert window.system==original
-    assert (window.normal_generator.triples.value(),window.normal_generator.doubles.value())==recommended_counts
-    assert tuple(control.value() for control in window.filter_ranges['variants'])==(5,8)
-    assert tuple(control.value() for control in window.filter_ranges['x_count'])==(2,6)
-    assert tuple(control.value() for control in window.filter_ranges['changes'])==(5,10)
-    assert window.filter_max_one.value()==4
-    assert window.filter_checks['x_count'].isChecked()
-    assert not window.filter_checks['coincidences'].isChecked()
-    assert not window.filter_checks['x_distance'].isChecked()
+    assert 'Prepara las apuestas candidatas' not in [label.text() for label in window.findChildren(type(window.optimize_info))]
+    window.count_apply['X'].setChecked(True)
+    for value in range(15):window.count_squares[('X',value)].setChecked(value==14)
     wait_for_optimization(window)
-    assert 0<window.system.quantity<original.quantity
-    window.quick_conditions_slider.setValue(10)
-    assert tuple(control.value() for control in window.filter_ranges['variants'])==(0,14)
+    assert window.system.quantity==0
+    assert (window.normal_generator.triples.value(),window.normal_generator.doubles.value())==recommended_counts
+    window.reset_filters()
     wait_for_optimization(window)
     assert window.system.bets==original.bets
     assert window.system.pleno==original.pleno
@@ -606,21 +598,18 @@ def test_live_optimization_latest_request_empty_recovery_and_budget_last(window)
     window.reduction_activation_buttons[19].setChecked(True)
     window.reduction_activation_buttons[0].setChecked(True)
     normal_counts=(window.normal_generator.triples.value(),window.normal_generator.doubles.value())
-    window.quick_conditions_slider.setValue(0);window.quick_conditions_slider.setValue(8);window.quick_conditions_slider.setValue(1)
     wait_for_optimization(window)
-    from quiniela_ai_studio.domain.filters import quick_conditions
-    assert window.system.bets==quick_conditions(1).apply(original.bets)
+    assert window.system.bets==original.bets
     assert (window.normal_generator.triples.value(),window.normal_generator.doubles.value())==normal_counts
     assert str(window.system.quantity) in window.optimize_info.text()
     assert window.budget_apply.isEnabled()
     assert window.budget_group.mapTo(window,window.budget_group.rect().topLeft()).y()>window.filter_group.mapTo(window,window.filter_group.rect().topLeft()).y()
-    window.quick_conditions_slider.setValue(10);wait_for_optimization(window)
     window.count_apply['X'].setChecked(True)
     window.count_squares[('X',14)].setChecked(True)
     wait_for_optimization(window)
     assert window.system.quantity==0 and window.system.cost(window.round)==0
     assert not window.budget_apply.isEnabled()
-    window.quick_conditions_slider.setValue(0);window.quick_conditions_slider.setValue(10)
+    window.reset_filters()
     wait_for_optimization(window)
     assert window.system.bets==original.bets
     assert window.budget_apply.isEnabled()
@@ -635,7 +624,8 @@ def test_live_optimization_latest_request_empty_recovery_and_budget_last(window)
 
 def test_close_cancels_pending_live_optimization(window,application):
     window.example_system();wait_for_generation(window)
-    window.quick_conditions_slider.setValue(0)
+    window.reduction_activation_buttons[0].setChecked(True)
+    window.count_apply['X'].setChecked(True)
     window.close();application.processEvents()
     assert not window.filter_timer.isActive()
     assert not window.isVisible()
@@ -648,7 +638,7 @@ def test_live_worker_superseded_request_and_close_are_safe(window,monkeypatch,ap
     from quiniela_ai_studio.domain.filters import BasicFilters
     original_apply=BasicFilters.apply;started=threading.Event()
     def slow_apply(spec,bets,cancelled=lambda:False):
-        if spec.variants==(5,8):
+        if spec.x_count==(0,0):
             started.set()
             while not cancelled():
                 threading.Event().wait(0.005)
@@ -657,16 +647,18 @@ def test_live_worker_superseded_request_and_close_are_safe(window,monkeypatch,ap
     monkeypatch.setattr(BasicFilters,'apply',slow_apply)
     window.example_system();wait_for_generation(window)
     original=window.system.bets
-    window.quick_conditions_slider.setValue(0)
+    window.reduction_activation_buttons[0].setChecked(True)
+    window.filter_checks['x_count'].setChecked(True)
+    window.filter_ranges['x_count'][1].setValue(0)
     for _ in range(100):
         QTest.qWait(10)
         if started.is_set():break
     assert started.is_set() and window.filter_job.isRunning()
-    window.quick_conditions_slider.setValue(10)
+    window.filter_ranges['x_count'][1].setValue(14)
     wait_for_optimization(window)
     assert window.system.bets==original
     started.clear()
-    window.quick_conditions_slider.setValue(0)
+    window.filter_ranges['x_count'][1].setValue(0)
     for _ in range(100):
         QTest.qWait(10)
         if started.is_set():break
@@ -682,12 +674,14 @@ def test_live_worker_superseded_request_and_close_are_safe(window,monkeypatch,ap
 
 def test_saved_optimization_controls_survive_restart(window):
     window.example_system();wait_for_generation(window)
-    window.quick_conditions_slider.setValue(4);wait_for_optimization(window)
+    window.reduction_activation_buttons[0].setChecked(True)
+    window.count_apply['X'].setChecked(True)
+    window.count_squares[('X',14)].setChecked(True)
+    wait_for_optimization(window)
     saved=window.system;path=window.repository.path
     window.close()
     repo=Repository(path);reopened=MainWindow(repo)
-    assert reopened.quick_conditions_slider.value()==4
-    assert reopened.quick_level==4, (saved.parameters,reopened.system.parameters,reopened.quick_level)
+    assert reopened.quick_level is None
     assert reopened.system.bets==saved.bets
     assert not reopened.filter_timer.isActive()
     reopened.close()

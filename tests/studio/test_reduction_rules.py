@@ -1,4 +1,5 @@
 import math
+from itertools import pairwise
 
 import pytest
 
@@ -114,6 +115,54 @@ def test_interruption_tab_must_be_explicitly_enabled():
     bets=(Bet(example,'M0'),Bet(''.join(alternate),'M0'))
     assert BasicFilters(reduction_rules=(matrix,)).apply(bets)==bets
     assert BasicFilters(reduction_rules=(matrix,),reduction_tabs_enabled=(18,)).apply(bets)==(bets[0],)
+
+
+def test_exact_figures_combine_with_other_reduction_tabs_in_one_filter_pass():
+    """FSSeguidos and Distancias stay active alongside Cuenta (AND semantics)."""
+    from quiniela_ai_studio.domain.interruption_statistics import interruption_profile
+
+    fss_example='12X21XX1212111'
+    assert len(fss_example)==14
+    # Re-label all X as 2: the V sequence and its exact partition stay intact,
+    # while the independent X-count rule no longer admits the column.
+    fss_other=fss_example.replace('X','2')
+    fss=ReductionRule('fss-v-7','allowed_run_figure',0,1,sign='V',run_length=7,
+                      allowed_figures=('3-2-1-1',),tab_index=17)
+    cuenta=ReductionRule('cuenta-x-3','allowed_count',0,14,sign='X',
+                         allowed_values=(3,),tab_index=0)
+    assert fss.accepts(fss_example) and fss.accepts(fss_other)
+    assert cuenta.accepts(fss_example) and not cuenta.accepts(fss_other)
+    fss_bets=(Bet(fss_example,'M0'),Bet(fss_other,'M0'))
+    assert BasicFilters(reduction_rules=(fss,cuenta),reduction_tabs_enabled=(0,17)).apply(fss_bets)==(fss_bets[0],)
+
+    from quiniela_ai_studio.domain.sign_distance import maximum_sign_distance
+    distance=ReductionRule('distance-x-3','allowed_sign_distance',0,13,sign='X',
+                           allowed_values=(3,),tab_index=20)
+    assert maximum_sign_distance(fss_example,'X')==3
+    assert not distance.accepts(fss_other)
+    assert BasicFilters(reduction_rules=(distance,cuenta),reduction_tabs_enabled=(0,20)).apply(fss_bets)==(fss_bets[0],)
+
+    interruption_example='11X21221XX121X'
+    total,_,figure=interruption_profile(interruption_example)
+    assert (total,figure)==(10,'4-4-2')
+    bits=tuple(left!=right for left,right in pairwise(interruption_example))
+    alternate=['1']
+    for changed in bits:
+        if not changed:
+            alternate.append(alternate[-1])
+        else:
+            alternate.append(next(sign for sign in '1X2' if sign!=alternate[-1]
+                                  and (sign!='X' or alternate.count('X')<1)))
+    interruption_other=''.join(alternate)
+    assert interruption_profile(interruption_other)==(10,4,'4-4-2')
+    x_total=interruption_example.count('X')
+    exact=ReductionRule('dist-figure-10','allowed_interruption_figure',0,1,
+                        run_length=10,allowed_figures=('4-4-2',),tab_index=20)
+    count_x=ReductionRule('cuenta-x-exact','allowed_count',0,14,sign='X',
+                          allowed_values=(x_total,),tab_index=0)
+    bets=(Bet(interruption_example,'M0'),Bet(interruption_other,'M0'))
+    assert exact.accepts(interruption_other)
+    assert BasicFilters(reduction_rules=(exact,count_x),reduction_tabs_enabled=(0,20)).apply(bets)==(bets[0],)
 
 
 def test_joint_automatic_profile_keeps_categories_dependent():

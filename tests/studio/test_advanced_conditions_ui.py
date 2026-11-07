@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 from PySide6.QtCore import Qt
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QFileDialog, QPushButton, QSpinBox, QWidget
+from PySide6.QtWidgets import QFileDialog, QPushButton, QScrollArea, QSpinBox, QWidget
 
 from quiniela_ai_studio.domain.models import Bet
 
@@ -170,7 +170,7 @@ def test_count_and_streak_mode_grids_apply_and_outer_squares_preserve_settings(w
     for mode in (1,2,0):
         window.mode_tabs['Cuenta'].setCurrentIndex(mode)
         assert window.mode_tabs['Cuenta'].widget(mode).isAncestorOf(count_board)
-        assert window.classic_reduction_canvases[0].width()==930
+        assert window.classic_reduction_canvases[0].width()>=700
         assert window.count_squares[('V',14)].text()!=''
     window.count_apply['V'].setChecked(True)
     QTest.mouseClick(window.count_squares[('V',14)],Qt.MouseButton.LeftButton)
@@ -297,7 +297,7 @@ def test_sseguidos_three_modes_compact_panels_filter_and_share_state(window):
     assert len(board.findChildren(QWidget,'streakSignPanel'))==4
     assert all(panel.width()==166 for panel in board.findChildren(QWidget,'streakSignPanel'))
     assert board.height()<=600
-    assert window.history_season_grids['Racha'].columnCount()==2
+    assert window.history_season_grids['Racha'].columnCount()==1
     assert window.classic_reduction_canvases[1].decorative is False
     assert window.classic_reduction_canvases[1].width()==960
     methods.setCurrentWidget(window.run_mode_pages['Automática'])
@@ -642,6 +642,16 @@ def test_sign_distances_tab_filters_and_restores_without_changing_figures(window
     assert not window.sign_distance_apply['1'].isChecked()
 
 
+def test_reduction_tabs_remain_fixed_while_panel_content_scrolls(window):
+    window.navigation.setCurrentRow(8)
+    window.reduction_tabs.setCurrentIndex(window.reduction_visible_indexes[17])
+    page=window.reduction_tabs.currentWidget()
+    scroll=page.findChild(QScrollArea)
+    assert scroll is not None
+    assert not scroll.isAncestorOf(window.reduction_tabs)
+    assert window.reduction_tabs.tabBar().isVisible()
+
+
 def test_distances_automatic_mode_has_seasons_and_calculates_historical_values(window):
     assert [window.mode_tabs['Distancias'].tabText(i)
             for i in range(window.mode_tabs['Distancias'].count())] == ['Manual', 'Automática']
@@ -751,7 +761,7 @@ def test_automatic_season_picker_is_compact_and_has_bulk_selection(window):
     window.refresh_history_seasons()
     seasons=window.history_season_squares['Cuenta']
     assert list(seasons)==['2024-2025','2023-2024']
-    assert window.history_season_grids['Cuenta'].columnCount()==2
+    assert window.history_season_grids['Cuenta'].columnCount()==1
     assert window.history_season_summaries['Cuenta'].text()=='2 temp. · 3 jornadas · 0 con marcador'
     assert window.findChild(QPushButton,'historyImportButton') is not None
     assert all(button.text()!='Importar CSV/JSON' for button in window.reduction_tabs.findChildren(QPushButton))

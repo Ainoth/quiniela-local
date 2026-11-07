@@ -133,6 +133,11 @@ class SystemService:
         source,bets=self.origin_bets(system)
         base=tuple(json.loads(source.parameters).get('base',source.base))
         saved=dict(json.loads(system.parameters).get('filter_spec',{}))
+        # Older releases may persist quick_conditions_active=True from the
+        # separate optimizer slider. The ranges are retained as the user's
+        # configured reductions, but this legacy switch must not add another
+        # filtering pass during optimization.
+        saved['quick_conditions_active']=False
         identity=saved.get('id');version=saved.get('version')
         if identity not in (None,'basic-local-v1','basic-local-v2','basic-local-v3','basic-local-v4','basic-local-v5') or version not in (None,1,2,3,4,5):
             raise ValueError('Versión de condiciones no admitida; no se ignoran restricciones desconocidas.')

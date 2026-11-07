@@ -126,7 +126,8 @@ def test_save_is_blocked_while_latest_filter_is_pending(window, tmp_path, monkey
     system = window.service.imported(window.round, 'Origen',
                                      (Bet('1' * 14, '01'), Bet('X' * 14, '01')))
     window.set_system(system)
-    window.configure_quick_conditions(10)
+    window.reduction_activation_buttons[0].setChecked(True)
+    window.filter_checks['x_count'].setChecked(True)
     assert window.filter_timer.isActive() and not window.export_button.isEnabled()
     assert not window.full_export_button.isEnabled()
     monkeypatch.setattr(QFileDialog, 'getSaveFileName', lambda *args: pytest.fail('Filtro pendiente'))

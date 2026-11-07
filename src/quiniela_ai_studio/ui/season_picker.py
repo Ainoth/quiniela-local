@@ -27,7 +27,7 @@ class SeasonPicker(QWidget):
     def __init__(self, parent: QWidget | None = None):
         super().__init__(parent)
         self.setObjectName("seasonPicker")
-        self.setMinimumHeight(260)
+        self.setMinimumHeight(210)
         self.counts: dict[str, int] = {}
         self.boxes: dict[str, QCheckBox] = {}
         root = QVBoxLayout(self)
@@ -50,7 +50,7 @@ class SeasonPicker(QWidget):
         root.addWidget(self.search)
         self.scroll = QScrollArea()
         self.scroll.setWidgetResizable(True)
-        self.scroll.setFixedHeight(150)
+        self.scroll.setFixedHeight(130)
         host = QWidget()
         self.grid = QGridLayout(host)
         self.grid.setContentsMargins(2, 2, 2, 2)
@@ -68,14 +68,14 @@ class SeasonPicker(QWidget):
                 border-radius:4px; padding:6px 4px; font-size:11px;
             }
             QWidget#seasonPicker QCheckBox:checked {
-                background:#123f3a; border-color:#269b6a; color:#b7ffd5;
+                background:#17466d; border-color:#4b9ccc; color:#e5f5ff;
             }
             QWidget#seasonPicker QCheckBox::indicator {
                 width:12px; height:12px; border:1px solid #91bed7;
                 background:#edf6ff; border-radius:2px;
             }
             QWidget#seasonPicker QCheckBox::indicator:checked {
-                background:#19b56b; border-color:#5cf1a4; image:none;
+                background:#2782b8; border-color:#84c9ed; image:none;
             }
             QWidget#seasonPicker QPushButton#seasonPreset {
                 padding:4px 5px; font-size:10px; min-height:20px;
@@ -145,6 +145,6 @@ class SeasonPicker(QWidget):
             matches = query in season.lower()
             box.setVisible(matches)
             if matches:
-                self.grid.addWidget(box, visible // 3, visible % 3)
+                self.grid.addWidget(box, visible, 0)
                 visible += 1
-        self.grid.setRowStretch((visible + 2) // 3, 1)
+        self.grid.setRowStretch(visible, 1)

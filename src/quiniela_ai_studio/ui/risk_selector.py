@@ -12,7 +12,7 @@ QPushButton#riskLevel {
 }
 QPushButton#riskLevel:hover {background:#1b4b6d; border-color:#5fbed7;}
 QPushButton#riskLevel:checked {
-    background:#116d60; color:#d4ffdb; border:1px solid #50dfa6; font-weight:bold;
+    background:#1b527e; color:#e5f5ff; border:1px solid #4b9ccc; font-weight:bold;
 }
 QPushButton#riskLevel:focus {border:2px solid #ffd15a;}
 QPushButton#riskLevel:disabled {color:#71869a; background:#172b3c;}

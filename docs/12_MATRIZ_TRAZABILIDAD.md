@@ -1,5 +1,16 @@
 # 12 · Matriz de trazabilidad de requisitos
 
+RF-RED-025 (v2.0.30): todas las reducciones activas se cruzan con AND sobre el
+mismo conjunto de candidatas; Optimizar solo toma ese conjunto filtrado y ya no
+presenta un segundo filtro rápido. FSSeguidos y Distancias conservan sus figuras
+exactas y se prueban combinadas con Cuenta. La navegación de Reducciones queda
+fija mientras se desplaza cada panel; temporadas se presentan en listas
+verticales con búsqueda/presets, selección azul y mensajes no duplicados en la
+franja naranja. Pruebas: `test_exact_figures_combine_with_other_reduction_tabs_in_one_filter_pass`,
+`test_fsseguidos_filters_exact_partition_separately_and_persists`,
+`test_interruption_matrix_and_distances_are_separate_active_filters_and_persist`
+y pruebas de interfaz de temporadas/optimización.
+
 RF-RED-024 (v2.0.28): unifica la presentación de las pestañas de Reducciones,
 añade búsqueda y presets comunes para temporadas históricas y sitúa Optimizar
 al final en un panel compacto. Pruebas: suite focalizada de pestañas y
@@ -148,10 +159,10 @@ mensaje sugiere revisar filtros o recuperar apuestas. Pruebas:
 `test_sign_distances_tab_filters_and_restores_without_changing_figures` y
 `test_distances_are_index_differences_and_variants_share_a_family`.
 
-RF-UX-030 (v1.0.35): Optimizar presenta tres pasos —preparar candidatas,
-definir presupuesto/prioridad y revisar la propuesta—, explica el sentido del
-nivel rápido y deja explícito que las apuestas no cambian hasta aplicar.
-Prueba: `test_72_proposal_apply_and_audit`.
+RF-UX-030 (v1.0.35): el presupuesto y la revisión de propuesta de Optimizar se
+mantienen. Su filtro rápido de preparación quedó retirado en v2.0.30; los
+controles de reducción viven en sus pestañas y Optimizar recibe sus candidatas
+admitidas (RF-RED-025). Prueba: `test_72_proposal_apply_and_audit`.
 
 RF-DAT-008 (v1.0.35): reconoce únicamente la errata «Sevila (F)» del PRE de
 WIN1X2 frente a «Sevilla (F)» en el XML de Quinielista para permitir la

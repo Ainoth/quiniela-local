@@ -27,8 +27,9 @@ def test_72_proposal_apply_and_audit(window):
     window.reduction_activation_buttons[19].setChecked(True)
     assert window.budget_group.title()=='2 · Define presupuesto y prioridad'
     assert window.budget_apply.text()=='Calcular propuesta'
-    assert '10 · sin condiciones rápidas' in window._quick_conditions_text(10)
-    assert 'más restrictiva' in window._quick_conditions_text(2)
+    assert 'condiciones activas' in window.optimize_info.text()
+    assert not any('Prepara las apuestas candidatas' in label.text()
+                   for label in window.findChildren(type(window.optimize_info)))
     assert 'Quiniela abierta:' in window.optimize_info.text()
     assert 'Límite:' in window.budget_capacity.text()
     window.budget.setValue(5);window.optimize();wait_for_data(window)

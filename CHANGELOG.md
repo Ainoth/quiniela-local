@@ -1,5 +1,18 @@
 # Cambios
 
+## 2.0.30 — reducciones combinadas y Optimizar
+
+- Optimizar usa siempre las apuestas admitidas por todas las reducciones activas;
+  elimina el filtro rápido duplicado de candidatas.
+- Mantiene fija la barra de pestañas de Reducciones y desplaza el contenido de
+  cada pestaña por separado.
+- Reordena los selectores históricos como listas verticales compactas con
+  búsqueda y selección por lotes; unifica el color azul de selección.
+- Integra los mensajes temporales en la franja naranja para quitar la segunda
+  barra de estado inferior.
+- Añade pruebas conjuntas para las figuras exactas de FSSeguidos/Distancias y
+  otras reducciones activas.
+
 ## 2.0.29 — temporadas y cálculo automático para Distancias
 
 - Añade a Distancias los modos Manual y Automática, selección y búsqueda de
