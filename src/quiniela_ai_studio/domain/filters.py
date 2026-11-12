@@ -79,6 +79,37 @@ class BasicFilters:
             reference=tuple(reference) if reference else None,
             repetition_range=self.coincidences if reference else None,
         )
+        active_advanced = bool(
+            self.advanced.groups
+            or self.advanced.relations
+            or self.advanced.implications
+        )
+        active_rules = any(
+            rule.active and (rule.tab_index < 0 or rule.tab_index in enabled_tabs)
+            for rule in self.reduction_rules
+        )
+        if (
+            variants == (0, 14)
+            and x_count == (0, 14)
+            and two_count == (0, 14)
+            and all(value == 14 for value in max_runs.values())
+            and changes == (0, 13)
+            and distance == (1, 13)
+            and not reference
+            and not active_advanced
+            and not active_rules
+        ):
+            # A neutral filter is common when the user has not enabled any
+            # reduction. Preserve cancellation responsiveness while skipping
+            # repeated per-column Python rule evaluation.
+            unchanged = []
+            for index, bet in enumerate(bets):
+                if index % 500 == 0 and cancelled():
+                    raise Cancelled("Cálculo de condiciones cancelado.")
+                unchanged.append(bet)
+            if cancelled():
+                raise Cancelled("Cálculo de condiciones cancelado.")
+            return tuple(unchanged)
         result = []
         for index, bet in enumerate(bets):
             if index % 256 == 0 and cancelled():

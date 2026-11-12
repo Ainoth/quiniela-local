@@ -4,6 +4,7 @@ import pytest
 
 from quiniela_studio.demo import demo_round
 from quiniela_studio.domain import Bet
+from quiniela_studio.engine import Cancelled
 from quiniela_studio.filters import BasicFilters
 from quiniela_studio.services import SystemService
 from quiniela_studio.storage import Repository
@@ -36,6 +37,13 @@ def test_shared_filters_against_exhaustive_reference():
             expected.append(b)
     assert spec.apply(bets) == tuple(expected)
     assert all(b.quantity == 2 and b.pleno == "M0" for b in expected)
+
+
+def test_neutral_filter_preserves_order_duplicates_and_cancellation():
+    bets = (Bet("1" * 14, "M0", 3), Bet("1" * 14, "M0", 2), Bet("X" * 14))
+    assert BasicFilters().apply(bets) == bets
+    with pytest.raises(Cancelled, match="cancelado"):
+        BasicFilters().apply(bets, cancelled=lambda: True)
 
 
 def test_filter_versions_restore_initial_origin_and_reject_empty(tmp_path):

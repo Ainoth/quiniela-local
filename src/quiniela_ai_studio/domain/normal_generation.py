@@ -27,13 +27,20 @@ class ProbabilitySource:
     round_key: str
     source: str
     captured_at: str
-    values: tuple[tuple[float, float, float], ...]
+    values: tuple[tuple[float, float, float] | None, ...]
     kind: str = "custom"
     matches: tuple[tuple[str, str], ...] = ()
     original_name: str = ""
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "values", tuple(tuple(float(value) for value in row) for row in self.values))
+        object.__setattr__(
+            self,
+            "values",
+            tuple(
+                None if row is None else tuple(float(value) for value in row)
+                for row in self.values
+            ),
+        )
         object.__setattr__(self, "matches", tuple(tuple(pair) for pair in self.matches))
         if not self.round_key or not self.source or not self.captured_at:
             raise ValueError("La fuente necesita jornada, nombre y fecha de captura.")
@@ -43,6 +50,8 @@ class ProbabilitySource:
         if len(self.values) != 14:
             raise ValueError("La matriz de porcentajes debe contener 14 partidos.")
         for row in self.values:
+            if row is None:
+                continue
             if len(row) != 3 or any(not math.isfinite(v) or v < 0 or v > 1 for v in row):
                 raise ValueError("Cada porcentaje debe ser finito y estar entre 0 y 100%.")
             if not math.isclose(sum(row), 1.0, abs_tol=1e-8):
@@ -67,7 +76,12 @@ def _probability_rows(values: Sequence[Sequence[float]]) -> tuple[tuple[float, f
     if len(values) != 14:
         raise ValueError("Se necesitan porcentajes para los 14 partidos.")
     rows = []
-    for row in values:
+    for index, row in enumerate(values, 1):
+        if row is None:
+            raise ValueError(
+                f"Faltan porcentajes verificados para el partido {index}; "
+                "completa la fila manualmente antes de calcular."
+            )
         if len(row) != 3:
             raise ValueError("Cada partido necesita porcentajes 1, X y 2.")
         normalized = tuple(float(value) for value in row)
@@ -101,7 +115,12 @@ def validate_percentages(values: Sequence[Sequence[float]]) -> tuple[tuple[float
     if len(values) != 14:
         raise ValueError("La matriz debe tener exactamente 14 partidos.")
     rows = []
-    for row in values:
+    for index, row in enumerate(values, 1):
+        if row is None:
+            raise ValueError(
+                f"Faltan porcentajes verificados para el partido {index}; "
+                "completa la fila manualmente antes de calcular."
+            )
         values_row = tuple(float(value) for value in row)
         if len(values_row) != 3 or any(not math.isfinite(v) or not 0 <= v <= 1 for v in values_row):
             raise ValueError("Cada porcentaje debe estar entre 0 y 100.")
@@ -253,6 +272,11 @@ def weighted_probabilities(
     total_weight = math.fsum(weight for _, weight in active)
     rows = []
     for match_index in range(14):
+        if any(source.values[match_index] is None for source, _weight in active):
+            raise ValueError(
+                f"Falta una fuente completa para el partido {match_index + 1}; "
+                "no se puede combinar esa fila."
+            )
         row = tuple(math.fsum(source.values[match_index][sign] * weight for source, weight in active) / total_weight for sign in range(3))
         total = math.fsum(row)
         rows.append(tuple(value / total for value in row))

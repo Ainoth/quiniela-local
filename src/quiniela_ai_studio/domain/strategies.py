@@ -17,11 +17,15 @@ def selection_weights(round_, kind='sport', differentiation=0):
     selected = round_.snapshot(kind)
     if selected is None:
         raise ValueError('Esta fuente no tiene porcentajes. Descárgalos antes de recomendar signos.')
+    if any(row is None for row in selected.values):
+        raise ValueError('La fuente tiene partidos sin porcentajes verificados; complétalos antes de recomendar signos.')
     if differentiation == 0:
         return SelectionWeights(selected.values, selected.pleno_values, selected.source)
     sport, public = round_.snapshot('sport'), round_.snapshot('public')
     if kind != 'sport' or not sport or not public:
         raise ValueError('Diferenciar requiere elegir Mercado y disponer de mercado y popularidad descargados.')
+    if any(row is None for source in (sport, public) for row in source.values):
+        raise ValueError('La diferenciación necesita las 14 filas verificadas en ambas fuentes.')
     alpha = differentiation / 10
 
     def weights(p, q):

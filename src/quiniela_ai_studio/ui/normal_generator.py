@@ -327,6 +327,20 @@ class NormalGenerator(QWidget):
                 f"{', '.join(sources)}{detail}. Se listan solo fuentes descargadas y validadas. "
                 "La matriz elegida arriba es la que se usa para rellenar la base."
             )
+        market = self.current_round.snapshot("sport") if self.current_round else None
+        public = self.current_round.snapshot("public") if self.current_round else None
+        if market and public:
+            from quiniela_ai_studio.domain.value_signals import value_signals
+
+            signals = value_signals(market, public)
+            positive = sum(signal.label == "infra-apostado" for signal in signals)
+            negative = sum(signal.label == "sobreapostado" for signal in signals)
+            note = (
+                f" CR compara mercado/jugado: {positive} signos infra-apostados y "
+                f"{negative} sobreapostados. Pasa el cursor sobre 1/X/2 para ver el ratio; "
+                "es una señal relativa, no ROI ni premio esperado."
+            )
+            self.source_explanation.setText(self.source_explanation.text() + note)
 
     def _source_selected(self, _index):
         if self._loading or not self.current_round:
@@ -501,6 +515,16 @@ class NormalGenerator(QWidget):
         self._refresh_historical_recommendation()
 
     def _populate_probability_table(self, values):
+        value_tooltips = {}
+        market = self.current_round.snapshot("sport") if self.current_round else None
+        public = self.current_round.snapshot("public") if self.current_round else None
+        if market and public:
+            from quiniela_ai_studio.domain.value_signals import value_signals
+
+            value_tooltips = {
+                (signal.match_number - 1, "1X2".index(signal.sign)): signal
+                for signal in value_signals(market, public)
+            }
         self.probability_table.blockSignals(True)
         for row in range(14):
             match = self.current_round.matches[row]
@@ -508,9 +532,16 @@ class NormalGenerator(QWidget):
             self.probability_table.setItem(row, 0, number)
             teams = QTableWidgetItem(f"{match.home} – {match.away}"); teams.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
             self.probability_table.setItem(row, 1, teams)
+            row_values = None if values is None else values[row]
             for offset in range(3):
-                text = "" if values is None else f"{100 * float(values[row][offset]):.2f}"
+                text = "" if row_values is None else f"{100 * float(row_values[offset]):.2f}"
                 item = QTableWidgetItem(text); item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                signal = value_tooltips.get((row, offset))
+                if signal:
+                    item.setToolTip(
+                        f"CR mercado/jugado: {signal.ratio:.2f} · {signal.label}. "
+                        "Comparación descriptiva, no rentabilidad garantizada."
+                    )
                 self.probability_table.setItem(row, offset + 2, item)
         self.probability_table.blockSignals(False)
 
@@ -521,6 +552,11 @@ class NormalGenerator(QWidget):
             for column in range(2, 5):
                 item = self.probability_table.item(row, column)
                 text = item.text().strip().replace("%", "").replace(",", ".") if item else ""
+                if not text:
+                    raise ValueError(
+                        f"Faltan porcentajes verificados para el partido {row + 1}; "
+                        "completa la fila manualmente antes de calcular."
+                    )
                 try: value = float(text) / 100
                 except ValueError as exc: raise ValueError(f"Introduce un porcentaje válido en el partido {row + 1}.") from exc
                 values.append(value)
@@ -1104,7 +1140,9 @@ class NormalGenerator(QWidget):
         table = QTableWidget(14, 5); table.setHorizontalHeaderLabels(("#", "Partido", "1", "X", "2")); table.verticalHeader().hide(); table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         for col in (0, 2, 3, 4): table.horizontalHeader().setSectionResizeMode(col, QHeaderView.ResizeMode.ResizeToContents)
         for i, match in enumerate(self.current_round.matches[:14]):
-            for j, value in enumerate((f"{i+1:02}", f"{match.home} – {match.away}", *(f"{100*p:.2f}%" for p in source.values[i]))):
+            values = source.values[i]
+            display_values = tuple(f"{100*p:.2f}%" for p in values) if values is not None else ("Revisar",) * 3
+            for j, value in enumerate((f"{i+1:02}", f"{match.home} – {match.away}", *display_values)):
                 item = QTableWidgetItem(value); item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable); table.setItem(i, j, item)
         layout.addWidget(table, 1); buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close); buttons.rejected.connect(dialog.reject); buttons.accepted.connect(dialog.accept); layout.addWidget(buttons); dialog.show()
         self.percentages_dialog = dialog

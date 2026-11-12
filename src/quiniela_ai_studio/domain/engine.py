@@ -96,6 +96,8 @@ def coverage_template(base, locks, level, snapshot=None):
     base = normalize_base(base)
     if len(locks) != 14 or any(type(v) is not bool for v in locks) or type(level) is not int or not 0 <= level <= 10:
         raise ValueError("Nivel 0–10 y 14 bloqueos válidos requeridos.")
+    if snapshot and any(row is None for row in snapshot.values):
+        raise ValueError("La fuente tiene partidos sin porcentajes verificados; complétalos antes de calcular.")
     rankings = [sorted(SIGNS, key=lambda s: (-snapshot.values[i][SIGNS.index(s)], SIGNS.index(s))) if snapshot else list(SIGNS)
                 for i in range(14)]
     available = [i for i in range(14) if not locks[i]]
@@ -111,6 +113,8 @@ def coverage_template(base, locks, level, snapshot=None):
 
 
 def log_probability(column, snapshot):
+    if snapshot and any(row is None for row in snapshot.values):
+        raise ValueError("La fuente tiene partidos sin porcentajes verificados; no se puede puntuar esta columna.")
     return sum(math.log(p) if p else -math.inf for p in (snapshot.values[i][SIGNS.index(s)] for i, s in enumerate(column)))
 
 

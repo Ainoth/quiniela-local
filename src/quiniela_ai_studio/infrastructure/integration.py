@@ -34,6 +34,7 @@ from quiniela_ai_studio.infrastructure.providers import (
     text,
 )
 
+
 def validate_teams(
     round_: Round,
     teams: list[tuple[str, str]],
@@ -61,6 +62,19 @@ def validate_teams(
             )
 
 
+def _provider_row_matches(round_: Round, index: int, home: str, away: str) -> bool:
+    """Return whether one numbered provider fixture uniquely matches locally."""
+    homes = [match.home for match in round_.matches]
+    aways = [match.away for match in round_.matches]
+    fixture = round_.matches[index]
+    return bool(
+        home
+        and away
+        and _unique_team_match(fixture.home, home, homes, True)
+        and _unique_team_match(fixture.away, away, aways, True)
+    )
+
+
 def _unique_team_match(expected, actual, candidates, allow_missing_gender):
     return uniquely_matches_team(
         expected, actual, candidates, allow_missing_gender=allow_missing_gender
@@ -73,16 +87,40 @@ def public_snapshot(
     """XML público validado por identidad completa; nunca produce deportiva/P15."""
     rows = data_updater._validated_percentages(payload, round_.season, round_.number)
     matches = ElementTree.fromstring(payload).findall(".//partido")
-    validate_teams(
-        round_, [(m.get("local", ""), m.get("visitante", "")) for m in matches],
-        allow_missing_gender=True,
-    )
+    values = []
+    issues = []
+    for index, row in enumerate(rows):
+        match = matches[index]
+        if not _provider_row_matches(
+            round_, index, match.get("local", ""), match.get("visitante", "")
+        ):
+            values.append(None)
+            issues.append(
+                f"Revisar proveedor, partido {index + 1}: "
+                f"{match.get('local', '?')} – {match.get('visitante', '?')}"
+            )
+        else:
+            values.append(tuple(v / 100 for v in row))
+    if all(row is None for row in values):
+        raise ValueError("Ningún partido del proveedor coincide con esta jornada.")
+    pleno_match = matches[-1]
+    if _provider_row_matches(
+        round_, 14, pleno_match.get("local", ""), pleno_match.get("visitante", "")
+    ):
+        pleno_values = pleno_percentages(pleno_match, "p_jugados_")
+    else:
+        pleno_values = ()
+        issues.append(
+            "Revisar proveedor, Pleno al 15: "
+            f"{pleno_match.get('local', '?')} – {pleno_match.get('visitante', '?')}"
+        )
     snapshot = ProbabilitySnapshot(
         "public",
         "Quinielista · porcentajes jugados",
         captured_at or utcnow(),
-        tuple(tuple(v / 100 for v in row) for row in rows),
-        pleno_values=pleno_percentages(matches[-1], "p_jugados_"),
+        tuple(values),
+        pleno_values=pleno_values,
+        row_issues=tuple(issues),
     )
     return replace(
         round_,
@@ -121,7 +159,18 @@ def probability_snapshots(round_: Round, payload: bytes, captured_at: str | None
     import math
 
     rows = []
-    for match in matches:
+    issues = []
+    expected_round = round_
+    for index, match in enumerate(matches):
+        if not _provider_row_matches(
+            expected_round, index, match.get("local", ""), match.get("visitante", "")
+        ):
+            rows.append(None)
+            issues.append(
+                f"Revisar proveedor, partido {index + 1}: "
+                f"{match.get('local', '?')} – {match.get('visitante', '?')}"
+            )
+            continue
         try:
             values = tuple(float(match.attrib[field]) for field in fields)
         except (ValueError, KeyError) as exc:
@@ -129,10 +178,27 @@ def probability_snapshots(round_: Round, payload: bytes, captured_at: str | None
         if any(not math.isfinite(v) or not 0 <= v <= 100 for v in values) or not 99 <= sum(values) <= 101:
             raise ValueError("Los porcentajes de mercado no son válidos o no suman 100.")
         rows.append(tuple(v / sum(values) for v in values))
+    if all(row is None for row in rows):
+        raise ValueError("Ningún partido del proveedor coincide con esta jornada.")
+    all_matches = ElementTree.fromstring(payload).findall(".//partido")
+    pleno_match = all_matches[-1]
+    if _provider_row_matches(
+        round_, 14, pleno_match.get("local", ""), pleno_match.get("visitante", "")
+    ):
+        pleno_values = pleno_percentages(pleno_match, "p_bf_", "desc") or pleno_percentages(
+            pleno_match, "p_bf_"
+        )
+    else:
+        pleno_values = ()
+        issues.append(
+            "Revisar proveedor, Pleno al 15: "
+            f"{pleno_match.get('local', '?')} – {pleno_match.get('visitante', '?')}"
+        )
     snapshot = ProbabilitySnapshot(
         "sport", "Quinielista / Eduardo Losilla · mercado (Betfair/casas de apuestas)",
         captured_at or utcnow(), tuple(rows), "porcentajes publicados; sin calibración propia",
-        pleno_values=pleno_percentages(ElementTree.fromstring(payload).findall(".//partido")[-1], "p_bf_", "desc") or pleno_percentages(ElementTree.fromstring(payload).findall(".//partido")[-1], "p_bf_"),
+        pleno_values=pleno_values,
+        row_issues=tuple(issues),
     )
     return replace(updated, snapshots=tuple(s for s in updated.snapshots if s.kind != "sport") + (snapshot,))
 
@@ -185,13 +251,19 @@ def _season_percentage_snapshot(round_: Round, payload: bytes, kind: str, season
     matches = root.findall(".//partido")
     if len(matches) != 15 or any(m.get("num") != str(i) for i, m in enumerate(matches, 1)):
         raise ValueError("La fuente no contiene los 15 partidos en el orden esperado.")
-    validate_teams(
-        round_, [(m.get("local", ""), m.get("visitante", "")) for m in matches],
-        allow_missing_gender=True,
-    )
     value_rows = []
+    issues = []
     signs = ("1", "X", "2")
-    for match in matches[:14]:
+    for index, match in enumerate(matches[:14]):
+        if not _provider_row_matches(
+            round_, index, match.get("local", ""), match.get("visitante", "")
+        ):
+            value_rows.append(None)
+            issues.append(
+                f"Revisar proveedor, partido {index + 1}: "
+                f"{match.get('local', '?')} – {match.get('visitante', '?')}"
+            )
+            continue
         fields = tuple(
             (f"porcDec_{sign}" if kind == "sport" and f"porcDec_{sign}" in match.attrib else f"porc_{sign}")
             for sign in signs
@@ -204,12 +276,22 @@ def _season_percentage_snapshot(round_: Round, payload: bytes, kind: str, season
         if any(not math.isfinite(v) or not 0 <= v <= 100 for v in values) or not 99 <= total <= 101:
             raise ValueError("Los porcentajes de un partido no son válidos o no suman 100.")
         value_rows.append(tuple(v / total for v in values))
+    if all(row is None for row in value_rows):
+        raise ValueError("Ningún partido del proveedor coincide con esta jornada.")
 
     pleno = ()
     final_match = matches[-1]
     prefix = "porc_15"
     fields = tuple(tuple(f"{prefix}{side}_{goal}" for goal in "012M") for side in ("L", "V"))
-    if all(field in final_match.attrib for row in fields for field in row):
+    pleno_matches = _provider_row_matches(
+        round_, 14, final_match.get("local", ""), final_match.get("visitante", "")
+    )
+    if not pleno_matches:
+        issues.append(
+            "Revisar proveedor, Pleno al 15: "
+            f"{final_match.get('local', '?')} – {final_match.get('visitante', '?')}"
+        )
+    if pleno_matches and all(field in final_match.attrib for row in fields for field in row):
         rows = []
         for side_fields in fields:
             values = tuple(float(final_match.attrib[field]) for field in side_fields)
@@ -224,7 +306,15 @@ def _season_percentage_snapshot(round_: Round, payload: bytes, kind: str, season
         if kind == "public"
         else "Quinielista · probabilidad real (casas de apuestas)"
     )
-    return ProbabilitySnapshot(kind, source, utcnow(), tuple(value_rows), "porcentajes publicados", pleno)
+    return ProbabilitySnapshot(
+        kind,
+        source,
+        utcnow(),
+        tuple(value_rows),
+        "porcentajes publicados",
+        pleno,
+        tuple(issues),
+    )
 
 
 @dataclass(frozen=True)
@@ -406,9 +496,9 @@ def live_for_round(round_: Round, preferred_source: str = "") -> tuple[LiveMatch
     from quiniela_ai_studio.infrastructure.espn_live import fetch_espn_live_scores
 
     def fetch_espn():
-        matches = fetch_espn_live_scores(round_.matches)
-        validate_teams(round_, [(m.home, m.away) for m in matches])
-        return matches
+        # Identity is checked row by row by ``align`` below. A single ESPN
+        # label mismatch must not erase the other confirmed match results.
+        return fetch_espn_live_scores(round_.matches)
 
     def align(rows):
         """Keep results only for positionally confirmed fixtures; localize labels."""

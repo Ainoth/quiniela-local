@@ -1,5 +1,38 @@
 # Cambios
 
+## 2.0.34 — comparación de mercado y filtros neutros rápidos
+
+- Añade CR = probabilidad de mercado / porcentaje jugado. La pantalla muestra
+  cuántos signos superan los umbrales descriptivos y permite consultar el ratio
+  por signo; aclara que no equivale a ROI ni a premio esperado.
+- Evita recorrer reglas por cada columna cuando todas las reducciones están
+  neutras. Conserva orden, duplicados, cantidad y cancelación comprobada cada
+  500 columnas.
+- En una muestra local fija de 100.000 apuestas, el filtro neutro pasó de
+  2,277 s a 0,012 s. Es una medición de este caso, no una aceleración universal.
+- Cachea el cálculo de perfiles de rachas y conteos por columna para evitar
+  repetir estadísticas históricas idénticas durante la sesión.
+
+## 2.0.33 — aislamiento de porcentajes por partido
+
+- Conserva las filas de porcentajes cuya identidad de equipo sí se confirma y
+  marca como «Revisar proveedor» cada partido que no coincide con seguridad.
+- Mantiene vacías esas probabilidades y bloquea los cálculos que necesiten una
+  matriz completa hasta que el usuario complete los valores.
+- Permite round-trip de instantáneas parciales en SQLite y exporta mensajes de
+  revisión en los tooltips y el estado de la fuente.
+
+## 2.0.32 — alias de equipos, fallback parcial y SQLite
+
+- Añade aliases explícitos para variantes de nombres y marcadores femeninos;
+  mantiene la separación de género y equipos filiales.
+- ESPN ya no pierde los otros resultados cuando una sola fila no puede
+  confirmarse; esa fila queda pendiente de revisión.
+- Activa WAL/NORMAL y añade índices para las relaciones del esquema SQLite
+  existente.
+- Registra el plan de implementación por fases para las brechas restantes de
+  la especificación global.
+
 ## 2.0.31 — riesgo automático y Distancias visibles
 
 - Corrige callbacks de riesgo que apuntaban al selector y resumen de otra

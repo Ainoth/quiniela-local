@@ -1,9 +1,16 @@
 """SQLite, transacciones, versiones inmutables y copia consistente."""
 import json
-from pathlib import Path
 import sqlite3
 import uuid
-from quiniela_ai_studio.domain.models import round_dict, round_from_dict, system_dict, system_from_dict, utcnow
+from pathlib import Path
+
+from quiniela_ai_studio.domain.models import (
+    round_dict,
+    round_from_dict,
+    system_dict,
+    system_from_dict,
+    utcnow,
+)
 
 
 class Repository:
@@ -11,6 +18,15 @@ class Repository:
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.db = sqlite3.connect(self.path)
+        # This repository is file-backed and may be read while the UI is
+        # saving a system. WAL permits readers to continue during commits.
+        try:
+            self.db.execute('PRAGMA journal_mode=WAL')
+        except sqlite3.DatabaseError:
+            # Some mounted/network filesystems do not support WAL mode.
+            # Keep the repository usable there with SQLite's default journal.
+            pass
+        self.db.execute('PRAGMA synchronous=NORMAL')
         self.db.execute('PRAGMA foreign_keys=ON')
         version = self.db.execute('PRAGMA user_version').fetchone()[0]
         if version > 2:
@@ -37,6 +53,12 @@ class Repository:
             with self.db:
                 self.db.execute('CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)')
                 self.db.execute('PRAGMA user_version=2')
+        # Index the actual normalized schema. ``rounds.key`` is already its
+        # primary-key index; round metadata lives in JSON, so inventing a
+        # season/number column index would not match this schema.
+        with self.db:
+            self.db.execute('CREATE INDEX IF NOT EXISTS idx_systems_round_key ON systems(round_key)')
+            self.db.execute('CREATE INDEX IF NOT EXISTS idx_versions_system_revision ON versions(system_id, revision)')
 
     def setting(self, key, default=None):
         row = self.db.execute('SELECT value FROM settings WHERE key=?', (key,)).fetchone()

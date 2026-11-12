@@ -308,6 +308,130 @@ def test_live_strict_identity_and_no_other_round_fallback(tmp_path, monkeypatch)
     assert all(match.home == fixture.home for match, fixture in zip(aligned, round_.matches))
 
 
+def test_espn_fallback_keeps_confirmed_rows_when_one_name_is_unrecognized(
+    tmp_path, monkeypatch
+):
+    from quiniela_studio import integration
+
+    round_ = load_win1x2(data_folder(tmp_path / "partial-source"))[-1]
+    expected = round_.matches
+    rows = tuple(
+        LiveMatch(
+            match.number,
+            "Nombre no reconocido" if match.number == 4 else match.home,
+            match.away,
+            "2 - 0",
+            "2",
+            "",
+            "Finalizado",
+            True,
+            0,
+        )
+        for match in expected
+    )
+
+    def offline(*_args):
+        raise ConnectionError("offline")
+
+    monkeypatch.setattr(integration, "fetch_live_results", offline)
+    monkeypatch.setattr(
+        "quiniela_ai_studio.infrastructure.espn_live.fetch_espn_live_scores",
+        lambda _fixtures: rows,
+    )
+
+    actual = live_for_round(round_)
+
+    assert actual[0].sign == "2"
+    assert not actual[3].sign
+    assert "Identidad sin confirmar" in actual[3].status
+    assert actual[4].sign == "2"
+
+
+def test_repository_uses_wal_and_indexes_actual_relations(tmp_path):
+    repo = Repository(tmp_path / "indexed.sqlite3")
+    assert repo.db.execute("PRAGMA journal_mode").fetchone()[0].casefold() == "wal"
+    assert repo.db.execute("PRAGMA synchronous").fetchone()[0] == 1
+    indexes = {
+        row[1]
+        for row in repo.db.execute("PRAGMA index_list(systems)").fetchall()
+    }
+    assert "idx_systems_round_key" in indexes
+    repo.close()
+
+
+def test_percentage_snapshot_preserves_verified_rows_on_single_team_mismatch(tmp_path):
+    from quiniela_ai_studio.domain.models import round_dict, round_from_dict
+
+    round_ = load_win1x2(data_folder(tmp_path / "partial-percentages"))[-1]
+    parts = []
+    for index, fixture in enumerate(round_.matches, 1):
+        home = "Nombre que no corresponde" if index == 6 else fixture.home
+        parts.append(
+            f'<partido num="{index}" local="{home}" visitante="{fixture.away}" '
+            'p_jugados_1="50" p_jugados_X="30" p_jugados_2="20"/>'
+        )
+    payload = (
+        f'<quinielista><porcentajes temporada="2027" jornada="{round_.number}">'
+        + "".join(parts)
+        + "</porcentajes></quinielista>"
+    ).encode()
+
+    updated = public_snapshot(round_, payload)
+    snapshot = updated.snapshot("public")
+
+    assert snapshot is not None
+    assert sum(row is not None for row in snapshot.values) == 13
+    assert snapshot.values[5] is None
+    assert "partido 6" in snapshot.row_issues[0]
+    restored = round_from_dict(round_dict(updated))
+    assert restored.snapshot("public").values[5] is None
+
+
+def test_unmatched_pleno_fixture_does_not_attach_other_teams_percentages(tmp_path):
+    round_ = load_win1x2(data_folder(tmp_path / "partial-pleno"))[-1]
+    parts = []
+    for index, fixture in enumerate(round_.matches, 1):
+        home = "Nombre distinto" if index == 15 else fixture.home
+        pleno = (
+            'p_jugados_0L="25" p_jugados_1L="25" '
+            'p_jugados_2L="25" p_jugados_ML="25" '
+            'p_jugados_0V="25" p_jugados_1V="25" '
+            'p_jugados_2V="25" p_jugados_MV="25"'
+        )
+        parts.append(
+            f'<partido num="{index}" local="{home}" visitante="{fixture.away}" '
+            'p_jugados_1="50" p_jugados_X="30" p_jugados_2="20" '
+            + (pleno if index == 15 else "")
+            + "/>"
+        )
+    payload = (
+        f'<quinielista><porcentajes temporada="2027" jornada="{round_.number}">'
+        + "".join(parts)
+        + "</porcentajes></quinielista>"
+    ).encode()
+
+    snapshot = public_snapshot(round_, payload).snapshot("public")
+
+    assert snapshot is not None
+    assert snapshot.pleno_values == ()
+    assert any("Pleno al 15" in issue for issue in snapshot.row_issues)
+
+
+def test_partial_snapshot_is_rejected_for_automatic_ranking_with_clear_error():
+    from quiniela_ai_studio.domain.engine import coverage_template
+    from quiniela_ai_studio.domain.models import ProbabilitySnapshot
+    from quiniela_studio.demo import demo_round
+
+    original = demo_round()
+    rows = list(original.snapshot("sport").values)
+    rows[3] = None
+    partial = ProbabilitySnapshot(
+        "sport", "test", original.captured_at, tuple(rows),
+    )
+    with pytest.raises(ValueError, match="partidos sin porcentajes verificados"):
+        coverage_template(("1",) * 14, (False,) * 14, 1, partial)
+
+
 def test_provider_team_aliases_are_explicit():
     from quiniela_studio.integration import team_key
 

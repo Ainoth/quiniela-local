@@ -134,9 +134,22 @@ def test_win1x2_sevilla_typo_does_not_reject_valid_live_round():
     ('Shaktar Donetsk', 'Shakhtar Donetsk'),
     ('Alaves', 'Alavés'),
     ('Badalona W.(F)', 'FC Badalona (F)'),
+    ('Badalona W.', 'Badalona (F)'),
+    ('Madrid CCF', 'Madrid CFF (F)'),
+    ('Madrid CCF (F)', 'Madrid CFF (F)'),
+    ('Atleti', 'At. Madrid'),
+    ('Porto', 'Oporto'),
+    ('R.B. Leipzig', 'Leipzig'),
+    ('Athletic Bilbao', 'Ath.Club'),
 ])
 def test_team_identity_accepts_known_spelling_and_format_variants(left, right):
     assert same_team_name(left, right, allow_missing_gender=True)
+
+
+def test_feminine_identity_markers_do_not_match_mens_team():
+    assert same_team_name('Sevilla W.', 'Sevilla (F)')
+    assert not same_team_name('Sevilla W.', 'Sevilla')
+    assert not same_team_name('Sevilla (F)', 'Sevilla (M)', allow_missing_gender=True)
 
 
 @pytest.mark.parametrize(('left', 'right'), [

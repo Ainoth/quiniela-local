@@ -1,5 +1,48 @@
 # 12 · Matriz de trazabilidad de requisitos
 
+RF-VAL-001 (v2.0.34): compara por signo la probabilidad publicada de mercado
+con el porcentaje público jugado, `CR = P / Q`. Marca CR > 1,15 como
+infra-apostado y CR < 0,85 como sobreapostado; los ratios aparecen en el
+tooltip de cada celda 1/X/2 cuando ambas fuentes están disponibles. Se
+identifica como comparación relativa, no ROI ni valor esperado del premio.
+Pruebas: `test_value_signals.py` y
+`test_market_public_ratio_is_explained_and_available_on_probability_cells`.
+
+RF-PERF-001 (v2.0.34): si todos los límites básicos están en sus valores
+neutros y no hay reglas avanzadas activas, el filtro conserva las apuestas sin
+evaluar reglas redundantes y comprueba cancelación por bloques de 500. En una
+medición local fija, 100.000 apuestas pasaron de 2,277 s a 0,012 s. No se
+extiende esa cifra a filtros activos ni a otras máquinas. Prueba:
+`test_neutral_filter_preserves_order_duplicates_and_cancellation`.
+Los perfiles de rachas y conteos repetidos se cachean por columna en memoria;
+la carga histórica completa sigue pendiente de diferirse.
+
+RF-DAT-013 (v2.0.33): las instantáneas públicas y de mercado guardan filas de
+porcentajes únicamente cuando el partido de esa posición se identifica de
+forma única. Un partido no confirmado queda como `None`, se muestra «Revisar
+proveedor» y no descarta las otras trece filas. Persisten las filas parciales;
+la generación, ponderación y ranking automáticos dan un error accionable hasta
+completar los valores ausentes. Pruebas: `test_percentage_snapshot_preserves_verified_rows_on_single_team_mismatch`,
+`test_one_unmatched_market_fixture_does_not_discard_other_percentages` y
+`test_partial_snapshot_is_rejected_for_automatic_ranking_with_clear_error`.
+
+RF-DAT-011 (v2.0.32): amplía alias canónicos para Atleti, Porto/Oporto y
+variantes documentadas de equipos femeninos; los sufijos `W.` y `W` se tratan
+como marcador femenino al final del nombre. `Madrid CCF` identifica al equipo
+femenino incluso si el proveedor omite `(F)`. Los marcadores masculino y
+femenino no se mezclan. Pruebas parametrizadas en `test_team_aliases.py`.
+
+RF-DAT-012 (v2.0.32): el fallback ESPN deja la validación de identidad al
+alineamiento partido por partido. Un nombre no reconocido queda vacío y marcado
+para revisión, mientras se conservan resultados de otros partidos confirmados.
+Prueba: `test_espn_fallback_keeps_confirmed_rows_when_one_name_is_unrecognized`.
+
+RF-STO-003 (v2.0.32): activa WAL y `synchronous=NORMAL` en el repositorio
+SQLite, y añade índices sobre las relaciones reales `systems.round_key` y
+`versions(system_id, revision)`. `rounds.key` ya es clave primaria; no se
+crearon índices sobre campos de temporada/jornada que no existen como columnas.
+Prueba: `test_repository_uses_wal_and_indexes_actual_relations`.
+
 RF-RED-026 (v2.0.31): los selectores Automáticos de Interrupciones y Distancias
 actualizan su propia recomendación al cambiar riesgo. Distancias calcula la
 cobertura sobre perfiles históricos conjuntos 1/X/2/V, muestra los valores

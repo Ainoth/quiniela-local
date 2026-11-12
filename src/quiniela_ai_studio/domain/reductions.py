@@ -27,6 +27,8 @@ def reduction_template(base, locks, number: int, weights):
         raise ValueError('Elige una de las seis reducciones.')
     if len(locks) != 14 or any(type(v) is not bool for v in locks):
         raise ValueError('Se requieren 14 bloqueos válidos.')
+    if any(row is None for row in weights.values):
+        raise ValueError('La fuente contiene porcentajes sin verificar; completa las filas antes de crear la reducida.')
     table = TABLES[number - 1]
     ranking = [sorted(SIGNS, key=lambda s: (-weights.values[i][SIGNS.index(s)], SIGNS.index(s))) for i in range(14)]
     result = [base[i] if locks[i] else ranking[i][0] for i in range(14)]

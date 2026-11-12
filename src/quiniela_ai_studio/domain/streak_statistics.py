@@ -14,6 +14,7 @@ def validate_result_column(column: str) -> str:
     return column
 
 
+@lru_cache(maxsize=32768)
 def run_lengths(column: str, sign: str) -> tuple[int, tuple[int,...]]:
     """Longest maximal run plus counts of exact run lengths 1..14.
 
@@ -160,6 +161,7 @@ def possible_run_length_bounds(base: Sequence[str], sign: str) -> tuple[int, int
     return longest(forced),longest(possible)
 
 
+@lru_cache(maxsize=32768)
 def count_profile(column: str) -> tuple[int,int,int]:
     validate_result_column(column)
     x=column.count('X');two=column.count('2')

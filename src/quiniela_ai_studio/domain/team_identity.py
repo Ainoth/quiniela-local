@@ -22,6 +22,7 @@ TEAM_ALIASES = {
     "ATHLETICCLUBBILBAO": "ATHCLUB",
     "ATLETICOMADRID": "ATMADRID",
     "ATLETICODEMADRID": "ATMADRID",
+    "ATLETI": "ATMADRID",
     "RAYOVALLECANO": "RAYO",
     "REALSOCIEDAD": "RSOCIEDAD",
     "REALMADRID": "RMADRID",
@@ -46,6 +47,7 @@ TEAM_ALIASES = {
     "OLYMPIQUEDELYON": "LYON",
     "SHAKTARDONETSK": "SHAKHTARDONETSK",
     "RBLEIPZIG": "LEIPZIG",
+    "PORTO": "OPORTO",
     "REALBETIS": "BETIS",
     "REALBETISBALOMPIE": "BETIS",
     "CELTAVIGO": "CELTA",
@@ -69,7 +71,7 @@ TEAM_ALIASES = {
 }
 
 _FEMALE_SUFFIX = re.compile(
-    r"(?:\s*W\.?\s*\(\s*F\s*\)|\s*\(\s*(?:F|FEM|FEMENINO|W|WOMEN)\s*\)|\s+(?:FEMENINO|WOMEN))\s*$",
+    r"(?:\s*W\.?\s*\(\s*F\s*\)|\s*\(\s*(?:F|FEM|FEMENINO|W|WOMEN)\s*\)|\s+(?:FEMENINO|WOMEN|W\.?))\s*$",
     re.IGNORECASE,
 )
 _MALE_SUFFIX = re.compile(r"\s*\(\s*(?:M|MASCULINO)\s*\)\s*$", re.IGNORECASE)
@@ -92,6 +94,10 @@ def _parts(name: str) -> tuple[tuple[str, ...], str | None]:
     tokens = tuple(re.findall(r"[A-Z0-9]+", text.upper()))
     while tokens and tokens[-1] in _LEGAL_SUFFIXES:
         tokens = tokens[:-1]
+    # Madrid CCF is a documented historical name for the women's club. The
+    # provider sometimes omits its usual (F) marker, so retain that identity.
+    if "".join(tokens) == "MADRIDCCF":
+        gender = "F"
     return tokens, gender
 
 

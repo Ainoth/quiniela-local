@@ -64,16 +64,24 @@ class ProbabilitySnapshot:
     values: tuple
     model_version: str = ""
     pleno_values: tuple = ()
+    row_issues: tuple[str, ...] = ()
 
     def __post_init__(self):
-        object.__setattr__(self, "values", tuple(tuple(row) for row in self.values))
+        object.__setattr__(
+            self,
+            "values",
+            tuple(None if row is None else tuple(row) for row in self.values),
+        )
         object.__setattr__(self, "pleno_values", tuple(tuple(row) for row in self.pleno_values))
+        object.__setattr__(self, "row_issues", tuple(self.row_issues))
         if self.kind not in ("sport", "public") or not self.source:
             raise ValueError("Fuente deportiva o público requerida.")
         validate_datetime(self.captured_at)
         if len(self.values) != 14:
             raise ValueError("Se requieren probabilidades para los 14 partidos.")
         for row in self.values:
+            if row is None:
+                continue
             if len(row) != 3 or any(isinstance(v, bool) or not isinstance(v, (int, float)) or not 0 <= v <= 1 or not math.isfinite(v) for v in row):
                 raise ValueError("Probabilidades: valores finitos entre 0 y 1.")
             if not math.isclose(sum(row), 1, abs_tol=1e-6):
@@ -230,7 +238,7 @@ def round_dict(round_):
 
 def round_from_dict(data):
     return Round(**{**data, "matches": tuple(Match(**m) for m in data["matches"]),
-                    "snapshots": tuple(ProbabilitySnapshot(**{**s, "values": tuple(tuple(r) for r in s["values"])}) for s in data.get("snapshots", []))})
+                    "snapshots": tuple(ProbabilitySnapshot(**{**s, "values": tuple(None if r is None else tuple(r) for r in s["values"])}) for s in data.get("snapshots", []))})
 
 
 def system_dict(system):

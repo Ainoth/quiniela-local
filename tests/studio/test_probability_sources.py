@@ -51,12 +51,24 @@ def test_market_and_popularity_are_distinct(tmp_path):
     market_xml().replace(b'p_bf_1desc="20"', b'p_bf_1desc="80"'),
     market_xml().replace(b'p_bf_Xdesc="30"', b'', 1),
     market_xml().replace(b'jornada="12"', b'jornada="13"'),
-    market_xml().replace(b'Equipo A', b'Otro equipo', 1),
+    market_xml().replace(b'Equipo A', b'Otro equipo'),
 ])
 def test_invalid_market_or_identity_rejected(tmp_path, payload):
     round_ = load_win1x2(data_folder(tmp_path / 'source'))[-1]
     with pytest.raises(ValueError):
         probability_snapshots(round_, payload)
+
+
+def test_one_unmatched_market_fixture_does_not_discard_other_percentages(tmp_path):
+    round_ = load_win1x2(data_folder(tmp_path / 'single-mismatch'))[-1]
+    payload = market_xml().replace(b'Equipo A', b'Otro equipo', 1)
+
+    updated = probability_snapshots(round_, payload)
+
+    assert updated.snapshot('sport').values[0] is None
+    assert sum(row is not None for row in updated.snapshot('sport').values) == 13
+    assert updated.snapshot('public').values[0] is None
+    assert sum(row is not None for row in updated.snapshot('public').values) == 13
 
 
 def test_no_market_is_not_invented(tmp_path):

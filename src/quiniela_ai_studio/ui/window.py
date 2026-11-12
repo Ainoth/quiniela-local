@@ -12,7 +12,15 @@ from decimal import Decimal
 from functools import partial
 from pathlib import Path
 
-from PySide6.QtCore import QAbstractTableModel, QModelIndex, QSize, Qt, QThread, QTimer, Signal
+from PySide6.QtCore import (
+    QAbstractTableModel,
+    QModelIndex,
+    QSize,
+    Qt,
+    QThread,
+    QTimer,
+    Signal,
+)
 from PySide6.QtGui import QColor, QIntValidator, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QAbstractItemView,
@@ -2332,7 +2340,9 @@ class MainWindow(QMainWindow):
 
     def _calculate_automatic_distances(self,risk,summary):
         """Recommend joint, inspectable 1/X/2/V gaps from selected seasons."""
-        from quiniela_ai_studio.domain.sign_distance import historical_sign_distance_recommendation
+        from quiniela_ai_studio.domain.sign_distance import (
+            historical_sign_distance_recommendation,
+        )
 
         seasons={season for season,square in self.history_season_squares.get('Distancias',{}).items() if square.isChecked()}
         columns=[row['results14'] for row in self.historical_reduction_results
@@ -3492,6 +3502,8 @@ class MainWindow(QMainWindow):
         if self.weight_sum_enabled.isChecked() or self.weight_product_enabled.isChecked():
             snapshot=self.frozen_round().snapshot(self.ranking_source.currentData())
             if not snapshot:raise ValueError('Descarga porcentajes de la fuente seleccionada antes de usar valoraciones.')
+            if any(row is None for row in snapshot.values):
+                raise ValueError('La fuente tiene partidos sin porcentajes verificados; completa esas filas antes de usar valoraciones.')
             weights=tuple(tuple(float(v) for v in row) for row in snapshot.values)
             if self.weight_sum_enabled.isChecked():
                 rules.append(ReductionRule('manual-weight-sum','weighted_sum',self.weight_sum_min.value(),self.weight_sum_max.value(),weights=weights,tab_index=12))
@@ -4024,7 +4036,11 @@ class MainWindow(QMainWindow):
             self.match_labels[i].setText(f'{match.home} – {match.away}')
             self.match_labels[i].setToolTip(f'{match.home} – {match.away}\n{kickoff}')
             snapshot = view_round.snapshot('sport'); public = view_round.snapshot('public')
-            fmt = lambda snap,position=i: ' / '.join(f'{100*v:.0f}' for v in snap.values[position]) if snap else 'Sin datos'
+            def fmt(snap, position=i):
+                if not snap:
+                    return 'Sin datos'
+                row = snap.values[position]
+                return 'Revisar proveedor' if row is None else ' / '.join(f'{100*v:.0f}' for v in row)
             self.match_labels[i].setToolTip(f'{match.home} – {match.away}\n{kickoff}\nDeportiva 1/X/2: {fmt(snapshot)}\nPúblico 1/X/2: {fmt(public)}')
             for sign, button in self.sign_buttons[i].items():
                 button.blockSignals(True); button.setChecked(bool(system and sign in system.base[i])); button.blockSignals(False)
@@ -4056,7 +4072,9 @@ class MainWindow(QMainWindow):
         self.analysis_info.setText(self.analysis_text())
         def percentages(kind,index):
             snap=view_round.snapshot(kind)
-            return ' / '.join(f'{100*v:.1f}' for v in snap.values[index]) if snap else 'Sin datos'
+            if not snap:return 'Sin datos'
+            row=snap.values[index]
+            return 'Revisar proveedor' if row is None else ' / '.join(f'{100*v:.1f}' for v in row)
         self.analysis_model.update_rows([(f'{i+1}. {m.home} – {m.away}',percentages('sport',i),percentages('public',i)) for i,m in enumerate(view_round.matches[:14])])
         self.optimize_info.setToolTip(f'Identificador de contenido: {system.hash}' if system else '')
         self.optimize_info.setText(
@@ -4427,17 +4445,25 @@ class MainWindow(QMainWindow):
         for index,header in enumerate(self.prob_headers):
             header.setToolTip(f'{source_name} · porcentaje del signo {"1X2"[index]}. Mercado y popularidad son datos diferentes; no son una IA propia.')
         for i,labels in enumerate(self.prob_labels):
-            values=[f'{100*value:.0f}%' for value in snapshot.values[i]] if snapshot else ['—']*3
+            row=snapshot.values[i] if snapshot else None
+            values=[f'{100*value:.0f}%' for value in row] if row else ['—']*3
             for index,label in enumerate(labels):
                 label.setText(values[index])
-                label.setToolTip(f'{snapshot.source} · {"1X2"[index]}: {values[index]}' if snapshot else 'Sin porcentajes disponibles de esta fuente.')
+                issue = next((message for message in snapshot.row_issues if f'partido {i+1}:' in message), '') if snapshot else ''
+                label.setToolTip(issue or (f'{snapshot.source} · {"1X2"[index]}: {values[index]}' if snapshot and row else 'Sin porcentajes verificados para este partido.'))
         for side,labels in enumerate(self.goal_percentages):
             for i,goal in enumerate('012M'):
                 labels[goal].setText(f'{snapshot.pleno_values[side][i]:.1%}' if snapshot and snapshot.pleno_values else '—')
                 labels[goal].setToolTip(f'{snapshot.source} · goles {goal}' if snapshot and snapshot.pleno_values else 'Sin porcentajes del Pleno para esta fuente; descarga datos actualizados.')
         if snapshot:
             captured=datetime.fromisoformat(snapshot.captured_at).astimezone()
-            self.source_status.setText(f'{self.round.key} · {snapshot.source}\nCaptura: {captured:%d/%m/%Y %H:%M}. Datos guardados en esta versión de tu quiniela; no son una actualización automática.')
+            issue_note = ''
+            if snapshot.row_issues:
+                issue_note = (
+                    f'\n{len(snapshot.row_issues)} partido(s) sin identidad confirmada; '
+                    'se muestran sin porcentajes y no entran en cálculos automáticos.'
+                )
+            self.source_status.setText(f'{self.round.key} · {snapshot.source}\nCaptura: {captured:%d/%m/%Y %H:%M}. Datos guardados en esta versión de tu quiniela; no son una actualización automática.{issue_note}')
         else:
             self.source_status.setText(f'{self.round.key} · Sin porcentajes de esta fuente. Descárgalos antes de aplicar recomendaciones. No se usa 40/30/30 ni un modelo oculto.')
         if hasattr(self,'reduction_source'):self.reduction_source.setToolTip(self.source_status.text())
@@ -5227,7 +5253,9 @@ class MainWindow(QMainWindow):
                 lines.append('La combinación ganadora sí estaba en el desarrollo original y no consta como eliminada por las reducciones guardadas. Puede haber quedado fuera al seleccionar una cartera o por otro paso posterior.')
                 return '\n'.join(lines)
             revision, spec = removed_at
-            from quiniela_ai_studio.domain.scrutiny_diagnostics import explain_filter_rejections
+            from quiniela_ai_studio.domain.scrutiny_diagnostics import (
+                explain_filter_rejections,
+            )
             failures = explain_filter_rejections(winning, spec)
             lines.append(f'REDUCCIÓN QUE LA DESCARTÓ · se eliminó en la revisión v{revision}')
             if failures:

@@ -28,6 +28,19 @@ def test_normal_generator_is_graphical_compact_and_edits_exact_base(window):
     assert len(report["decisions"]) == 14
 
 
+def test_market_public_ratio_is_explained_and_available_on_probability_cells(window):
+    window.new_system()
+    panel = window.normal_generator
+
+    panel._refresh_matrix_sources()
+
+    assert "CR compara mercado/jugado" in panel.source_explanation.text()
+    assert "no ROI" in panel.source_explanation.text()
+    tooltip = panel.probability_table.item(0, 3).toolTip()
+    assert "CR mercado/jugado" in tooltip
+    assert "infra-apostado" in tooltip
+
+
 def test_normal_generator_manual_mode_chooses_counts_and_parties_by_probability(window):
     window.new_system(); panel = window.normal_generator
     assert panel.probability_table.columnCount() == 5
@@ -72,7 +85,9 @@ def test_historical_percentages_source_uses_selected_season_results(window):
     index = panel.matrix_source.findData("history:positions")
     assert index >= 0
     panel.matrix_source.setCurrentIndex(index)
-    from quiniela_ai_studio.domain.normal_generation import historical_position_percentages
+    from quiniela_ai_studio.domain.normal_generation import (
+        historical_position_percentages,
+    )
     expected = historical_position_percentages(panel._history_rows())
     assert panel._matrix_values() == expected
     assert "no es un pronóstico" in panel.base_status.text()
